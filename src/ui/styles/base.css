@@ -1,0 +1,385 @@
+/* Hearts of Vlianska — tokens y estilos base.
+   Estética: acero oxidado, latón y luz de lámpara de sodio en la oscuridad del túnel. */
+
+:root {
+  color-scheme: dark;
+  --bg: #0b0d0c;
+  --bg-2: #101311;
+  --panel: #161a17;
+  --panel-2: #1c211d;
+  --panel-3: #252b25;
+  --panel-4: #2f362f;
+  --line: #353c34;
+  --line-2: #4a5247;
+  --brass: #b3955c;
+  --brass-2: #d8bb7e;
+  --brass-dim: #6f5f3c;
+  --amber: #e9a53c;
+  --amber-2: #ffc766;
+  --amber-glow: rgba(233, 165, 60, 0.35);
+  --text: #e4dccb;
+  --text-dim: #a7a08e;
+  --text-faint: #6f6b5f;
+  --good: #8cc063;
+  --bad: #e0614a;
+  --warn: #e6b93f;
+  --info: #72a9cf;
+  --shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
+  --radius: 3px;
+  --font-display: 'Big Shoulders Stencil Display', 'Oswald', 'Arial Narrow', Impact, sans-serif;
+  --font-body: 'PT Sans', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-narrow: 'PT Sans Narrow', 'Arial Narrow', 'PT Sans', sans-serif;
+  --font-mono: 'PT Mono', ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  --topbar-h: 52px;
+  --rail-w: 60px;
+  --panel-w: 440px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-2);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--panel-4);
+  border: 2px solid var(--bg-2);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--brass-dim);
+}
+
+:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+p {
+  margin: 0;
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.good {
+  color: var(--good);
+}
+.bad {
+  color: var(--bad);
+}
+.warn {
+  color: var(--warn);
+}
+.dim {
+  color: var(--text-dim);
+}
+.faint {
+  color: var(--text-faint);
+}
+.amber {
+  color: var(--amber);
+}
+
+.label {
+  font-family: var(--font-narrow);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* ------------------------------------------------------------------ Botones */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 5px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--panel-4), var(--panel-3));
+  color: var(--text);
+  font-family: var(--font-narrow);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    color 0.12s;
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--brass);
+  color: var(--brass-2);
+}
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.btn.primary {
+  background: linear-gradient(180deg, #f0b04b, #c98522);
+  border-color: #ffd28a;
+  color: #1a1206;
+}
+.btn.primary:hover:not(:disabled) {
+  color: #000;
+  background: linear-gradient(180deg, #ffc566, #d99530);
+}
+.btn.danger {
+  border-color: #7a3325;
+  color: #f2a492;
+}
+.btn.danger:hover:not(:disabled) {
+  border-color: var(--bad);
+  color: #ffc3b6;
+}
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+}
+.btn.ghost:hover:not(:disabled) {
+  background: var(--panel-3);
+  border-color: var(--line);
+}
+.btn.small {
+  min-height: 26px;
+  padding: 2px 9px;
+  font-size: 12.5px;
+}
+.btn.icon {
+  padding: 4px;
+  min-width: 32px;
+}
+.btn.icon.small {
+  min-width: 26px;
+  padding: 2px;
+}
+
+/* ------------------------------------------------------------------ Barras */
+
+.bar {
+  position: relative;
+  height: 8px;
+  background: #0a0c0b;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(180deg, var(--amber-2), var(--amber));
+  transition: width 0.25s linear;
+}
+.bar.green > span {
+  background: linear-gradient(180deg, #a6d67c, #5f8f3b);
+}
+.bar.red > span {
+  background: linear-gradient(180deg, #f08a73, #b33a26);
+}
+.bar.blue > span {
+  background: linear-gradient(180deg, #9cc9ea, #3f7fae);
+}
+.bar.thin {
+  height: 5px;
+}
+
+/* ------------------------------------------------------------------ Tooltips */
+
+.tooltip {
+  position: fixed;
+  z-index: 1000;
+  max-width: 380px;
+  padding: 10px 12px;
+  background: rgba(14, 17, 15, 0.97);
+  border: 1px solid var(--brass-dim);
+  border-top: 2px solid var(--brass);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  line-height: 1.45;
+  pointer-events: none;
+}
+.tooltip h4 {
+  font-size: 17px;
+  color: var(--brass-2);
+  margin-bottom: 4px;
+}
+.tooltip .tt-desc {
+  color: var(--text-dim);
+  font-style: italic;
+  margin-bottom: 6px;
+}
+.tooltip .tt-sep {
+  height: 1px;
+  background: var(--line);
+  margin: 7px 0;
+}
+.tooltip .tt-sub {
+  font-family: var(--font-narrow);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11.5px;
+  color: var(--brass);
+  margin: 6px 0 2px;
+}
+.tt-line {
+  display: flex;
+  gap: 6px;
+}
+.tt-line.good {
+  color: var(--good);
+}
+.tt-line.bad {
+  color: var(--bad);
+}
+.tt-line.met {
+  color: var(--good);
+}
+.tt-line.unmet {
+  color: var(--bad);
+}
+.tt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* ------------------------------------------------------------------ Formularios */
+
+select,
+input[type='text'],
+input[type='number'] {
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius);
+  padding: 5px 8px;
+  min-height: 30px;
+}
+select:focus,
+input:focus {
+  border-color: var(--brass);
+  outline: none;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.toggle input {
+  accent-color: var(--amber);
+  width: 16px;
+  height: 16px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: var(--panel-3);
+  font-family: var(--font-narrow);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.chip.war {
+  border-color: #8a3a2b;
+  background: #3a1a14;
+  color: #ffb4a3;
+}
+.chip.ally {
+  border-color: #3f6a2d;
+  background: #1c2c16;
+  color: #bfe3a3;
+}
+.chip.info {
+  border-color: #33566e;
+  background: #152430;
+  color: #b5d7ef;
+}
+.chip.gold {
+  border-color: var(--brass-dim);
+  background: #2a2416;
+  color: var(--brass-2);
+}
+
+.kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 4px;
+  border: 1px solid var(--line-2);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
