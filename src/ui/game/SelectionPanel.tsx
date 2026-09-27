@@ -14,6 +14,7 @@ import { Bar, Icon, ModLines, Tip, fmt, fmtSigned, pct } from '../components/cor
 import { store, ui, useGame } from '../store';
 import { visibleProvinces } from '../map/mapUtil';
 import { TemplateTooltip } from '../panels/ArmyPanel';
+import { ResourceChips } from '../components/Resources';
 
 function UnitLine({ u }: { u: Unit }) {
   const state = useGame();
@@ -182,7 +183,7 @@ function ProvincePanel({ pid }: { pid: string }) {
               <Tip content={BUILDINGS.infraestructura.name}><span><Icon name="Cable" size={14} /> {st.buildings.infraestructura}</span></Tip>
               <Tip content={BUILDINGS.fortificacion.name}><span><Icon name="BrickWall" size={14} /> {p.fort}</span></Tip>
             </div>
-            <div className="tt-row"><span>Recursos (ch/pó/co)</span><span className="num">{st.resources.chatarra}/{st.resources.polvora}/{st.resources.combustible}</span></div>
+            <div className="tt-row"><span>Recursos al día</span><ResourceChips state={state} sid={pid} f={f} /></div>
             {food && <div className="tt-row"><span>Comida</span><span className="num">+{fmt(food.prod, 1)} / −{fmt(food.cons, 1)}</span></div>}
             {st.owner === f && contribution(state, pid, f) < 1 && (
               <div className="warn">Estación no integrada: rinde el {pct(contribution(state, pid, f))}. Intégrala con una decisión.</div>

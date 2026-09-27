@@ -3,7 +3,8 @@
 // coordenadas del mapa y los elementos de interfaz (emblemas, rótulos, fichas)
 // a tamaño constante en pantalla, como en Hearts of Iron.
 import { FACTIONS, MAP, RIVERS, STATION_SEEDS, STATIONS } from '../../data';
-import type { FactionId, GameState, Terrain, Unit } from '../../game/types';
+import type { FactionId, GameState, ResourceId, Terrain, Unit } from '../../game/types';
+import { RESOURCE_IDS } from '../../game/types';
 import { friendly, isAtWarWith } from '../../game/helpers';
 import { edgeHours, suppliedProvinces, templateById, unitStats } from '../../game/military';
 import type { MapMode } from '../../ui/store';
@@ -19,6 +20,13 @@ import { Particles } from './particles';
 import { FULL_QUALITY, type MapQuality } from '../quality';
 import { barricadeSprite, labelSprite, lightSprite, starSprite, unitSprite, type UnitKind } from './props';
 import { paintHall, type HallSprite } from './stations';
+
+/** Icono y color de cada recurso en el mapa (los mismos que en la interfaz). */
+const RESOURCE_STYLE: Record<ResourceId, { icon: string; color: string }> = {
+  chatarra: { icon: 'Anvil', color: '#b9b4a8' },
+  polvora: { icon: 'FlaskConical', color: '#e0823f' },
+  combustible: { icon: 'Fuel', color: '#e2c54a' },
+};
 
 export interface Camera {
   x: number;
@@ -1130,8 +1138,43 @@ export class MapRenderer {
       if (dy < -0.1) ly -= lh + (isCapital && Math.abs(dx) <= 0.1 ? 12 : 0);
       else if (Math.abs(dy) <= 0.1) ly -= lh / 2;
       g.drawImage(lab, lx, ly, lw, lh);
+      if (input.mapMode === 'recursos') this.drawResourceBadge(st.resources, sx, dy > 0.1 ? sy - R - (isCapital ? 34 : 22) : sy + R + 8);
       g.restore();
     }
+  }
+
+  /** Yacimientos de la estación (modo de mapa de recursos), al estilo de los iconos de HoI4. */
+  private drawResourceBadge(res: Record<ResourceId, number>, cx: number, top: number) {
+    const g = this.g;
+    const items = RESOURCE_IDS.filter((r) => res[r] > 0);
+    const W_ITEM = 30;
+    const w = Math.max(24, items.length * W_ITEM + 6);
+    const h = 18;
+    const x = cx - w / 2;
+    g.save();
+    g.globalAlpha = 1;
+    g.fillStyle = 'rgba(10,12,11,0.9)';
+    g.strokeStyle = 'rgba(233,165,60,0.55)';
+    g.lineWidth = 1;
+    g.beginPath();
+    g.roundRect(x, top, w, h, 4);
+    g.fill();
+    g.stroke();
+    g.font = `700 11px 'PT Mono', ui-monospace, monospace`;
+    g.textBaseline = 'middle';
+    g.textAlign = 'left';
+    if (items.length === 0) {
+      g.fillStyle = 'rgba(200,190,170,0.5)';
+      g.textAlign = 'center';
+      g.fillText('—', cx, top + h / 2 + 0.5);
+    }
+    items.forEach((r, i) => {
+      const ix = x + 4 + i * W_ITEM;
+      strokeIcon(g, RESOURCE_STYLE[r].icon, ix + 7, top + h / 2, 12, RESOURCE_STYLE[r].color, 2.2);
+      g.fillStyle = RESOURCE_STYLE[r].color;
+      g.fillText(String(res[r]), ix + 15, top + h / 2 + 0.5);
+    });
+    g.restore();
   }
 
   // ------------------------------------------------------------------ Batallas

@@ -259,7 +259,7 @@ export function applyEffect(state: GameState, e: Effect, ctx: Ctx) {
       const pid = e.province === 'TARGET' ? ctx.target : e.province;
       if (pid && state.provinces[pid]) {
         state.provinces[pid].collapsed = false;
-        addLog(state, { text: `${MAP.provinces[pid].name} vuelve a ser transitable.`, kind: 'info', province: pid });
+        addLog(state, { text: `${MAP.provinces[pid].name} vuelve a ser transitable.`, kind: 'info', province: pid, quiet: true });
       }
       break;
     }
@@ -410,7 +410,7 @@ function runCustom(state: GameState, id: string, ctx: Ctx, arg?: string | number
       const pid = ctx.target;
       if (pid && state.provinces[pid]) {
         state.provinces[pid].collapsed = false;
-        addLog(state, { text: `Los zapadores de ${factionName(ctx.root)} despejan ${MAP.provinces[pid].name}.`, kind: 'info', province: pid });
+        addLog(state, { text: `Los zapadores de ${factionName(ctx.root)} despejan ${MAP.provinces[pid].name}.`, kind: 'info', province: pid, quiet: true });
       }
       break;
     }

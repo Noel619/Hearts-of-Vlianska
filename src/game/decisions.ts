@@ -118,7 +118,7 @@ export function takeDecision(state: GameState, f: FactionId, id: string, target?
   applyEffects(state, d.effects, { root: f, target });
   if (d.days) c.activeDecisions.push({ id, target, until: state.hour + d.days * 24, manpower: cost.manpower || undefined });
   else applyEffects(state, d.completeEffects, { root: f, target });
-  if (state.player === f) addLog(state, { text: `Decisión: ${d.name}${target ? ` (${targetLabel(target)})` : ''}.`, kind: 'info', faction: f });
+  if (state.player === f) addLog(state, { text: `Decisión: ${d.name}${target ? ` (${targetLabel(target)})` : ''}.`, kind: 'info', faction: f, quiet: true });
   return true;
 }
 
@@ -135,7 +135,7 @@ export function dailyDecisions(state: GameState, f: FactionId) {
     const d = DECISIONS[a.id];
     if (!d) continue;
     applyEffects(state, d.completeEffects, { root: f, target: a.target });
-    if (state.player === f) addLog(state, { text: `Completada: ${d.name}${a.target ? ` (${targetLabel(a.target)})` : ''}.`, kind: 'bueno', faction: f });
+    if (state.player === f) addLog(state, { text: `Completada: ${d.name}${a.target ? ` (${targetLabel(a.target)})` : ''}.`, kind: 'bueno', faction: f, quiet: true });
   }
 }
 

@@ -12,7 +12,7 @@ const UI_ICONS = [
   'Cog', 'BrickWall', 'Sprout', 'Cable', 'Route', 'Sparkles', 'Download', 'Upload', 'Copy', 'RotateCcw', 'House',
   'BookOpen', 'Gauge', 'Siren', 'Radiation', 'Activity', 'TrendingUp', 'TrendingDown', 'UsersRound', 'Wrench',
   'CircleDollarSign', 'Unplug', 'Waves', 'Pickaxe', 'Flame', 'Mail', 'ArrowRight', 'Maximize', 'Minimize', 'LocateFixed',
-  'MoveHorizontal', 'Split', 'Shovel', 'Monitor', 'MonitorCog', 'Gamepad2',
+  'MoveHorizontal', 'Split', 'Shovel', 'Monitor', 'MonitorCog', 'Gamepad2', 'MessageSquare',
 ];
 
 function walk(dir, out = []) {

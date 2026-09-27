@@ -520,30 +520,40 @@
 }
 
 .toasts {
-  position: fixed;
-  z-index: 60;
-  left: 50%;
-  bottom: 60px;
-  transform: translateX(-50%);
+  position: absolute;
+  z-index: 17;
+  right: 10px;
+  bottom: 10px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  width: min(560px, calc(100vw - 32px));
+  align-items: flex-end;
+  gap: 3px;
+  width: min(300px, calc(100vw - var(--rail-w) - 20px));
   pointer-events: none;
+}
+/* Con el panel de selección abierto, a su izquierda. */
+.toasts.beside-selection {
+  right: 380px;
 }
 .toast {
   display: flex;
-  gap: 10px;
-  padding: 7px 12px;
-  background: rgba(16, 19, 17, 0.96);
-  border: 1px solid var(--line-2);
+  gap: 8px;
+  max-width: 100%;
+  padding: 4px 8px;
+  background: rgba(16, 19, 17, 0.9);
+  border: 1px solid var(--line);
   border-left: 3px solid var(--info);
   border-radius: var(--radius);
+  font-size: 12px;
+  line-height: 1.35;
   text-align: left;
   pointer-events: auto;
   cursor: pointer;
-  animation: toastIn 0.25s ease-out;
-  box-shadow: var(--shadow);
+  animation: toastIn 0.2s ease-out;
+}
+.toast .num {
+  flex: none;
+  font-size: 11px;
 }
 .toast.guerra,
 .toast.malo {
@@ -566,6 +576,9 @@
 /* ------------------------------------------------------------------ Móvil */
 
 @media (max-width: 820px) {
+  .toasts.beside-selection {
+    display: none;
+  }
   :root {
     --rail-w: 0px;
     --panel-w: 100vw;

@@ -19,6 +19,8 @@ import { DecisionsPanel, LogPanel } from '../panels/MiscPanels';
 import { FocusTreeView } from '../trees/FocusTree';
 import { TechTreeView } from '../trees/TechTree';
 import { HelpModal } from '../screens/Help';
+import { RESOURCES } from '../components/Resources';
+import { RESOURCE_IDS } from '../../game/types';
 
 const MAP_MODES: { id: MapMode; label: string; icon: string }[] = [
   { id: 'politico', label: 'Político', icon: 'Flag' },
@@ -26,6 +28,7 @@ const MAP_MODES: { id: MapMode; label: string; icon: string }[] = [
   { id: 'terreno', label: 'Túneles', icon: 'Route' },
   { id: 'peligro', label: 'Peligro mutante', icon: 'Skull' },
   { id: 'suministro', label: 'Suministro', icon: 'Package' },
+  { id: 'recursos', label: 'Recursos', icon: 'Anvil' },
 ];
 
 function MapControls() {
@@ -57,6 +60,12 @@ function MapControls() {
           <div className="legend-row"><span className="legend-skull">☠</span> Peligro mutante alto</div>
           <div className="legend-row"><span className="legend-fort">▮▮</span> Barricadas</div>
           <div className="legend-row"><span className="legend-star">★</span> Capital</div>
+          {s.mapMode === 'recursos' &&
+            RESOURCE_IDS.map((r) => (
+              <div key={r} className="legend-row">
+                <Icon name={RESOURCES[r].icon} size={14} style={{ color: RESOURCES[r].color }} /> {RESOURCES[r].name} al día
+              </div>
+            ))}
         </div>
       )}
     </div>
@@ -82,30 +91,59 @@ interface Toast {
   entry: LogEntry;
 }
 
+/** ¿Merece una notificación emergente? Lo rutinario solo va al registro. */
+function toastWorthy(entry: LogEntry, f: string, name: string, mode: 'importantes' | 'todas'): boolean {
+  if (entry.kind === 'evento') return true;
+  const mine = entry.faction === f || entry.text.includes(name);
+  if (!mine) return false;
+  return mode === 'todas' || !entry.quiet;
+}
+
+/** Avisos pequeños en la esquina inferior derecha (a la izquierda del panel de selección si está abierto). */
 function Toasts() {
   const state = useGame();
+  const s = ui.use();
   const [toasts, setToasts] = useState<Toast[]>([]);
   const seen = useRef(state.log.length);
   const counter = useRef(0);
+  const timers = useRef(new Set<number>());
   const f = state.player!;
   const name = FACTIONS[f].name;
+  const mode = store.settings.toasts;
   useEffect(() => {
     if (state.log.length < seen.current) seen.current = 0;
     const fresh = state.log.slice(seen.current);
     seen.current = state.log.length;
-    const relevant = fresh.filter((l) => l.faction === f || l.text.includes(name) || l.kind === 'evento').slice(-3);
+    if (mode === 'ninguna') return;
+    const relevant = fresh.filter((l) => toastWorthy(l, f, name, mode)).slice(-3);
     if (relevant.length === 0) return;
     const add = relevant.map((entry) => ({ id: ++counter.current, entry }));
-    setToasts((t) => [...t, ...add].slice(-4));
+    setToasts((t) => [...t, ...add].slice(-3));
     const ids = add.map((a) => a.id);
-    const timer = window.setTimeout(() => setToasts((t) => t.filter((x) => !ids.includes(x.id))), 6000);
-    return () => window.clearTimeout(timer);
-  }, [state.log.length, f, name, state.log]);
-  if (!toasts.length) return null;
+    // Cada tanda se retira sola a los 5 s (los mensajes nuevos no alargan los anteriores).
+    const timer = window.setTimeout(() => {
+      timers.current.delete(timer);
+      setToasts((t) => t.filter((x) => !ids.includes(x.id)));
+    }, 5000);
+    timers.current.add(timer);
+  }, [state.log.length, f, name, state.log, mode]);
+  useEffect(() => {
+    const all = timers.current;
+    return () => all.forEach((t) => window.clearTimeout(t));
+  }, []);
+  if (!toasts.length || mode === 'ninguna') return null;
+  const besideSelection = s.selectedUnits.length > 0 || !!s.selectedProvince;
   return (
-    <div className="toasts" aria-live="polite">
+    <div className={`toasts ${besideSelection ? 'beside-selection' : ''}`} aria-live="polite">
       {toasts.map((t) => (
-        <button key={t.id} className={`toast ${t.entry.kind}`} onClick={() => t.entry.province && centerMapOn(t.entry.province)}>
+        <button
+          key={t.id}
+          className={`toast ${t.entry.kind}`}
+          onClick={() => {
+            if (t.entry.province) centerMapOn(t.entry.province);
+            setToasts((all) => all.filter((x) => x.id !== t.id));
+          }}
+        >
           <span className="num dim">{formatShortDate(t.entry.hour)}</span>
           <span>{t.entry.text}</span>
         </button>
@@ -180,6 +218,7 @@ export function GameScreen() {
           <FocusTicker />
           <MapControls />
           {store.settings.showFps && <FpsMeter />}
+          <Toasts />
           {store.speed === 0 && !s.menuOpen && <div className="paused-badge">EN PAUSA · <span className="kbd">Espacio</span></div>}
           {s.moveMode && <div className="move-hint">Elige el destino en el mapa · <span className="kbd">Esc</span> para cancelar</div>}
         </main>
@@ -197,7 +236,6 @@ export function GameScreen() {
         )}
         <SelectionPanel />
       </div>
-      <Toasts />
       {s.overlay === 'focus' && <FocusTreeView />}
       {s.overlay === 'tech' && <TechTreeView />}
       {s.overlay === 'templates' && <TemplateDesigner />}

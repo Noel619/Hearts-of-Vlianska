@@ -755,6 +755,8 @@ export interface LogEntry {
   kind: 'info' | 'guerra' | 'diplo' | 'bueno' | 'malo' | 'evento';
   faction?: FactionId;
   province?: string;
+  /** Mensaje rutinario: queda en el registro pero no sale como notificación emergente. */
+  quiet?: boolean;
 }
 
 export interface NewsEntry {

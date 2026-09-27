@@ -20,6 +20,8 @@ export interface Settings extends VideoSettings {
   volAmbience: number;
   volSfx: number;
   muted: boolean;
+  /** Notificaciones emergentes: solo las importantes, todas las de tu facción o ninguna. */
+  toasts: 'importantes' | 'todas' | 'ninguna';
 }
 
 const SETTINGS_KEY = 'hov-settings';
@@ -35,6 +37,7 @@ function loadSettings(): Settings {
     volAmbience: 0.55,
     volSfx: 0.8,
     muted: false,
+    toasts: 'importantes',
     // La primera vez, la calidad gráfica se elige según el equipo.
     ...defaultVideoSettings(),
   };
@@ -209,7 +212,7 @@ export function createUIStore<T extends object>(initial: T) {
 }
 
 export type PanelId = 'politica' | 'diplomacia' | 'construccion' | 'produccion' | 'comercio' | 'ejercito' | 'decisiones' | 'registro';
-export type MapMode = 'politico' | 'terreno' | 'peligro' | 'suministro' | 'diplomatico';
+export type MapMode = 'politico' | 'terreno' | 'peligro' | 'suministro' | 'diplomatico' | 'recursos';
 
 export interface UIState {
   panel: PanelId | null;

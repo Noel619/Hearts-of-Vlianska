@@ -82,7 +82,7 @@ export function dailyResearch(state: GameState, f: FactionId) {
     if (a.progress >= researchCost(state, t)) {
       c.research.active[i] = null;
       grantTech(state, f, t.id);
-      addLog(state, { text: `${factionName(f)} completa la investigación: ${t.name}.`, kind: 'bueno', faction: f });
+      addLog(state, { text: `${factionName(f)} completa la investigación: ${t.name}.`, kind: 'bueno', faction: f, quiet: true });
     }
   }
 }

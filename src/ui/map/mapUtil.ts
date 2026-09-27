@@ -19,6 +19,15 @@ export const TERRAIN_COLOR: Record<Terrain, string> = {
   derrumbe: '#4b463d',
 };
 
+/** De gris (sin recursos) a dorado (estación muy rica). */
+export function resourceColor(total: number): string {
+  const t = Math.max(0, Math.min(1, total / 6));
+  const r = Math.round(62 + t * (233 - 62));
+  const g = Math.round(62 + t * (165 - 62));
+  const b = Math.round(55 + t * (60 - 55));
+  return `rgb(${r},${g},${b})`;
+}
+
 export function dangerColor(d: number): string {
   const t = Math.max(0, Math.min(1, d / 80));
   const r = Math.round(90 + t * 150);
@@ -36,6 +45,13 @@ export function provinceColor(state: GameState, pid: string, mode: MapMode, supp
       return TERRAIN_COLOR[MAP.provinces[pid].terrain];
     case 'peligro':
       return dangerColor(p.danger);
+    case 'recursos': {
+      // Estaciones según la riqueza de su yacimiento; los túneles, apagados.
+      const st = state.stations[pid];
+      if (!st) return NEUTRAL_DARK;
+      const total = st.resources.chatarra + st.resources.polvora + st.resources.combustible;
+      return resourceColor(total);
+    }
     case 'suministro':
       if (!supplied) return NEUTRAL;
       return supplied.has(pid) ? '#6f9e4c' : ctrl === player ? '#b8492f' : NEUTRAL;

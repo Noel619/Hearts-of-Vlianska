@@ -151,6 +151,7 @@ export function startOrJoinBattle(state: GameState, attacker: Unit, pid: string)
       addLog(state, {
         text: `Combate en ${provinceName(pid)}: ${factionName(attacker.owner)} ataca a ${factionName(battle.defenderSide)}.`,
         kind: 'guerra',
+        quiet: true,
         faction: attacker.owner,
         province: pid,
       });
@@ -324,6 +325,7 @@ function battleHour(state: GameState, b: Battle, defending: Map<string, string>)
       addLog(state, {
         text: `${factionName(b.defenderSide)} rechaza el ataque en ${provinceName(pid)}.`,
         kind: b.defenderSide === state.player ? 'bueno' : 'malo',
+        quiet: true,
         province: pid,
       });
     }
@@ -476,7 +478,7 @@ function attackersWin(state: GameState, b: Battle, attackers: Fighter[]) {
     a.u.dug = 0;
     enterProvince(state, a.u, pid);
     if (!entered && state.player === a.u.owner && MAP.provinces[pid].kind !== 'estacion') {
-      addLog(state, { text: `${a.u.name} avanza hasta ${provinceName(pid)}.`, kind: 'bueno', faction: a.u.owner, province: pid });
+      addLog(state, { text: `${a.u.name} avanza hasta ${provinceName(pid)}.`, kind: 'bueno', faction: a.u.owner, province: pid, quiet: true });
     }
     entered = true;
   }
@@ -503,7 +505,7 @@ function retreatUnit(state: GameState, u: Unit, pid: string, attackerProvinces: 
   u.retreating = false;
   u.dug = 0;
   if (state.player === u.owner) {
-    addLog(state, { text: `${u.name} se retira de ${provinceName(pid)} a ${provinceName(target)}.`, kind: 'malo', faction: u.owner, province: target });
+    addLog(state, { text: `${u.name} se retira de ${provinceName(pid)} a ${provinceName(target)}.`, kind: 'malo', faction: u.owner, province: target, quiet: true });
   }
 }
 

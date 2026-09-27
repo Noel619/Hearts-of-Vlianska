@@ -1433,3 +1433,20 @@
 .slider-row .num {
   text-align: right;
 }
+
+/* ------------------------------------------------------------------ Recursos */
+
+.res-chips {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+.res-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.res-chip.none {
+  color: var(--text-faint);
+  opacity: 0.55;
+}

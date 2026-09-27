@@ -57,16 +57,21 @@ export function exportShare(state: GameState, f: FactionId): number {
   return LAWS[state.countries[f].laws.comercio]?.value ?? 0.5;
 }
 
+/**
+ * Lo que una estación aporta cada día de un recurso a quien la controla: su yacimiento, por lo integrada
+ * que esté (propia, sin integrar u ocupada), su infraestructura y los modificadores de la facción.
+ */
+export function stationResourceOutput(state: GameState, sid: string, f: FactionId, res: ResourceId): number {
+  const k = contribution(state, sid, f);
+  if (k <= 0) return 0;
+  const st = state.stations[sid];
+  return st.resources[res] * k * (1 + 0.05 * st.buildings.infraestructura) * Math.max(0, 1 + mod(state, f, 'recursos'));
+}
+
 export function resourceProduced(state: GameState, f: FactionId, res: ResourceId): number {
-  const bonus = 1 + mod(state, f, 'recursos');
   let total = 0;
-  for (const sid of Object.keys(state.stations)) {
-    const k = contribution(state, sid, f);
-    if (k <= 0) continue;
-    const st = state.stations[sid];
-    total += st.resources[res] * k * (1 + 0.05 * st.buildings.infraestructura);
-  }
-  return total * Math.max(0, bonus);
+  for (const sid of Object.keys(state.stations)) total += stationResourceOutput(state, sid, f, res);
+  return total;
 }
 
 /** Recursos que otros ya nos compran. */
@@ -328,7 +333,7 @@ function completeBuilding(state: GameState, f: FactionId, building: BuildingId, 
     st.buildings[building] += 1;
   }
   if (state.player === f) {
-    addLog(state, { text: `Construcción terminada: ${BUILDINGS[building].name} en ${stationName(location)}.`, kind: 'bueno', faction: f, province: location });
+    addLog(state, { text: `Construcción terminada: ${BUILDINGS[building].name} en ${stationName(location)}.`, kind: 'bueno', faction: f, province: location, quiet: true });
   }
 }
 
@@ -424,7 +429,7 @@ function remindIdleConstruction(state: GameState, f: FactionId, justFinished: bo
   }
   if (state.hour - since >= IDLE_REMINDER_DAYS * 24) {
     c.idleSince = state.hour;
-    addLog(state, { text: `Recordatorio: llevas ${IDLE_REMINDER_DAYS} días con talleres civiles parados.`, kind: 'malo', faction: f });
+    addLog(state, { text: `Recordatorio: llevas ${IDLE_REMINDER_DAYS} días con talleres civiles parados.`, kind: 'malo', faction: f, quiet: true });
   }
 }
 

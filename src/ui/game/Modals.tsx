@@ -330,6 +330,15 @@ function GameSettings() {
         <input type="checkbox" checked={s.fog} onChange={(e) => store.updateSettings({ fog: e.target.checked })} />
         Niebla de guerra (solo ves las tropas cercanas)
       </label>
+      <label className="select-row">
+        <Icon name="MessageSquare" size={16} className="amber" />
+        <span>Notificaciones emergentes</span>
+        <select value={s.toasts} onChange={(e) => store.updateSettings({ toasts: e.target.value as typeof s.toasts })}>
+          <option value="importantes">Solo las importantes</option>
+          <option value="todas">Todas las de tu facción</option>
+          <option value="ninguna">Ninguna (solo el registro)</option>
+        </select>
+      </label>
     </div>
   );
 }

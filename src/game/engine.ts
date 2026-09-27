@@ -141,5 +141,5 @@ export function advanceDay(state: GameState) {
 
 function logYearStart(state: GameState) {
   const d = dateOf(state.hour);
-  if (d.getUTCMonth() === 0 && d.getUTCDate() === 1) addLog(state, { text: `Comienza el año ${d.getUTCFullYear()}.`, kind: 'info' });
+  if (d.getUTCMonth() === 0 && d.getUTCDate() === 1) addLog(state, { text: `Comienza el año ${d.getUTCFullYear()}.`, kind: 'info', quiet: true });
 }

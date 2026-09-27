@@ -10,6 +10,7 @@ import { mapLayersReady, MapRenderer, prepareMapLayers, type Camera, type Counte
 import { Bar, fmt, hideTip, showHoverTip, showTip } from '../components/core';
 import { centerMapOn, store, ui, type MapMode } from '../store';
 import { FrameLimiter, mapQuality, renderDpr } from '../video';
+import { ResourceChips } from '../components/Resources';
 
 export interface MapViewProps {
   mode: 'game' | 'preview' | 'demo';
@@ -230,6 +231,12 @@ export function MapView({ mode, state, highlight, onPickFaction, mapMode: forced
           <div className="tt-row">
             <span>Población</span>
             <span className="num">{fmt(station.population)}</span>
+          </div>
+        )}
+        {station && (
+          <div className="tt-row">
+            <span>Recursos al día</span>
+            <ResourceChips state={st} sid={pid} f={st.player} tip={false} />
           </div>
         )}
         <div className="tt-row">

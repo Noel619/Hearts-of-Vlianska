@@ -75,6 +75,11 @@ const SECTIONS: { id: string; title: string; icon: string; body: ReactNode }[] =
           caravanas segura).
         </p>
         <p>
+          Cada estación tiene su <strong>yacimiento</strong>: lo que da cada día de cada recurso a quien la controla (menos si no está integrada o solo está ocupada, más con
+          infraestructura). El modo de mapa <strong>Recursos</strong> los muestra sobre el mapa, como en Hearts of Iron: Industrialnaya es la más rica, Kholodnogo tiene el
+          combustible y la pólvora está repartida entre el Levantamiento, Vhlainska y el sur. Conquistar estaciones con recursos es la forma de alimentar tus fábricas.
+        </p>
+        <p>
           La <strong>comida</strong> sale de las granjas de hongos y de los cerdos. Si las reservas se acaban llega la hambruna: la población muere y la estabilidad se
           hunde.
         </p>

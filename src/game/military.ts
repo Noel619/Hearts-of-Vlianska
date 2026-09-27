@@ -793,6 +793,7 @@ export function dailyRecruitment(state: GameState, f: FactionId) {
       addLog(state, {
         text: `${u.name} completa su instrucción en ${stationName(where)}${ratio < 0.99 ? ` (equipada al ${Math.round(ratio * 100)} %)` : ''}.`,
         kind: 'bueno',
+        quiet: true,
         faction: f,
         province: where,
       });

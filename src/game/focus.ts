@@ -82,11 +82,11 @@ export function completeFocus(state: GameState, fac: FactionId, id: string, bypa
     c.focus.progress = 0;
   }
   if (bypassed) {
-    if (state.player === fac) addLog(state, { text: `Se omite el enfoque «${f.name}»: ya no tiene sentido.`, kind: 'info', faction: fac });
+    if (state.player === fac) addLog(state, { text: `Se omite el enfoque «${f.name}»: ya no tiene sentido.`, kind: 'info', faction: fac, quiet: true });
     return;
   }
   applyEffects(state, f.effects, { root: fac });
-  addLog(state, { text: `${factionName(fac)} completa el enfoque nacional «${f.name}».`, kind: state.player === fac ? 'bueno' : 'diplo', faction: fac });
+  addLog(state, { text: `${factionName(fac)} completa el enfoque nacional «${f.name}».`, kind: state.player === fac ? 'bueno' : 'diplo', faction: fac, quiet: true });
 }
 
 export function dailyFocus(state: GameState, fac: FactionId) {

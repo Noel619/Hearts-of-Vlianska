@@ -124,7 +124,7 @@ export function enactLaw(state: GameState, f: FactionId, lawId: string): boolean
   c.pp -= lawCost(state, f, lawId);
   c.laws[law.group] = lawId;
   invalidateMods(state);
-  addLog(state, { text: `${factionName(f)} aprueba la ley: ${law.name}.`, kind: 'info', faction: f });
+  addLog(state, { text: `${factionName(f)} aprueba la ley: ${law.name}.`, kind: 'info', faction: f, quiet: true });
   return true;
 }
 

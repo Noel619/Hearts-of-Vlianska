@@ -20,6 +20,7 @@ import {
   removeProductionLine,
   setLineFactories,
   slotsUsed,
+  stationResourceOutput,
 } from '../../game/economy';
 import { equipmentLevel } from '../../game/research';
 import { factionName, ownedStations, provinceName } from '../../game/helpers';
@@ -28,6 +29,7 @@ import { Bar, Empty, Icon, Panel, Section, Tip, fmt, fmtSigned } from '../compon
 import { RES_NAMES } from '../game/TopBar';
 import { store, ui, useGame } from '../store';
 import { focusProvince } from '../map/MapView';
+import { RESOURCES, ResourceChips, resourceUsers } from '../components/Resources';
 
 const STATION_BUILDINGS: BuildingId[] = ['civil', 'militar', 'granja', 'infraestructura', 'fortificacion'];
 
@@ -251,7 +253,30 @@ export function TradePanel() {
               return (
                 <tr key={r}>
                   <td>
-                    <Icon name={RES_NAMES[r].icon} size={14} /> {RES_NAMES[r].name}
+                    <Tip
+                      content={() => (
+                        <div>
+                          <h4>{RESOURCES[r].name}</h4>
+                          <div className="tt-desc">{RESOURCES[r].desc}</div>
+                          <div className="tt-sub">Lo producen</div>
+                          {ownedStations(state, f).filter((sid) => state.stations[sid].resources[r] > 0).length === 0 && <div className="dim">Ninguna de tus estaciones.</div>}
+                          {Object.keys(state.stations)
+                            .filter((sid) => stationResourceOutput(state, sid, f, r) > 0)
+                            .map((sid) => (
+                              <div key={sid} className="tt-row">
+                                <span>{STATIONS[sid].shortName}</span>
+                                <span className="num">{fmt(stationResourceOutput(state, sid, f, r), 1)}</span>
+                              </div>
+                            ))}
+                          <div className="tt-sub">Lo consumen (por taller)</div>
+                          <div>{resourceUsers(r)}</div>
+                        </div>
+                      )}
+                    >
+                      <span>
+                        <Icon name={RES_NAMES[r].icon} size={14} style={{ color: RESOURCES[r].color }} /> {RES_NAMES[r].name}
+                      </span>
+                    </Tip>
                   </td>
                   <td className="num">{fmt(x.produced, 1)}</td>
                   <td className="num">{fmtSigned(x.imported - x.exported, 1)}</td>
@@ -329,15 +354,15 @@ export function TradePanel() {
                   <td>{STATIONS[sid].shortName}</td>
                   <td className="num">{fmt(st.population)}</td>
                   <td className="num">{st.buildings.granja}</td>
-                  <td className="num dim">
-                    {st.resources.chatarra}/{st.resources.polvora}/{st.resources.combustible}
+                  <td>
+                    <ResourceChips state={state} sid={sid} f={f} />
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
-        <div className="hint">Recursos: chatarra / pólvora / combustible al día.</div>
+        <div className="hint">Yacimientos de chatarra, pólvora y combustible de cada estación (al día). El modo de mapa «Recursos» los muestra sobre el mapa.</div>
       </Section>
     </Panel>
   );
