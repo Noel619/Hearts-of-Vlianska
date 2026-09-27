@@ -1450,3 +1450,28 @@
   color: var(--text-faint);
   opacity: 0.55;
 }
+
+/* ------------------------------------------------------------------ Nido de arañas */
+
+.nest-info {
+  margin: 6px 0 10px;
+  padding: 8px 10px;
+  background: rgba(40, 20, 44, 0.35);
+  border: 1px solid #5a3150;
+  border-left: 3px solid #a0506f;
+  border-radius: var(--radius);
+}
+.nest-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  color: #e6c9e8;
+}
+.nest-head .num {
+  margin-left: auto;
+}
+.nest-info .small {
+  margin-bottom: 6px;
+  font-size: 12px;
+}

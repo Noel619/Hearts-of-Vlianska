@@ -15,6 +15,7 @@ import {
 } from './helpers';
 import { dateOf, hourOfDate } from './time';
 import { MAP } from '../data';
+import { nestAt } from './nests';
 
 export interface Ctx {
   root: FactionId;
@@ -82,7 +83,10 @@ export function check(state: GameState, cond: Condition | undefined, ctx: Ctx): 
       return !!s && state.stations[s]?.owner === ctx.root;
     }
     case 'stationFree':
-      return !!state.stations[cond.station] && !state.stations[cond.station].owner;
+      // Abandonada y habitable: con un nido de criaturas dentro no se puede recolonizar.
+      return !!state.stations[cond.station] && !state.stations[cond.station].owner && !nestAt(state, cond.station);
+    case 'nestAlive':
+      return !!nestAt(state, cond.province);
     case 'exists': {
       const t = resolveTarget(state, ctx, cond.target);
       return !!t && state.countries[t].alive;

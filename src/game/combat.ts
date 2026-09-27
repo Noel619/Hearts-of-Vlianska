@@ -17,6 +17,7 @@ import { addLog, factionName, friendly, hasAccess, isAtWarWith, neighbors, newId
 import { getMods } from './modifiers';
 import { fireEvent } from './events';
 import { applyLoss, canEnter, edgeHours, relocateCapital, removeUnit, unitStats, type UnitStats } from './military';
+import { nestAt } from './nests';
 
 export const COMBAT = {
   /** Organización perdida por cada impacto. */
@@ -72,6 +73,15 @@ export function hourlyMovement(state: GameState) {
         continue;
       }
       startOrJoinBattle(state, u, next);
+      continue;
+    }
+    // Un nido de criaturas no se cruza: se combate desde el túnel (ver nests.ts).
+    if (nestAt(state, next)) {
+      u.moveProgress = 0;
+      if (u.retreating) {
+        u.path = [];
+        u.retreating = false;
+      }
       continue;
     }
     const edge = MAP.adjacency[u.province].find((a) => a.to === next)?.edge;

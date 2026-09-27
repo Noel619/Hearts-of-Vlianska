@@ -99,7 +99,7 @@ function travelFrom(
     done.add(cur);
     if (cur !== from && opts.stopAt?.(cur)) continue;
     for (const n of neighbors(state, cur)) {
-      if (!provincePassable(state, n.to)) continue;
+      if (!provincePassable(state, n.to) || state.nests[n.to]?.packs.length) continue;
       if (opts.pass && !opts.pass(n.to)) continue;
       const nd = best + edgeHours(state, f, 4, n.length, n.terrain);
       if (nd < (dist.get(n.to) ?? Infinity)) dist.set(n.to, nd);
@@ -243,6 +243,7 @@ function buildPosts(state: GameState, f: FactionId, hostile: Map<FactionId, numb
   const candidates = new Map<string, number>();
   for (const sid of Object.keys(state.stations)) {
     const ctrl = state.provinces[sid].controller;
+    if (state.nests[sid]?.packs.length) continue; // nadie guarnece un nido de arañas
     if (ctrl === f) {
       const owner = state.stations[sid].owner;
       let v = STATIONS[sid].victoryPoints * (sid === c.capital ? 2 : 1);

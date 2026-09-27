@@ -30,6 +30,7 @@ import {
 } from './diplomacy';
 import { addTemplate, spawnUnit } from './military';
 import { crushRevolt, liberateStation } from './resistance';
+import { burnNest, nestAt } from './nests';
 
 export function applyEffects(state: GameState, effects: Effect[] | undefined, ctx: Ctx) {
   if (!effects) return;
@@ -389,7 +390,8 @@ function runCustom(state: GameState, id: string, ctx: Ctx, arg?: string | number
     case 'colonizar': {
       const s = ctx.target ?? 'TEN';
       const st = state.stations[s];
-      if (!st || st.owner) break;
+      // Con un nido de arañas dentro no hay colonos que aguanten.
+      if (!st || st.owner || nestAt(state, s)) break;
       transferStation(state, s, ctx.root);
       st.population = Math.max(st.population, Number(arg ?? 80));
       if (!st.cores.includes(ctx.root)) st.cores.push(ctx.root);
@@ -443,6 +445,15 @@ function runCustom(state: GameState, id: string, ctx: Ctx, arg?: string | number
       if (!ally || !enemy) break;
       const war = state.wars.find((w) => (w.attackers.includes(ally) && w.defenders.includes(enemy)) || (w.defenders.includes(ally) && w.attackers.includes(enemy)));
       if (war) joinWar(state, ctx.root, war.id, war.attackers.includes(ally) ? 'att' : 'def');
+      break;
+    }
+    case 'quemarNido': {
+      const pid = String(ctx.target ?? 'TEN');
+      burnNest(state, pid, Number(arg ?? 0.4));
+      const n = state.nests[pid];
+      if (n && n.packs.length === 0) {
+        addLog(state, { text: `¡${factionName(ctx.root)} quema el nido de arañas de ${stationName(pid)}!`, kind: 'guerra', faction: ctx.root, province: pid });
+      }
       break;
     }
     case 'limpiarPermanente': {

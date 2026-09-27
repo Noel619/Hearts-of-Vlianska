@@ -975,6 +975,7 @@ export class MapRenderer {
     this.screenTransform();
     this.drawStationMarkers(input, cam, colors);
     this.drawBattles(input, cam, vis);
+    if (input.mode === 'game') this.drawNests(input, cam);
     if (input.mode === 'game') this.drawUnits(input, cam, vis);
     else this.counters = [];
 
@@ -1139,6 +1140,78 @@ export class MapRenderer {
       else if (Math.abs(dy) <= 0.1) ly -= lh / 2;
       g.drawImage(lab, lx, ly, lw, lh);
       if (input.mapMode === 'recursos') this.drawResourceBadge(st.resources, sx, dy > 0.1 ? sy - R - (isCapital ? 34 : 22) : sy + R + 8);
+      g.restore();
+    }
+  }
+
+  /** Fichas del nido de arañas: una silueta, el número de grupos y su vida. */
+  private drawNests(input: RenderInput, cam: Camera) {
+    const g = this.g;
+    for (const n of Object.values(input.state.nests ?? {})) {
+      if (!n.packs.length) continue;
+      const p = MAP.provinces[n.province];
+      const [sx, sy] = this.worldToScreen(cam, p.x, p.y);
+      if (sx < -120 || sy < -80 || sx > this.cssW + 120 || sy > this.cssH + 80) continue;
+      const W = 64;
+      const H = 34;
+      const x = sx - 18 - 10 - W;
+      const y = sy - H / 2;
+      const fighting = Object.values(input.state.units).some((u) => u.nest === n.province);
+      const hp = n.packs.reduce((s, q) => s + q.hp, 0) / n.packs.length;
+      g.save();
+      g.fillStyle = 'rgba(12,8,14,0.95)';
+      g.beginPath();
+      g.roundRect(x, y, W, H, 3);
+      g.fill();
+      g.lineWidth = 1.4;
+      g.strokeStyle = fighting ? `rgba(224,97,74,${0.6 + 0.4 * Math.sin(input.time * 8)})` : '#6d3a5c';
+      g.stroke();
+      // Silueta: cuerpo, patas y ojos rojos
+      const bx = x + 3;
+      const by = y + 3;
+      const bw = 31;
+      const bh = H - 11;
+      g.fillStyle = '#1c1320';
+      g.fillRect(bx, by, bw, bh);
+      const cx = bx + bw / 2;
+      const cy = by + bh / 2 + 1;
+      const twitch = Math.sin(input.time * 5) * 0.6;
+      g.strokeStyle = '#8d7f96';
+      g.lineWidth = 1.2;
+      g.lineCap = 'round';
+      for (const side of [-1, 1]) {
+        for (let i = 0; i < 4; i++) {
+          const a = -0.9 + i * 0.6;
+          const kx = cx + side * (5 + Math.cos(a) * 4);
+          const ky = cy + Math.sin(a) * 4 - 3;
+          g.beginPath();
+          g.moveTo(cx + side * 2, cy + (i - 1.5) * 1.4);
+          g.lineTo(kx, ky + (i % 2 ? twitch : -twitch));
+          g.lineTo(kx + side * 4, ky + 6);
+          g.stroke();
+        }
+      }
+      g.fillStyle = '#3a2d40';
+      g.beginPath();
+      g.ellipse(cx, cy + 2, 4.2, 5.5, 0, 0, Math.PI * 2);
+      g.fill();
+      g.beginPath();
+      g.ellipse(cx, cy - 4, 3, 2.6, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#ff5a4a';
+      g.fillRect(cx - 1.8, cy - 5, 1.2, 1.2);
+      g.fillRect(cx + 0.6, cy - 5, 1.2, 1.2);
+      // Número de grupos
+      g.fillStyle = '#e6d6ee';
+      g.font = `700 15px 'PT Mono', ui-monospace, monospace`;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText(String(n.packs.length), x + 34 + (W - 34) / 2, y + (H - 8) / 2 + 1);
+      // Vida del nido
+      g.fillStyle = '#060606';
+      g.fillRect(x + 3, y + H - 6, W - 6, 3);
+      g.fillStyle = '#c0504a';
+      g.fillRect(x + 3, y + H - 6, (W - 6) * clamp(hp), 3);
       g.restore();
     }
   }

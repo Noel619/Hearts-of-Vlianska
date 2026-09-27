@@ -5,6 +5,7 @@ import { FACTION_IDS } from './types';
 import { emptyDerived, updateDerived, START_EFFICIENCY } from './economy';
 import { invalidateMods } from './modifiers';
 import { spawnUnit } from './military';
+import { createNests } from './nests';
 
 export const SAVE_VERSION = 2;
 
@@ -98,6 +99,7 @@ export function newGame(opts: NewGameOptions): GameState {
     provinces,
     stations,
     countries,
+    nests: createNests(0),
     units: {},
     battles: {},
     wars: [],

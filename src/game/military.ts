@@ -49,6 +49,8 @@ export interface UnitStats {
   /** Ataque de los batallones de fuego indirecto (morteros), que disparan desde la reserva. */
   indirectSoft: number;
   indirectHard: number;
+  /** Ataque de los batallones que atacan con fuego (lanzallamas). */
+  fireSoft: number;
 }
 
 export function emptyEquipment(): Record<EquipmentId, number> {
@@ -98,6 +100,7 @@ export function templateStats(state: GameState, f: FactionId, tpl: TemplateDef):
     excavation: 0,
     indirectSoft: 0,
     indirectHard: 0,
+    fireSoft: 0,
   };
   let orgSum = 0;
   let maxArmor = 0;
@@ -137,6 +140,7 @@ export function templateStats(state: GameState, f: FactionId, tpl: TemplateDef):
         s.indirectSoft += b.soft * q;
         s.indirectHard += b.hard * q;
       }
+      if (sp.fire) s.fireSoft += b.soft * q;
     }
   }
   for (const b of line) {
@@ -348,6 +352,8 @@ export function findPath(
     for (const n of neighbors(state, cur)) {
       if (noAux && AUX_TERRAINS.has(n.terrain)) continue;
       if (!canEnter(state, f, n.to, noAux)) continue;
+      // Un nido de criaturas solo se pisa para atacarlo.
+      if (n.to !== to && state.nests?.[n.to]?.packs.length) continue;
       // No se atraviesan estaciones enemigas ni túneles con tropas enemigas salvo que sean el destino;
       // un túnel enemigo vacío se cruza (y se ocupa de paso), aunque se prefiere evitarlo.
       const ctrl = state.provinces[n.to].controller;

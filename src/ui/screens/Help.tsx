@@ -53,10 +53,15 @@ const SECTIONS: { id: string; title: string; icon: string; body: ReactNode }[] =
             <strong>Derrumbes</strong>: infranqueables. Se pueden excavar con la tecnología de excavación y la decisión correspondiente.
           </li>
           <li>
-            <strong>Tenevskaya</strong> está abandonada. Si llevas tropas a la estación, puedes recolonizarla.
+            <strong>Tenevskaya</strong> está abandonada. Cuando no quede nido, puedes recolonizarla llevando tropas a la estación.
           </li>
         </ul>
-        <p>Usa los modos de mapa (abajo a la izquierda) para ver facciones, diplomacia, tipos de túnel, peligro mutante o suministro.</p>
+        <p>
+          En <strong>Tenevskaya</strong> anida una colonia de <strong>arañas</strong>: hembras que atacan con sus quelíceros y machos que lanzan telarañas. Nunca salen de la
+          oscuridad, pero nadie puede recolonizar la estación mientras vivan. Son extremadamente resistentes a los disparos y vulnerables al fuego: atácalas con
+          lanzallamas (mejor con focos o stalkers) o quema el nido con la decisión del mismo nombre. Si no se limpia del todo, el nido vuelve a criar.
+        </p>
+        <p>Usa los modos de mapa (abajo a la izquierda) para ver facciones, diplomacia, tipos de túnel, peligro mutante, suministro o recursos.</p>
       </>
     ),
   },

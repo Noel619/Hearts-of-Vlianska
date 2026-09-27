@@ -16,6 +16,7 @@ import { dailyPopularityDrift } from './politics';
 import { runAI } from './ai';
 import { monthlyResistance } from './resistance';
 import { dateOf, hourOfDate, isNewMonth } from './time';
+import { dailyNests, hourlyNests } from './nests';
 
 export const END_HOUR = hourOfDate('2040-01-01');
 export const VICTORY_STATIONS = 11;
@@ -24,6 +25,7 @@ export function advanceHour(state: GameState) {
   state.hour += 1;
   hourlyMovement(state);
   hourlyCombat(state);
+  hourlyNests(state);
   hourlyOrg(state);
   processScheduled(state);
   if (state.hour % 24 === 0) advanceDay(state);
@@ -49,8 +51,8 @@ function dailyDanger(state: GameState) {
     }
     if (ps.suppressedUntil && ps.suppressedUntil > state.hour) continue;
     let target = p.baseDanger;
-    // Si Tenevskaya está habitada, el nido pierde fuerza.
-    if (state.stations.TEN?.owner) {
+    // Sin el nido de arañas (o con Tenevskaya habitada), los túneles de alrededor se calman.
+    if (state.stations.TEN?.owner || !state.nests.TEN?.packs.length) {
       const d = Math.hypot(p.x - MAP.provinces.TEN.x, p.y - MAP.provinces.TEN.y);
       if (d < 160) target = Math.max(0, target - 15);
     }
@@ -127,6 +129,7 @@ export function advanceDay(state: GameState) {
   dailyDiplomacy(state);
   dailySurrender(state);
   dailyDanger(state);
+  dailyNests(state);
   dailyEvents(state);
   for (const f of aliveFactions(state)) {
     if (f !== state.player) runAI(state, f);

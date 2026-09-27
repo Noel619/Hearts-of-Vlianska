@@ -6,6 +6,7 @@ import { addLog, factionName, isAtWarWith, neighborFactions, neighbors, ownedSta
 import { killMen } from './military';
 import { mod } from './modifiers';
 import { applyEffects } from './effects';
+import { nestAt } from './nests';
 
 export interface DecisionTarget {
   id: string;
@@ -67,9 +68,23 @@ export function decisionTargets(state: GameState, f: FactionId, d: DecisionDef):
       return ownedStations(state, f)
         .filter((s) => !state.stations[s].cores.includes(f) && state.hour - state.stations[s].ownedSince >= 24 * 120)
         .map((s) => ({ id: s, label: STATIONS[s].name }));
+    case 'nest':
+      // Nidos a uno o dos tramos de nuestro territorio (o de nuestras tropas).
+      return Object.values(state.nests)
+        .filter((n) => n.packs.length > 0)
+        .filter((n) => {
+          const near = new Set<string>();
+          for (const { to } of MAP.adjacency[n.province]) {
+            near.add(to);
+            for (const { to: to2 } of MAP.adjacency[to]) near.add(to2);
+          }
+          near.delete(n.province);
+          return [...near].some((pid) => state.provinces[pid].controller === f || Object.values(state.units).some((u) => u.owner === f && u.province === pid));
+        })
+        .map((n) => ({ id: n.province, label: STATIONS[n.province]?.name ?? n.province }));
     case 'abandoned':
       return Object.keys(state.stations)
-        .filter((s) => !state.stations[s].owner && Object.values(state.units).some((u) => u.owner === f && u.province === s))
+        .filter((s) => !state.stations[s].owner && !nestAt(state, s) && Object.values(state.units).some((u) => u.owner === f && u.province === s))
         .map((s) => ({ id: s, label: STATIONS[s].name }));
   }
   return [];

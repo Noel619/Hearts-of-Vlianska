@@ -5,6 +5,7 @@ import { SAVE_VERSION } from './state';
 import { emptyDerived, updateDerived } from './economy';
 import { invalidateMods } from './modifiers';
 import { FOCUS_BY_ID } from '../data';
+import { createNests } from './nests';
 
 export function serialize(state: GameState): string {
   return JSON.stringify(state);
@@ -24,6 +25,8 @@ export function deserialize(json: string): GameState {
   state.playerEvents ??= [];
   state.news ??= [];
   state.stats ??= { battles: 0, captures: 0 };
+  // Las arañas de Tenevskaya llegaron después: si la estación sigue abandonada, el nido está ahí.
+  state.nests ??= state.stations.TEN && !state.stations.TEN.owner ? createNests(state.hour) : {};
   for (const f of FACTION_IDS) {
     const c = state.countries[f];
     c.derived = { ...emptyDerived(), ...(c.derived ?? {}) };

@@ -168,7 +168,7 @@ export const BATTALIONS: Record<string, BattalionDef> = {
     speed: 4,
     equipment: { lanzallamas: 3, armas: 2 },
     tech: 'lanzallamas',
-    special: { antiFort: 0.5, dangerAttack: 0.5 },
+    special: { antiFort: 0.5, dangerAttack: 0.5, fire: true },
   },
   draisina: {
     id: 'draisina',

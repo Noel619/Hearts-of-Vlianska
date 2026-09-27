@@ -233,6 +233,12 @@ export function MapView({ mode, state, highlight, onPickFaction, mapMode: forced
             <span className="num">{fmt(station.population)}</span>
           </div>
         )}
+        {st.nests[pid]?.packs.length ? (
+          <div className="tt-row bad">
+            <span>Nido de arañas</span>
+            <span className="num">{st.nests[pid].packs.length} grupos</span>
+          </div>
+        ) : null}
         {station && (
           <div className="tt-row">
             <span>Recursos al día</span>

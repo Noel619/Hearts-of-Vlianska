@@ -31,6 +31,7 @@ const KNOWN_CUSTOM = new Set([
   'robarEquipo',
   'unirseGuerra',
   'limpiarPermanente',
+  'quemarNido',
   'inundacion',
   'aplastarRevuelta',
   'liberarEstacion',

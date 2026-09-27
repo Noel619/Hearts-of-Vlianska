@@ -6,7 +6,7 @@ import { canBuild, contribution, queueBuilding, stationFood } from '../../game/e
 import { factionName, provinceName } from '../../game/helpers';
 import { etaHours, isDefending, stopUnits, unitStats } from '../../game/military';
 import { COMBAT } from '../../game/combat';
-import { canTakeDecision, takeDecision } from '../../game/decisions';
+import { canTakeDecision, decisionVisible, takeDecision } from '../../game/decisions';
 import { disbandUnit } from '../../game/playerActions';
 import { revoltChance } from '../../game/resistance';
 import { Emblem } from '../components/art';
@@ -22,7 +22,9 @@ function UnitLine({ u }: { u: Unit }) {
   const tpl = state.countries[u.owner].templates.find((t) => t.id === u.template);
   const moving = u.path.length ? `hacia ${provinceName(u.path[u.path.length - 1])} · ${Math.max(1, Math.ceil(etaHours(state, u) / 24))} d` : '';
   const dug = u.dug ?? 0;
-  const status = u.battle
+  const status = u.nest
+    ? 'Combatiendo contra las arañas'
+    : u.battle
     ? isDefending(state, u)
       ? 'Defendiendo'
       : 'Atacando'
@@ -131,6 +133,45 @@ function BattleFactorsView({ b }: { b: Battle }) {
   );
 }
 
+/** El nido de arañas: cuántas quedan, cómo combatirlas y qué pasa si no se limpia. */
+function NestInfo({ pid }: { pid: string }) {
+  const state = useGame();
+  const n = state.nests[pid];
+  const hembras = n.packs.filter((p) => p.kind === 'hembra');
+  const machos = n.packs.filter((p) => p.kind === 'macho');
+  const hp = n.packs.reduce((s, p) => s + p.hp, 0) / n.packs.length;
+  const days = Math.max(0, Math.ceil((n.nextBrood - state.hour) / 24));
+  return (
+    <div className="nest-info">
+      <div className="nest-head">
+        <Icon name="Bug" size={18} />
+        <strong>Nido de arañas</strong>
+        <span className="num dim">{pct(hp)}</span>
+      </div>
+      <p className="dim small">
+        Criaturas arácnidas que acechan en la oscuridad y nunca salen de ella. Extremadamente resistentes a los disparos, vulnerables al fuego; la luz de focos y bengalas
+        las debilita.
+      </p>
+      <div className="tt-row">
+        <span>Hembras (quelíceros)</span>
+        <span className="num">{hembras.length}</span>
+      </div>
+      <div className="tt-row">
+        <span>Machos (telarañas)</span>
+        <span className="num">{machos.length}</span>
+      </div>
+      <div className="tt-row">
+        <span>Próxima cría</span>
+        <span className="num">{days} d</span>
+      </div>
+      <div className="hint">
+        Para recolonizar la estación hay que acabar con el nido: atácalo con lanzallamas (las balas apenas les hacen daño) o quémalo con la decisión «Quemar el
+        nido».
+      </div>
+    </div>
+  );
+}
+
 function ProvincePanel({ pid }: { pid: string }) {
   const state = useGame();
   const f = state.player!;
@@ -153,6 +194,9 @@ function ProvincePanel({ pid }: { pid: string }) {
   const canBatida = batida && canTakeDecision(state, f, 'dec_batida', pid);
   const canExcavar = excavar && canTakeDecision(state, f, 'dec_excavar', pid);
   const canColonizar = colonizar && st && !st.owner ? canTakeDecision(state, f, 'dec_recolonizar', pid) : null;
+  const nest = !!state.nests[pid]?.packs.length;
+  const quemar = DECISIONS.dec_quemar_nido;
+  const canQuemar = nest && quemar ? canTakeDecision(state, f, 'dec_quemar_nido', pid) : null;
 
   return (
     <div className="sel-province">
@@ -170,6 +214,7 @@ function ProvincePanel({ pid }: { pid: string }) {
         </button>
       </header>
       {st && <p className="sel-desc">{sdef.desc}</p>}
+      {state.nests[pid]?.packs.length ? <NestInfo pid={pid} /> : null}
       <div className="sel-stats">
         {st && (
           <>
@@ -267,7 +312,14 @@ function ProvincePanel({ pid }: { pid: string }) {
             </button>
           </Tip>
         )}
-        {st && !st.owner && colonizar && (
+        {nest && quemar && decisionVisible(state, f, quemar) && (
+          <Tip content={canQuemar?.ok ? quemar.desc : <span className="bad">{canQuemar?.reason === 'Objetivo no válido.' ? 'Necesitas territorio o tropas a uno o dos tramos del nido.' : canQuemar?.reason}</span>}>
+            <button className="btn small primary" disabled={!canQuemar?.ok} onClick={() => store.act((s) => takeDecision(s, f, 'dec_quemar_nido', pid))}>
+              <Icon name="Flame" size={14} /> Quemar el nido
+            </button>
+          </Tip>
+        )}
+        {st && !st.owner && colonizar && !nest && (
           <Tip content={canColonizar?.ok ? colonizar.desc : <span className="bad">{canColonizar?.reason ?? 'Necesitas tropas en la estación.'}</span>}>
             <button className="btn small primary" disabled={!canColonizar?.ok} onClick={() => store.act((s) => takeDecision(s, f, 'dec_recolonizar', pid))}>
               <Icon name="Flag" size={14} /> Recolonizar

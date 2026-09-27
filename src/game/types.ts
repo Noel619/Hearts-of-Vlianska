@@ -153,6 +153,8 @@ export type Condition =
   | { c: 'controls'; station: StationRef }
   | { c: 'owns'; station: StationRef }
   | { c: 'stationFree'; station: string }
+  /** Queda un nido de criaturas vivo en la provincia. */
+  | { c: 'nestAlive'; province: string }
   | { c: 'exists'; target: Target }
   | { c: 'isFaction'; id: FactionId }
   | { c: 'isPlayer' }
@@ -365,6 +367,8 @@ export interface BattalionDef {
   tech?: string;
   noAuxiliary?: boolean;
   special?: {
+    /** Ataca con fuego (lanzallamas): letal contra nidos de criaturas. */
+    fire?: boolean;
     attritionReduction?: number;
     fortBonus?: number;
     casualtyReduction?: number;
@@ -513,7 +517,7 @@ export interface DecisionDef {
   days?: number;
   cooldown?: number;
   once?: boolean;
-  targets?: 'dangerProvince' | 'collapse' | 'neighbor' | 'raidTarget' | 'ownedNonCore' | 'abandoned';
+  targets?: 'dangerProvince' | 'collapse' | 'neighbor' | 'raidTarget' | 'ownedNonCore' | 'abandoned' | 'nest';
   effects: Effect[];
   completeEffects?: Effect[];
   ai?: number;
@@ -703,6 +707,24 @@ export interface Unit {
   outOfSupply: boolean;
   xp: number;
   aiTarget?: string;
+  /** Nido de criaturas contra el que está combatiendo. */
+  nest?: string;
+}
+
+/** Un grupo de arañas del nido: hembras (quelíceros) o machos (telarañas y cola). */
+export interface SpiderPack {
+  id: string;
+  kind: 'hembra' | 'macho';
+  /** Vida del grupo (0..1). */
+  hp: number;
+}
+
+/** Nido de criaturas en una estación abandonada: hostil a todos, nunca sale de la oscuridad. */
+export interface Nest {
+  province: string;
+  packs: SpiderPack[];
+  /** Hora en que nace el próximo grupo si el nido no se ha limpiado. */
+  nextBrood: number;
 }
 
 export interface Battle {
@@ -796,6 +818,8 @@ export interface GameState {
   provinces: Record<string, ProvinceState>;
   stations: Record<string, StationState>;
   countries: Record<FactionId, CountryState>;
+  /** Nidos de criaturas (las arañas de Tenevskaya). */
+  nests: Record<string, Nest>;
   units: Record<string, Unit>;
   battles: Record<string, Battle>;
   wars: War[];

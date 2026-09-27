@@ -259,7 +259,9 @@ export function conditionText(cond: Condition, ctx?: Partial<Ctx>): string {
     case 'owns':
       return `Poseer ${stationName(cond.station, undefined, ctx)}`;
     case 'stationFree':
-      return `${STATIONS[cond.station]?.name ?? cond.station} sigue abandonada`;
+      return `${STATIONS[cond.station]?.name ?? cond.station} sigue abandonada y sin nido de arañas`;
+    case 'nestAlive':
+      return `Queda un nido de arañas en ${MAP.provinces[cond.province]?.name ?? cond.province}`;
     case 'exists':
       return `${targetName(cond.target, ctx)} existe`;
     case 'isFaction':
