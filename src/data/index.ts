@@ -2,7 +2,7 @@
 import type { DecisionDef, EventDef, FactionId, FocusDef, FocusTreeDef, SpiritDef } from '../game/types';
 import { BASE_SPIRITS } from './spirits';
 import { FOCUS_TREE_LIST, FOCUS_SPIRITS } from './focus';
-import { EVENT_LIST } from './events';
+import { EVENT_LIST, STORY_SPIRITS } from './events';
 import { DECISION_LIST } from './decisions';
 
 export * from './map';
@@ -14,7 +14,7 @@ export * from './economy';
 export * from './advisors';
 export * from './techs';
 
-export const SPIRITS: Record<string, SpiritDef> = Object.fromEntries([...BASE_SPIRITS, ...FOCUS_SPIRITS].map((s) => [s.id, s]));
+export const SPIRITS: Record<string, SpiritDef> = Object.fromEntries([...BASE_SPIRITS, ...STORY_SPIRITS, ...FOCUS_SPIRITS].map((s) => [s.id, s]));
 
 export const FOCUS_TREES: Record<FactionId, FocusTreeDef> = Object.fromEntries(FOCUS_TREE_LIST.map((t) => [t.faction, t])) as Record<
   FactionId,

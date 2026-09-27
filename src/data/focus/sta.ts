@@ -333,6 +333,7 @@ export const tree: FocusTreeDef = {
       prereq: [['sta_contables']],
       exclusive: ['sta_peaje_justo'],
       effects: [
+        { t: 'event', id: 'his_sta_monopolio', days: 60 },
         { t: 'addSpirit', id: 'sta_monopolio' },
         { t: 'if', cond: { c: 'exists', target: 'SDR' }, then: [{ t: 'relation', target: 'SDR', v: -15 }] },
         { t: 'if', cond: { c: 'exists', target: 'UNI' }, then: [{ t: 'relation', target: 'UNI', v: -10 }] },
@@ -459,6 +460,7 @@ export const tree: FocusTreeDef = {
         { t: 'revokeAccess', target: 'UNI' },
         { t: 'if', cond: { c: 'exists', target: 'UNI' }, then: [{ t: 'scoped', target: 'UNI', effects: [{ t: 'withdrawUnits', from: 'STA' }] }, { t: 'relation', target: 'UNI', v: -15 }] },
         { t: 'removeSpirit', id: 'sta_mano_union' },
+        { t: 'removeSpirit', id: 'sta_peaje_expoliado' },
         { t: 'if', cond: { c: 'exists', target: 'SDR' }, then: [{ t: 'relation', target: 'SDR', v: 15 }] },
       ],
       ai: 8,
@@ -563,6 +565,7 @@ export const tree: FocusTreeDef = {
         { t: 'addSpirit', id: 'sta_equilibrio' },
         { t: 'removeSpirit', id: 'sta_mano_union' },
         { t: 'removeSpirit', id: 'sta_peaje_rebajado' },
+        { t: 'removeSpirit', id: 'sta_peaje_expoliado' },
       ],
       ai: 14,
     },

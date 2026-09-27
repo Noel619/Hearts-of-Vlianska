@@ -15,6 +15,7 @@ import { FACTIONS, MAP, STATIONS, TERRAIN_INFO } from '../data';
 import type { Battle, BattleFactors, FactionId, GameState, Unit } from './types';
 import { addLog, factionName, friendly, hasAccess, isAtWarWith, neighbors, newId, provinceName, stationName } from './helpers';
 import { getMods } from './modifiers';
+import { fireEvent } from './events';
 import { applyLoss, canEnter, edgeHours, relocateCapital, removeUnit, unitStats, type UnitStats } from './military';
 
 export const COMBAT = {
@@ -110,6 +111,8 @@ export function enterProvince(state: GameState, u: Unit, pid: string) {
       province: pid,
     });
     if (state.countries[ctrl].capital === pid) relocateCapital(state, ctrl);
+    // Perder la capital histórica es un momento decisivo para cualquier facción.
+    if (FACTIONS[ctrl].capital === pid && state.countries[ctrl].alive) fireEvent(state, ctrl, 'sit_capital_caida', { from: u.owner, target: pid });
     if (owner && owner !== ctrl && state.countries[owner].capital === pid) relocateCapital(state, owner);
     // Quien recupera su capital histórica vuelve a gobernar desde ella.
     if (owner === newCtrl && FACTIONS[newCtrl].capital === pid && state.countries[newCtrl].capital !== pid) {

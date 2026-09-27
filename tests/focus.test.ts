@@ -40,11 +40,12 @@ describe('enfoques: el Califato', () => {
     // Y se nota en el poder político.
     const drain = modSources(s, 'CAL').find((m) => m.label.includes('Comisión Mixta'));
     expect(drain?.mods.ppDiario).toBeLessThan(0);
-    // Mientras dure, la Comisión vuelve cada pocos meses con nuevas exigencias.
-    expect(EVENTS.cal_exigencias.once).toBe(false);
+    // Semanas después, la Comisión llega con sus exigencias; meses más tarde, pide la Guardia.
     s.player = null;
-    advanceDays(s, 400);
-    expect(s.countries.CAL.firedEvents.cal_exigencias ?? 0).toBeGreaterThan(0);
+    advanceDays(s, 60);
+    expect(s.countries.CAL.firedEvents.cal_exigencias).toBe(1);
+    advanceDays(s, 120);
+    expect(s.countries.CAL.firedEvents.cal_exigencias_guardia).toBe(1);
   });
 
   it('recuperar la soberanía expulsa a los comisarios', () => {

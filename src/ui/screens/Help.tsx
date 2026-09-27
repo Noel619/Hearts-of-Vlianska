@@ -104,6 +104,10 @@ const SECTIONS: { id: string; title: string; icon: string; body: ReactNode }[] =
           consecuencias reales. Algunos enfoques dependen de lo que respondan otras facciones; los que pierden su sentido (porque su objetivo ha desaparecido, por
           ejemplo) se pueden omitir al instante.
         </p>
+        <p>
+          Los <strong>eventos</strong> no llegan al azar. Unos son consecuencia de tus enfoques (el tooltip lo avisa: «Dentro de 60 días: evento…») y te obligan a elegir
+          qué precio pagar por el camino tomado; otros llegan por situaciones reales, como perder la capital, pasar hambre o llevar un año en guerra.
+        </p>
       </>
     ),
   },

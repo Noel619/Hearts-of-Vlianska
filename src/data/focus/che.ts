@@ -456,7 +456,7 @@ export const tree: FocusTreeDef = {
       x: 9,
       y: 5,
       prereq: [['che_milicias_orden', 'che_ciudad_abierta', 'che_plan_zhukova']],
-      effects: [{ t: 'stability', v: 0.05 }, { t: 'pp', v: 40 }, { t: 'warSupport', v: 0.05 }],
+      effects: [{ t: 'event', id: 'his_che_verdad', days: 20 }, { t: 'stability', v: 0.05 }, { t: 'pp', v: 40 }, { t: 'warSupport', v: 0.05 }],
       ai: 12,
     },
     // ================= Ajuste de cuentas

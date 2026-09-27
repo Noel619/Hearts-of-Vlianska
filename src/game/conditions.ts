@@ -11,6 +11,7 @@ import {
   pactOf,
   relation,
   samePact,
+  warsOf,
 } from './helpers';
 import { dateOf, hourOfDate } from './time';
 import { MAP } from '../data';
@@ -175,6 +176,8 @@ export function check(state: GameState, cond: Condition | undefined, ctx: Ctx): 
     }
     case 'surrender':
       return c.surrender >= (cond.min ?? 0);
+    case 'warLength':
+      return warsOf(state, ctx.root).some((w) => (state.hour - w.start) / 24 >= cond.min);
     case 'leader':
       return c.leader === cond.id;
     case 'and':

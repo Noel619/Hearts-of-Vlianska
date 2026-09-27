@@ -201,22 +201,6 @@ export const BASE_SPIRITS: SpiritDef[] = [
   },
   // Genéricos
   {
-    id: 'invierno_crudo',
-    name: 'Invierno crudo',
-    desc: 'El frío baja por los pozos de ventilación y hiela los cultivos.',
-    icon: 'Snowflake',
-    negative: true,
-    modifiers: { alimentos: -0.2, estabilidad: -0.05 },
-  },
-  {
-    id: 'plaga_ratas',
-    name: 'Plaga de ratas',
-    desc: 'Se comen las reservas más rápido de lo que podemos cazarlas.',
-    icon: 'Rat',
-    negative: true,
-    modifiers: { alimentos: -0.15 },
-  },
-  {
     id: 'epidemia',
     name: 'Epidemia',
     desc: 'Fiebre en los andenes.',
@@ -230,13 +214,6 @@ export const BASE_SPIRITS: SpiritDef[] = [
     desc: 'Carteles, altavoces y discursos en cada andén.',
     icon: 'Megaphone',
     modifiers: { apoyoGuerra: 0.1 },
-  },
-  {
-    id: 'festejos',
-    name: 'Festejos',
-    desc: 'Por una vez, música en los andenes.',
-    icon: 'Sparkles',
-    modifiers: { estabilidad: 0.06 },
   },
   {
     id: 'movilizacion_emergencia',
@@ -259,21 +236,6 @@ export const BASE_SPIRITS: SpiritDef[] = [
     icon: 'TrendingDown',
     negative: true,
     modifiers: { organizacion: -0.1, apoyoGuerra: -0.05 },
-  },
-  {
-    id: 'refugiados',
-    name: 'Refugiados',
-    desc: 'Bocas que alimentar y manos que trabajan.',
-    icon: 'Users',
-    modifiers: { crecimientoPoblacion: 0.5, estabilidad: -0.03, consumoAlimentos: 0.05 },
-  },
-  {
-    id: 'apagon',
-    name: 'Apagón',
-    desc: 'Los generadores han fallado. Todo se detiene.',
-    icon: 'PlugZap',
-    negative: true,
-    modifiers: { produccionCivil: -0.1, produccionMilitar: -0.1, investigacion: -0.1 },
   },
   {
     id: 'corrupcion',
@@ -318,5 +280,19 @@ export const BASE_SPIRITS: SpiritDef[] = [
     desc: 'La guerra ha terminado y hemos vencido.',
     icon: 'Trophy',
     modifiers: { estabilidad: 0.05, apoyoGuerra: 0.05 },
+  },
+  {
+    id: 'festejos',
+    name: 'Festejos',
+    desc: 'Por una vez, música en los andenes.',
+    icon: 'Sparkles',
+    modifiers: { estabilidad: 0.06 },
+  },
+  {
+    id: 'refugiados',
+    name: 'Refugiados',
+    desc: 'Bocas que alimentar y manos que trabajan.',
+    icon: 'Users',
+    modifiers: { crecimientoPoblacion: 0.5, estabilidad: -0.03, consumoAlimentos: 0.05 },
   },
 ];

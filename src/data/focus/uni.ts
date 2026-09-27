@@ -154,7 +154,7 @@ export const tree: FocusTreeDef = {
       x: 1,
       y: 3,
       prereq: [['uni_oficina_seguridad']],
-      effects: [{ t: 'warSupport', v: 0.1 }, { t: 'unlockDecision', id: 'uni_ley_marcial' }],
+      effects: [{ t: 'event', id: 'his_uni_excepcion', days: 180 }, { t: 'warSupport', v: 0.1 }, { t: 'unlockDecision', id: 'uni_ley_marcial' }],
       ai: 12,
     },
     {
@@ -529,7 +529,7 @@ export const tree: FocusTreeDef = {
       prereq: [['uni_reforzar_staraya']],
       available: { c: 'exists', target: 'STA' },
       bypass: SIN_STA,
-      effects: [{ t: 'scoped', target: 'STA', effects: [{ t: 'addSpirit', id: 'sta_mano_union' }] }, { t: 'pp', v: 30 }],
+      effects: [{ t: 'event', id: 'his_uni_peaje_staraya', days: 60 }, { t: 'scoped', target: 'STA', effects: [{ t: 'addSpirit', id: 'sta_mano_union' }] }, { t: 'pp', v: 30 }],
       ai: 12,
     },
     {
@@ -793,12 +793,15 @@ export const events: EventDef[] = [
           { cond: { c: 'hasFocus', id: 'sta_ala_union' }, factor: 3 },
           { cond: { c: 'stability', max: 0.35 }, factor: 2 },
           { cond: { c: 'hasFocus', id: 'sta_neutralidad' }, factor: 0.1 },
+          { cond: { c: 'hasFlag', id: 'sta_confia_union' }, factor: 3 },
+          { cond: { c: 'hasSpirit', id: 'sta_peaje_expoliado' }, factor: 0.3 },
         ],
       },
       {
         name: 'Staraya no es de nadie.',
         effects: [
           { t: 'removeSpirit', id: 'sta_mano_union' },
+          { t: 'removeSpirit', id: 'sta_peaje_expoliado' },
           { t: 'removeSpirit', id: 'brigadas_union' },
           { t: 'revokeAccess', target: 'FROM' },
           { t: 'relation', target: 'FROM', v: -30 },

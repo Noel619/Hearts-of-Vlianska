@@ -185,6 +185,8 @@ export type Condition =
   | { c: 'strongerThan'; target: Target; ratio?: number }
   | { c: 'hasWargoal'; target: Target }
   | { c: 'surrender'; min?: number }
+  /** Días que dura ya la más larga de nuestras guerras. */
+  | { c: 'warLength'; min: number }
   | { c: 'leader'; id: string }
   | { c: 'and'; list: Condition[] }
   | { c: 'or'; list: Condition[] }
@@ -490,6 +492,8 @@ export interface EventDef {
   trigger?: Condition;
   mtth?: number;
   once?: boolean;
+  /** Días mínimos entre dos disparos de un evento repetible (por defecto, 150). */
+  cooldown?: number;
   news?: boolean;
   triggeredOnly?: boolean;
   options: EventOption[];

@@ -90,7 +90,7 @@ export function dailyEvents(state: GameState) {
     for (const ev of list) {
       if (ev.factions && !ev.factions.includes(f)) continue;
       if (ev.once !== false && c.firedEvents[ev.id]) continue;
-      if (ev.once === false && state.hour - (c.flags[`ev:${ev.id}`] ?? -1e9) < 24 * REPEAT_COOLDOWN_DAYS) continue;
+      if (ev.once === false && state.hour - (c.flags[`ev:${ev.id}`] ?? -1e9) < 24 * (ev.cooldown ?? REPEAT_COOLDOWN_DAYS)) continue;
       if (!check(state, ev.trigger, { root: f })) continue;
       const p = 1 - Math.pow(0.5, 1 / (ev.mtth ?? 100));
       if (chance(state, p)) fireEvent(state, f, ev.id);

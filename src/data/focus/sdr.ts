@@ -220,7 +220,7 @@ export const tree: FocusTreeDef = {
       x: 0,
       y: 3,
       prereq: [['sdr_renegociar_pacto']],
-      effects: [{ t: 'addSpirit', id: 'sdr_magnates_consejo' }, { t: 'unlockDecision', id: 'sdr_contratos' }],
+      effects: [{ t: 'event', id: 'his_sdr_magnates_armas', days: 60 }, { t: 'addSpirit', id: 'sdr_magnates_consejo' }, { t: 'unlockDecision', id: 'sdr_contratos' }],
       ai: 12,
     },
     {
@@ -724,7 +724,7 @@ export const tree: FocusTreeDef = {
       x: 18,
       y: 3,
       prereq: [['sdr_juventudes', 'sdr_oficina_lider']],
-      effects: [{ t: 'stability', v: 0.06 }, { t: 'removeSpirit', id: 'sdr_nacionalizacion_tensa' }, { t: 'popularity', id: 'comunismo', v: -5 }, { t: 'popularity', id: 'oligarquia', v: -5 }],
+      effects: [{ t: 'event', id: 'his_sdr_purga_generales', days: 40 }, { t: 'stability', v: 0.06 }, { t: 'removeSpirit', id: 'sdr_nacionalizacion_tensa' }, { t: 'popularity', id: 'comunismo', v: -5 }, { t: 'popularity', id: 'oligarquia', v: -5 }],
       ai: 10,
     },
     {
@@ -737,7 +737,7 @@ export const tree: FocusTreeDef = {
       prereq: [['sdr_purga']],
       available: { c: 'leader', id: 'bessmertny' },
       bypass: { c: 'not', cond: { c: 'ideology', id: 'nacionalismo' } },
-      effects: [{ t: 'addSpirit', id: 'sdr_culto' }],
+      effects: [{ t: 'event', id: 'sdr_atentado', days: 60 }, { t: 'addSpirit', id: 'sdr_culto' }],
       ai: 12,
     },
     {
@@ -867,19 +867,6 @@ export const events: EventDef[] = [
         available: { c: 'popularity', id: 'comunismo', min: 40 },
         ai: 1,
       },
-    ],
-  },
-  {
-    id: 'sdr_atentado',
-    title: 'Atentado contra el Inmortal',
-    desc: 'Una granada rueda por el andén de Kholodnogo durante el desfile. Bessmertny sale ileso, cubierto de sangre ajena. Los culpables llevaban brazaletes... ¿rojos? ¿de los magnates? Nadie lo sabe todavía.',
-    picture: 'Bomb',
-    factions: ['SDR'],
-    trigger: { c: 'and', list: [{ c: 'date', after: '2034-03-01' }, { c: 'leader', id: 'bessmertny' }, { c: 'stability', max: 0.5 }] },
-    mtth: 300,
-    options: [
-      { name: '¡Es inmortal! Los rusos lo saben.', effects: [{ t: 'warSupport', v: 0.08 }, { t: 'popularity', id: 'nacionalismo', v: 6 }], ai: 2 },
-      { name: 'Que la Oficina del Líder encuentre a los culpables.', effects: [{ t: 'stability', v: 0.05 }, { t: 'pp', v: -30 }, { t: 'popularity', id: 'comunismo', v: -5 }], ai: 1 },
     ],
   },
   {

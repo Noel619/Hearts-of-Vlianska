@@ -132,7 +132,7 @@ export const tree: FocusTreeDef = {
       y: 2,
       prereq: [['vhl_hermandad']],
       exclusive: ['vhl_comuna', 'vhl_mercenarios'],
-      effects: [{ t: 'setIdeology', id: 'autocracia', leader: 'rybakRey' }, { t: 'addSpirit', id: 'vhl_orden_bandido' }, { t: 'removeSpirit', id: 'sin_ley' }],
+      effects: [{ t: 'event', id: 'his_vhl_lugarteniente', days: 60 }, { t: 'setIdeology', id: 'autocracia', leader: 'rybakRey' }, { t: 'addSpirit', id: 'vhl_orden_bandido' }, { t: 'removeSpirit', id: 'sin_ley' }],
       ai: 14,
     },
     {

@@ -242,7 +242,7 @@ export const tree: FocusTreeDef = {
       x: 4,
       y: 3,
       prereq: [['lev_centralismo']],
-      effects: [{ t: 'addSpirit', id: 'lev_vigilancia' }, { t: 'unlockDecision', id: 'lev_depuracion_decision' }],
+      effects: [{ t: 'event', id: 'his_lev_anarquistas', days: 45 }, { t: 'addSpirit', id: 'lev_vigilancia' }, { t: 'unlockDecision', id: 'lev_depuracion_decision' }],
       ai: 12,
     },
     {
@@ -302,7 +302,7 @@ export const tree: FocusTreeDef = {
       x: 5,
       y: 2,
       prereq: [['lev_plan']],
-      effects: [{ t: 'slots', station: 'RAS', v: 1 }, { t: 'building', station: 'RAS', b: 'granja', v: 1 }, { t: 'tech', id: 'cerdos' }],
+      effects: [{ t: 'event', id: 'his_lev_colectivizacion', days: 60 }, { t: 'slots', station: 'RAS', v: 1 }, { t: 'building', station: 'RAS', b: 'granja', v: 1 }, { t: 'tech', id: 'cerdos' }],
       ai: 14,
     },
     {

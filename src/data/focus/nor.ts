@@ -287,7 +287,7 @@ export const tree: FocusTreeDef = {
       y: 4,
       cost: 49,
       prereq: [['nor_mapas', 'nor_radio']],
-      effects: [{ t: 'addSpirit', id: 'nor_puerta' }],
+      effects: [{ t: 'event', id: 'his_nor_superficie', days: 60 }, { t: 'addSpirit', id: 'nor_puerta' }],
       ai: 16,
     },
     {

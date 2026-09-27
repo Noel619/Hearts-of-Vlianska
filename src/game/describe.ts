@@ -326,6 +326,8 @@ export function conditionText(cond: Condition, ctx?: Partial<Ctx>): string {
       return `Objetivo de guerra contra ${targetName(cond.target, ctx)}`;
     case 'surrender':
       return `Capitulación de al menos ${Math.round((cond.min ?? 0) * 100)} %`;
+    case 'warLength':
+      return `Una guerra que dura al menos ${cond.min} días`;
     case 'leader':
       return `Gobierna ${LEADERS[cond.id]?.name ?? cond.id}${LEADERS[cond.id] ? ` (${LEADERS[cond.id].title})` : ''}`;
     case 'and':
