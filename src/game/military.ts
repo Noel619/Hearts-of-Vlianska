@@ -314,6 +314,12 @@ export function edgeHours(state: GameState, f: FactionId, speed: number, edgeLen
   return Math.max(3, ((edgeLength / 8) * t.move) / speedFactor) * (outOfSupply ? 1.3 : 1);
 }
 
+/** ¿Hay tropas en guerra con f en la provincia? */
+export function enemyUnitsIn(state: GameState, f: FactionId, pid: string): boolean {
+  for (const u of Object.values(state.units)) if (u.province === pid && isAtWarWith(state, f, u.owner)) return true;
+  return false;
+}
+
 /** Camino más rápido (Dijkstra) para una facción, evitando túneles peligrosos cuando hay alternativa. */
 export function findPath(
   state: GameState,
@@ -342,11 +348,13 @@ export function findPath(
     for (const n of neighbors(state, cur)) {
       if (noAux && AUX_TERRAINS.has(n.terrain)) continue;
       if (!canEnter(state, f, n.to, noAux)) continue;
-      // No se atraviesan provincias enemigas ocupadas salvo que sean el destino.
+      // No se atraviesan estaciones enemigas ni túneles con tropas enemigas salvo que sean el destino;
+      // un túnel enemigo vacío se cruza (y se ocupa de paso), aunque se prefiere evitarlo.
       const ctrl = state.provinces[n.to].controller;
-      if (n.to !== to && ctrl && isAtWarWith(state, f, ctrl) && opts.avoidEnemies) continue;
+      const hostile = n.to !== to && !!ctrl && isAtWarWith(state, f, ctrl) && !!opts.avoidEnemies;
+      if (hostile && (MAP.provinces[n.to].kind === 'estacion' || enemyUnitsIn(state, f, n.to))) continue;
       const danger = state.provinces[n.to].danger;
-      const cost = edgeHours(state, f, speed, n.length, n.terrain) + danger * 0.08;
+      const cost = edgeHours(state, f, speed, n.length, n.terrain) + danger * 0.08 + (hostile ? 12 : 0);
       const nd = dist[cur] + cost;
       if (dist[n.to] === undefined || nd < dist[n.to]) {
         dist[n.to] = nd;
@@ -481,6 +489,78 @@ export function normalizeControl(state: GameState) {
   expelUnits(state);
 }
 
+// ---------------------------------------------------------------------------
+// Frente: control de los túneles
+// ---------------------------------------------------------------------------
+
+let nearestCache: { key: string; map: Record<string, string | null> } | null = null;
+
+/** Estación más cercana a cada túnel (sin atravesar otras estaciones ni derrumbes). */
+export function nearestStations(state: GameState): Record<string, string | null> {
+  const key = state.openEdges.join(',') + '|' + MAP.provinceList.filter((p) => state.provinces[p.id].collapsed).map((p) => p.id).join(',');
+  if (nearestCache?.key === key) return nearestCache.map;
+  const dist: Record<string, number> = {};
+  const from: Record<string, string> = {};
+  const open = new Set<string>();
+  for (const sid of Object.keys(state.stations)) {
+    dist[sid] = 0;
+    from[sid] = sid;
+    open.add(sid);
+  }
+  while (open.size) {
+    let cur = '';
+    let best = Infinity;
+    for (const id of open) {
+      if (dist[id] < best) {
+        best = dist[id];
+        cur = id;
+      }
+    }
+    open.delete(cur);
+    for (const n of neighbors(state, cur)) {
+      if (MAP.provinces[n.to].kind === 'estacion' || MAP.provinces[n.to].terrain === 'derrumbe' || state.provinces[n.to].collapsed) continue;
+      const nd = best + n.length;
+      if (dist[n.to] === undefined || nd < dist[n.to]) {
+        dist[n.to] = nd;
+        from[n.to] = from[cur];
+        open.add(n.to);
+      }
+    }
+  }
+  const map: Record<string, string | null> = {};
+  for (const p of MAP.provinceList) if (p.kind !== 'estacion') map[p.id] = from[p.id] ?? null;
+  nearestCache = { key, map };
+  return map;
+}
+
+/**
+ * En guerra, un túnel vacío pertenece a quien controla la estación más cercana. Solo se conserva un
+ * túnel "del otro lado" mientras haya tropas propias dentro o justo al lado (una columna que avanza
+ * mantiene abierta su retaguardia inmediata). Así el frente sigue a las estaciones y a las tropas,
+ * y no quedan túneles ocupados por nadie que encierran o aíslan a nadie.
+ */
+export function dailyFrontControl(state: GameState) {
+  if (state.wars.length === 0) return;
+  const nearest = nearestStations(state);
+  const present = new Map<string, Set<FactionId>>();
+  for (const u of Object.values(state.units)) {
+    if (!present.has(u.province)) present.set(u.province, new Set());
+    present.get(u.province)!.add(u.owner);
+  }
+  const holds = (pid: string, f: FactionId, enemy: FactionId) =>
+    [...(present.get(pid) ?? [])].some((o) => o === f || (friendly(state, o, f) && isAtWarWith(state, o, enemy)));
+  for (const [pid, sid] of Object.entries(nearest)) {
+    if (!sid) continue;
+    const p = state.provinces[pid];
+    const x = p.controller;
+    const y = state.provinces[sid].controller;
+    if (!x || !y || x === y || !isAtWarWith(state, x, y)) continue;
+    if (present.get(pid)?.size) continue;
+    if (neighbors(state, pid).some((n) => holds(n.to, x, y))) continue;
+    p.controller = y;
+  }
+}
+
 /** Las unidades que quedan en territorio sin acceso vuelven a su capital. */
 export function expelUnits(state: GameState) {
   for (const u of Object.values(state.units)) {
@@ -499,17 +579,59 @@ export function expelUnits(state: GameState) {
 // Suministro, desgaste y refuerzos (diario)
 // ---------------------------------------------------------------------------
 
+/**
+ * Estaciones que abastecen a una facción. El suministro circula por provincias propias, aliadas, de
+ * quien nos da acceso o de nadie. Una zona así conectada se abastece si contiene una capital (propia
+ * o aliada) o al menos dos estaciones; una estación sola y rodeada queda sin suministro.
+ * `blocked` permite simular el corte de ciertos túneles (lo usa la IA para planear cercos).
+ */
+export function supplySources(state: GameState, f: FactionId, blocked?: Set<string>): Set<string> {
+  const open = (pid: string) => {
+    if (!provincePassable(state, pid) || blocked?.has(pid)) return false;
+    const ctrl = state.provinces[pid].controller;
+    return !ctrl || hasAccess(state, f, ctrl);
+  };
+  const capitals = new Set<string>();
+  for (const o of Object.keys(state.countries) as FactionId[]) {
+    const oc = state.countries[o];
+    if (oc.alive && (o === f || friendly(state, f, o))) capitals.add(oc.capital);
+  }
+  const friendlyStation = (sid: string) => {
+    const ctrl = state.provinces[sid].controller;
+    return !!ctrl && friendly(state, f, ctrl) && open(sid);
+  };
+  const sources = new Set<string>();
+  const seen = new Set<string>();
+  for (const start of Object.keys(state.stations)) {
+    if (seen.has(start) || !friendlyStation(start)) continue;
+    // Componente conectada de la estación.
+    const comp: string[] = [];
+    const queue = [start];
+    seen.add(start);
+    while (queue.length) {
+      const cur = queue.shift()!;
+      comp.push(cur);
+      for (const n of neighbors(state, cur)) {
+        if (seen.has(n.to) || !open(n.to)) continue;
+        seen.add(n.to);
+        queue.push(n.to);
+      }
+    }
+    const stations = comp.filter((pid) => state.stations[pid] && friendlyStation(pid));
+    if (stations.length >= 2 || stations.some((sid) => capitals.has(sid))) for (const sid of stations) sources.add(sid);
+  }
+  return sources;
+}
+
 export function suppliedProvinces(state: GameState, f: FactionId): Set<string> {
   const range = 3 + Math.round(mod(state, f, 'rangoSuministro'));
   const out = new Set<string>();
   const queue: { id: string; left: number }[] = [];
-  for (const sid of Object.keys(state.stations)) {
-    const ctrl = state.provinces[sid].controller;
-    if (ctrl && friendly(state, f, ctrl)) {
-      const infra = state.stations[sid].buildings.infraestructura;
-      queue.push({ id: sid, left: range + Math.floor(infra / 2) });
-      out.add(sid);
-    }
+  // Una estación cercada, sola, no abastece a nadie (ni siquiera a su guarnición).
+  for (const sid of supplySources(state, f)) {
+    const infra = state.stations[sid].buildings.infraestructura;
+    queue.push({ id: sid, left: range + Math.floor(infra / 2) });
+    out.add(sid);
   }
   const bestLeft: Record<string, number> = {};
   while (queue.length) {

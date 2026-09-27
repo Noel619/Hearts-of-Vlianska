@@ -9,7 +9,7 @@ import { dailyResearch } from './research';
 import { dailyFocus } from './focus';
 import { dailyDecisions } from './decisions';
 import { dailyDiplomacy, dailyJustify, dailySurrender } from './diplomacy';
-import { dailyRecruitment, dailyUnits, hourlyOrg } from './military';
+import { dailyFrontControl, dailyRecruitment, dailyUnits, hourlyOrg } from './military';
 import { hourlyCombat, hourlyMovement, resolveOverlaps } from './combat';
 import { dailyEvents, processScheduled } from './events';
 import { dailyPopularityDrift } from './politics';
@@ -123,6 +123,7 @@ export function advanceDay(state: GameState) {
     validateTrades(state, f);
   }
   resolveOverlaps(state);
+  dailyFrontControl(state);
   dailyDiplomacy(state);
   dailySurrender(state);
   dailyDanger(state);

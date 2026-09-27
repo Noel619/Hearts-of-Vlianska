@@ -10,15 +10,20 @@
 // 4. Con las tropas sobrantes, ataca solo cuando tiene superioridad local suficiente, reuniéndolas
 //    antes y atacando desde varios túneles a la vez si puede. Aprovecha para contraatacar a los
 //    enemigos agotados junto a sus estaciones y para ocupar lo que el enemigo deja desguarnecido.
-import { FACTIONS, MAP, STATIONS } from '../../data';
+import { FACTIONS, MAP, STATIONS, TERRAIN_INFO } from '../../data';
 import type { FactionId, GameState, Unit } from '../types';
 import { aliveFactions, enemiesOf, friendly, isAtWarWith, neighbors, ownedStations, provincePassable } from '../helpers';
-import { edgeHours, findPath, isDefending, leaveBattle, orderMove, unitStats, unitsOf } from '../military';
+import { COMBAT } from '../combat';
+import { edgeHours, enemyUnitsIn, findPath, isDefending, leaveBattle, orderMove, supplySources, unitStats, unitsOf } from '../military';
+import { mod } from '../modifiers';
 
 /** Horas máximas que se tienen en cuenta para amenazas y desplazamientos. */
 const HORIZON = 24 * 8;
-/** Superioridad que exige la IA para lanzar un ataque. */
-const ATTACK_RATIO = 1.35;
+/**
+ * Margen sobre la fuerza necesaria (según assaultDifficulty) que exige la IA para lanzar un ataque:
+ * una facción prudente quiere un 15 % de colchón; una agresiva o desesperada arriesga con menos.
+ */
+const ATTACK_MARGIN = 1.15;
 
 // ---------------------------------------------------------------------------
 // Valor de combate
@@ -46,6 +51,22 @@ function orgRatio(state: GameState, u: Unit): number {
 function defenseMultiplier(state: GameState, pid: string, dug: number): number {
   const station = MAP.provinces[pid].kind === 'estacion' ? 0.25 : 0;
   return (1 + station + 0.07 * state.provinces[pid].fort) * (1 + 0.25 * dug);
+}
+
+/**
+ * Cuántas veces el valor de combate de los defensores hace falta para tomar una provincia, con las
+ * mismas reglas que el combate: terreno, barricadas, atrincheramiento, flanqueo y suministro.
+ * En campo abierto y sin ventajas hace falta el doble (calibrado en tests/combat.test.ts).
+ */
+function assaultDifficulty(state: GameState, pid: string, defender: FactionId | null, dug: number, dirs: number, cutOff: boolean): number {
+  const fort = state.provinces[pid].fort;
+  const tInfo = TERRAIN_INFO[MAP.provinces[pid].terrain];
+  const attack =
+    Math.max(0.1, 1 + tInfo.attack) * Math.max(0.3, 1 - COMBAT.FORT_COVER * fort) * COMBAT.FLANK[Math.min(COMBAT.FLANK.length - 1, dirs)] * (1 - COMBAT.DIG_COVER * dug);
+  const stationBonus = isStation(pid) && defender ? Math.max(0, mod(state, defender, 'defensaEstacion')) : 0;
+  // Sin suministro el defensor pega y aguanta menos, y no recupera la organización entre asaltos.
+  const defense = (1 + COMBAT.FORT_DEFENSE * fort) * (1 + stationBonus) * (cutOff ? 0.55 : 1);
+  return (1.6 * defense) / attack;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,6 +110,27 @@ function travelFrom(
 
 function isStation(pid: string) {
   return MAP.provinces[pid]?.kind === 'estacion';
+}
+
+/** Túnel del enemigo sin tropas: se puede cruzar (y queda ocupado al pasar). */
+function openEnemyTunnel(state: GameState, f: FactionId, pid: string): boolean {
+  const ctrl = state.provinces[pid].controller;
+  return !!ctrl && !isStation(pid) && isAtWarWith(state, f, ctrl) && !enemyUnitsIn(state, f, pid);
+}
+
+/**
+ * Estaciones propias en manos del enemigo, de la más valiosa a la menos (la capital original vale
+ * el triple). Recuperarlas es la prioridad de cualquier facción que las haya perdido.
+ */
+export function lostStations(state: GameState, f: FactionId, hostile: Map<FactionId, number>): { sid: string; value: number }[] {
+  const out: { sid: string; value: number }[] = [];
+  for (const sid of Object.keys(state.stations)) {
+    const st = state.stations[sid];
+    const ctrl = state.provinces[sid].controller;
+    if (!ctrl || !hostile.has(ctrl) || (st.owner !== f && !st.cores.includes(f))) continue;
+    out.push({ sid, value: STATIONS[sid].victoryPoints * (FACTIONS[f].capital === sid ? 3 : 1) });
+  }
+  return out.sort((a, b) => b.value - a.value);
 }
 
 /** Peso de una amenaza según lo lejos que esté: plena a un día, nula a ocho. */
@@ -185,11 +227,15 @@ export function aggression(state: GameState, f: FactionId, hostile: Map<FactionI
   if (r > 2) a += 0.25;
   if (r < 0.8) a -= 0.25;
   if (FACTIONS[f].aiTargets.some((t) => hostile.has(t.target) && t.weight >= 3)) a += 0.1;
+  // Quien ha perdido estaciones propias (y más aún su capital) arriesga más para recuperarlas.
+  const lost = lostStations(state, f, hostile);
+  if (lost.length) a += lost.some((l) => l.sid === FACTIONS[f].capital) ? 0.45 : 0.25;
   return Math.max(0, Math.min(1, a));
 }
 
 function buildPosts(state: GameState, f: FactionId, hostile: Map<FactionId, number>, atWar: boolean, aggr: number): Post[] {
   const c = state.countries[f];
+  const lostTop = atWar ? (lostStations(state, f, hostile)[0]?.value ?? 0) : 0;
   const friendlyCtrl = (pid: string) => {
     const ctrl = state.provinces[pid].controller;
     return !!ctrl && friendly(state, ctrl, f);
@@ -259,9 +305,12 @@ function buildPosts(state: GameState, f: FactionId, hostile: Map<FactionId, numb
     if (border < Infinity) threat += avgHostile * 0.6 * proximity(border) * borderW;
     const mult = defenseMultiplier(state, sid, 0.6);
     let need = (threat * (atWar ? 0.95 - 0.4 * aggr : 0.8)) / mult;
+    // Para recuperar una estación propia perdida, las guarniciones de estaciones mucho menos valiosas
+    // se reducen al mínimo (la capital actual conserva la suya).
+    if (lostTop > 0 && sid !== c.capital) need *= Math.max(0.25, Math.min(1, value / lostTop));
     // Toda estación fronteriza merece al menos una unidad.
     if (threat > 0) need = Math.max(need, avgHostile * 0.5);
-    const reach = travelFrom(state, f, sid, { pass: (pid) => !state.provinces[pid].controller || friendlyCtrl(pid) || pid === sid });
+    const reach = travelFrom(state, f, sid, { pass: (pid) => !state.provinces[pid].controller || friendlyCtrl(pid) || pid === sid || openEnemyTunnel(state, f, pid) });
     posts.push({ sid, value, threat, need, have: 0, reach });
   }
   return posts;
@@ -346,7 +395,7 @@ export function aiMilitary(state: GameState, f: FactionId) {
   // 3. Ofensiva y contraataques (solo en guerra).
   if (atWar) {
     sortie(state, f, posts, all, busy);
-    offensive(state, f, pool, hostile, ATTACK_RATIO - 0.3 * aggr);
+    offensive(state, f, pool, hostile, ATTACK_MARGIN - 0.35 * aggr);
   } else {
     peacetimeReserve(state, f, pool, posts);
   }
@@ -415,8 +464,13 @@ function sortie(state: GameState, f: FactionId, posts: Post[], units: Unit[], bu
 interface Target {
   pid: string;
   gain: number;
-  required: number;
+  /** Valor de combate de los defensores (con su organización actual). */
+  def: number;
+  defender: FactionId | null;
+  dug: number;
   approaches: string[];
+  /** Los defensores ya están sin suministro (cercados). */
+  cutNow: boolean;
 }
 
 function offensive(state: GameState, f: FactionId, pool: Unit[], hostile: Map<FactionId, number>, ratio: number) {
@@ -435,23 +489,22 @@ function offensive(state: GameState, f: FactionId, pool: Unit[], hostile: Map<Fa
     seen.add(pid);
     const defenders = enemyAt(pid);
     const dug = defenders.length ? defenders.reduce((s, u) => s + (u.dug ?? 0), 0) / defenders.length : 0;
-    const def = defenders.reduce((s, u) => s + readiness(state, u), 0) * defenseMultiplier(state, pid, dug);
+    const def = defenders.reduce((s, u) => s + readiness(state, u), 0);
     // Accesos: provincias vecinas sin tropas enemigas desde las que atacar (si son enemigas, se ocupan de paso).
-    const approaches = neighbors(state, pid)
-      .map((n) => n.to)
-      .filter((n) => provincePassable(state, n) && enemyAt(n).length === 0);
+    const around = neighbors(state, pid).filter((n) => provincePassable(state, n.to));
+    const approaches = around.map((n) => n.to).filter((n) => enemyAt(n).length === 0);
     if (approaches.length === 0 && defenders.length > 0) return;
-    // Con varios accesos se puede flanquear: hace falta menos superioridad.
-    const flank = approaches.length >= 3 ? 1.3 : approaches.length === 2 ? 1.2 : 1;
-    targets.push({ pid, gain, required: (def * ratio) / flank, approaches });
+    const cutNow = defenders.length > 0 && defenders.every((d) => d.outOfSupply);
+    targets.push({ pid, gain, def, defender: state.provinces[pid].controller, dug, approaches, cutNow });
   };
   for (const sid of Object.keys(state.stations)) {
     const ctrl = state.provinces[sid].controller;
     if (!ctrl || !hostile.has(ctrl)) continue;
     const st = state.stations[sid];
     let gain = STATIONS[sid].victoryPoints * 10;
-    if (st.cores.includes(f)) gain *= 2;
+    if (st.owner === f || st.cores.includes(f)) gain *= 2;
     else if (st.claims.includes(f)) gain *= 1.5;
+    if (FACTIONS[f].capital === sid) gain *= 2;
     if (state.countries[ctrl].capital === sid) gain *= 1.3;
     consider(sid, gain);
   }
@@ -461,12 +514,30 @@ function offensive(state: GameState, f: FactionId, pool: Unit[], hostile: Map<Fa
     if (!neighbors(state, u.province).some((n) => ours(n.to))) continue;
     consider(u.province, 12 + potential(state, u) * 0.3);
   }
+  /**
+   * ¿Quedaría la estación sin suministro si ocupamos estos accesos? Basta con aislarla del resto del
+   * territorio del defensor, no hace falta rodearla por completo.
+   */
+  const cutCache = new Map<string, boolean>();
+  const canCutOff = (t: Target, dirs: string[]) => {
+    if (!isStation(t.pid) || t.def <= 0 || !t.defender) return false;
+    if (t.cutNow) return true;
+    const key = t.pid + '|' + dirs.join(',');
+    let v = cutCache.get(key);
+    if (v === undefined) {
+      v = !supplySources(state, t.defender, new Set(dirs)).has(t.pid);
+      cutCache.set(key, v);
+    }
+    return v;
+  };
+  /** Fuerza necesaria atacando desde `dirs` accesos, con o sin la estación cercada. */
+  const requiredFor = (t: Target, dirs: number, cutOff: boolean) => t.def * assaultDifficulty(state, t.pid, t.defender, t.dug, Math.max(1, dirs), cutOff) * ratio;
   // Mapas de tiempos de viaje hasta cada acceso (se reutilizan entre objetivos).
   const travelCache = new Map<string, Map<string, number>>();
   const mapFor = (d: string) => {
     let m = travelCache.get(d);
     if (!m) {
-      m = travelFrom(state, f, d, { pass: (pid) => ours(pid) || pid === d });
+      m = travelFrom(state, f, d, { pass: (pid) => ours(pid) || pid === d || openEnemyTunnel(state, f, pid) });
       travelCache.set(d, m);
     }
     return m;
@@ -475,7 +546,7 @@ function offensive(state: GameState, f: FactionId, pool: Unit[], hostile: Map<Fa
   const sticky = c.ai.plan && c.ai.plan.until > state.hour ? c.ai.plan.target : null;
   let launched = 0;
   for (let round = 0; round < 3 && fighters.length; round++) {
-    let best: { t: Target; score: number; eta: Map<string, { dir: string; h: number }> } | null = null;
+    let best: { t: Target; score: number; eta: Map<string, { dir: string; h: number }>; reachDirs: string[] } | null = null;
     for (const t of targets) {
       // Tiempo de cada unidad libre hasta el acceso más cercano (o hasta el blanco si está vacío).
       const eta = new Map<string, { dir: string; h: number }>();
@@ -494,17 +565,21 @@ function offensive(state: GameState, f: FactionId, pool: Unit[], hostile: Map<Fa
         if (bestDir) eta.set(u.id, { dir: bestDir, h: bh });
       }
       const reachable = fighters.filter((u) => eta.has(u.id));
+      // Accesos a los que llega alguna de nuestras unidades: solo se puede cercar si llegamos a todos.
+      const reachDirs = maps.filter(({ m }) => reachable.some((u) => m.has(u.province))).map(({ d }) => d);
+      const encirclable = canCutOff(t, reachDirs) && reachable.length >= reachDirs.length;
       const cv = reachable.reduce((s, u) => s + potential(state, u), 0);
-      if (reachable.length === 0 || cv < t.required) continue;
+      const required = requiredFor(t, Math.min(reachDirs.length, reachable.length), encirclable);
+      if (reachable.length === 0 || cv < required) continue;
       const avgH = reachable.reduce((s, u) => s + eta.get(u.id)!.h, 0) / reachable.length;
-      let score = t.gain / (1 + avgH / 48) / (1 + t.required / Math.max(1, cv));
+      let score = t.gain / (1 + avgH / 48) / (1 + required / Math.max(1, cv));
       if (t.pid === sticky) score *= 1.6;
-      if (!best || score > best.score) best = { t, score, eta };
+      if (!best || score > best.score) best = { t, score, eta, reachDirs };
     }
     if (!best) break;
     const t = best.t;
     targets.splice(targets.indexOf(t), 1);
-    if (t.required <= 0) {
+    if (t.def <= 0) {
       // Nadie lo defiende: basta con una unidad (la más cercana).
       const u = fighters.filter((x) => best!.eta.has(x.id)).sort((a, b) => best!.eta.get(a.id)!.h - best!.eta.get(b.id)!.h)[0];
       if (u && sendTo(state, u, t.pid)) {
@@ -515,37 +590,66 @@ function offensive(state: GameState, f: FactionId, pool: Unit[], hostile: Map<Fa
     }
     // Asignación: las unidades más cercanas hasta superar lo necesario con margen, repartidas por accesos.
     const cands = fighters.filter((x) => best!.eta.has(x.id)).sort((a, b) => best!.eta.get(a.id)!.h - best!.eta.get(b.id)!.h);
+    const reachDirs = best.reachDirs;
+    const canCut = canCutOff(t, reachDirs);
     const group: Unit[] = [];
     let cv = 0;
     for (const u of cands) {
-      if (cv >= t.required * 1.25) break;
+      const cut = canCut && group.length >= reachDirs.length;
+      if (cv >= requiredFor(t, Math.min(reachDirs.length, group.length), cut) * 1.25 && (!canCut || cut)) break;
       group.push(u);
       cv += potential(state, u);
     }
-    // Reparte en varios accesos cuando es posible (flanqueo).
+    const encircle = canCut && group.length >= reachDirs.length;
+    // Reparte en varios accesos (flanqueo); si hay tropas para todos, cerca la estación. Cada unidad
+    // conserva el acceso que ya tenía asignado para no deshacer la maniobra de un día para otro.
     const dirOf = new Map<string, string>();
-    if (t.approaches.length > 1) {
-      const load = new Map(t.approaches.map((d) => [d, 0]));
+    const reachOf = (u: Unit, d: string) => mapFor(d).get(u.province);
+    if (reachDirs.length > 1) {
+      const load = new Map(reachDirs.map((d) => [d, 0]));
+      const rest: Unit[] = [];
       for (const u of group) {
+        if (u.aiTarget && reachDirs.includes(u.aiTarget) && reachOf(u, u.aiTarget) !== undefined) {
+          dirOf.set(u.id, u.aiTarget);
+          load.set(u.aiTarget, (load.get(u.aiTarget) ?? 0) + 1);
+        } else rest.push(u);
+      }
+      if (encircle) {
+        // Cada acceso aún sin nadie, para la unidad libre más cercana que pueda llegar.
+        for (const d of reachDirs) {
+          if ((load.get(d) ?? 0) > 0) continue;
+          const cand = rest.filter((u) => reachOf(u, d) !== undefined).sort((a, b) => reachOf(a, d)! - reachOf(b, d)!)[0];
+          if (!cand) continue;
+          rest.splice(rest.indexOf(cand), 1);
+          dirOf.set(cand.id, d);
+          load.set(d, 1);
+        }
+      }
+      for (const u of rest) {
         const own = best.eta.get(u.id)!;
         // Prefiere el acceso menos cargado si no está mucho más lejos.
         let dir = own.dir;
-        for (const d of t.approaches) {
-          const h = mapFor(d).get(u.province);
+        for (const d of reachDirs) {
+          const h = reachOf(u, d);
           if (h !== undefined && (load.get(d) ?? 0) < (load.get(dir) ?? 0) && h <= own.h * 1.6 + 24) dir = d;
         }
         load.set(dir, (load.get(dir) ?? 0) + 1);
         dirOf.set(u.id, dir);
       }
     } else for (const u of group) dirOf.set(u.id, best.eta.get(u.id)!.dir);
-    // ¿Listos? Todas en su acceso y con la organización recuperada.
+    // ¿Listos? Todas en su acceso y con la organización recuperada. Si el cerco ya se ha cerrado,
+    // los defensores están sin suministro y el asalto sale más barato.
     const ready = group.filter((u) => u.province === dirOf.get(u.id) && !u.battle && orgRatio(state, u) >= 0.65);
     const readyCv = ready.reduce((s, u) => s + readiness(state, u), 0);
-    if (readyCv >= t.required) {
-      for (const u of ready) attack(u, t.pid);
-    }
+    const defenders = enemyAt(t.pid);
+    const cutNow = defenders.length > 0 && defenders.every((d) => d.outOfSupply);
+    const readyDirs = new Set(ready.map((u) => u.province)).size;
+    // Todo el grupo a la vez (o con margen de sobra): los ataques por partes solo desangran.
+    const need = requiredFor(t, readyDirs, cutNow);
+    const go = ready.length > 0 && readyCv >= need && (ready.length === group.length || readyCv >= need * 1.4);
+    if (go) for (const u of ready) attack(u, t.pid);
     for (const u of group) {
-      if (ready.includes(u) && readyCv >= t.required) continue;
+      if (go && ready.includes(u)) continue;
       sendTo(state, u, dirOf.get(u.id)!);
     }
     fighters = fighters.filter((x) => !group.includes(x));

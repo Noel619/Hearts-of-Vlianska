@@ -131,9 +131,13 @@ export function aiDiplomacy(state: GameState, f: FactionId) {
     }
   }
 
+  // En modo histórico, la IA solo va a la guerra por lo que marcan su árbol de enfoques y sus eventos:
+  // no fabrica pretextos ni busca alianzas o pactos por su cuenta.
+  const historical = state.historicalAI;
+
   // --- Justificar
   const day = state.hour / 24;
-  if (!isAtWar(state, f) && c.wargoals.length === 0 && day > 45) {
+  if (!historical && !isAtWar(state, f) && c.wargoals.length === 0 && day > 45) {
     for (const { target, weight } of aiTargetList(state, f)) {
       if (!state.countries[target].alive) continue;
       if (!canJustify(state, f, target).ok) continue;
@@ -151,7 +155,7 @@ export function aiDiplomacy(state: GameState, f: FactionId) {
   const threats = aliveFactions(state).filter(
     (o) => o !== f && (isAtWarWith(state, o, f) || state.countries[o].wargoals.some((w) => w.target === f)) && armyPower(state, o) > myPower * 0.9,
   );
-  if (threats.length > 0 && !pactOf(state, f) && cooldownOk(state, f, 'buscar_pacto', 90)) {
+  if (!historical && threats.length > 0 && !pactOf(state, f) && cooldownOk(state, f, 'buscar_pacto', 90)) {
     const cands = aliveFactions(state)
       .filter((o) => o !== f && !threats.includes(o) && !isAtWarWith(state, o, f))
       .sort((a, b) => {
@@ -174,7 +178,7 @@ export function aiDiplomacy(state: GameState, f: FactionId) {
   }
 
   // --- Pactos de no agresión con vecinos fuertes que no queremos atacar
-  if (cooldownOk(state, f, 'nap_check', 60)) {
+  if (!historical && cooldownOk(state, f, 'nap_check', 60)) {
     const near = neighborFactions(state, f, 6);
     for (const o of near) {
       if (o === f || hasNap(state, f, o) || isAtWarWith(state, f, o) || samePact(state, f, o)) continue;

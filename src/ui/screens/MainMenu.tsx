@@ -271,7 +271,7 @@ export function FactionSelect() {
           </div>
           <label className="toggle">
             <input type="checkbox" checked={historical} onChange={(e) => setHistorical(e.target.checked)} />
-            IA histórica (las facciones siguen su historia)
+            IA histórica (las facciones siguen su historia: solo van a la guerra o buscan aliados cuando lo marca su árbol de enfoques)
           </label>
         </div>
         <button className="btn primary big" onClick={start}>

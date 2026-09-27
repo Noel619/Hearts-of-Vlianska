@@ -139,7 +139,13 @@ const SECTIONS: { id: string; title: string; icon: string; body: ReactNode }[] =
             de que salga, huye con media organización.
           </li>
           <li>
-            Las unidades necesitan <strong>suministro</strong>: una estación amiga a pocos tramos. Sin él pierden fuerza cada día y combaten peor.
+            <strong>El frente</strong>: en guerra, un túnel vacío pertenece a quien controla la estación más cercana. Para quedarte un túnel del lado enemigo tienes que tener
+            tropas dentro o justo al lado; en cuanto te vas, vuelve a su dueño.
+          </li>
+          <li>
+            Las unidades necesitan <strong>suministro</strong>: una estación amiga a pocos tramos. Sin él pierden fuerza cada día, combaten un 30 % peor y apenas recuperan
+            organización. Una zona se abastece si incluye la capital o al menos dos estaciones; una estación sola y <strong>cercada</strong> (sin salida hacia el resto de su
+            territorio) se queda sin suministro. Cercar antes de asaltar abarata mucho el ataque, y los defensores rodeados que pierden se rinden.
           </li>
         </ul>
         <p>Diseña tus propias unidades en el panel de ejército con el diseñador de plantillas.</p>

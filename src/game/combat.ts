@@ -11,7 +11,7 @@
 //   (si ataca): lo que bloquea le hace poco daño y lo que no bloquea, mucho.
 // - Barricadas, terreno, estaciones, flanqueo, atrincheramiento y suministro modifican esos valores.
 // - La organización decide quién aguanta; la fuerza, cuántos hombres quedan.
-import { MAP, STATIONS, TERRAIN_INFO } from '../data';
+import { FACTIONS, MAP, STATIONS, TERRAIN_INFO } from '../data';
 import type { Battle, BattleFactors, FactionId, GameState, Unit } from './types';
 import { addLog, factionName, friendly, hasAccess, isAtWarWith, neighbors, newId, provinceName, stationName } from './helpers';
 import { getMods } from './modifiers';
@@ -111,6 +111,11 @@ export function enterProvince(state: GameState, u: Unit, pid: string) {
     });
     if (state.countries[ctrl].capital === pid) relocateCapital(state, ctrl);
     if (owner && owner !== ctrl && state.countries[owner].capital === pid) relocateCapital(state, owner);
+    // Quien recupera su capital histórica vuelve a gobernar desde ella.
+    if (owner === newCtrl && FACTIONS[newCtrl].capital === pid && state.countries[newCtrl].capital !== pid) {
+      state.countries[newCtrl].capital = pid;
+      addLog(state, { text: `${factionName(newCtrl)} vuelve a gobernar desde ${STATIONS[pid].name}.`, kind: 'bueno', faction: newCtrl, province: pid });
+    }
     // Las barricadas sufren en el asalto.
     p.fort = Math.max(0, p.fort - 1);
   }
