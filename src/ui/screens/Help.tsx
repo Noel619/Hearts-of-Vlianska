@@ -107,18 +107,32 @@ const SECTIONS: { id: string; title: string; icon: string; body: ReactNode }[] =
         </p>
         <ul>
           <li>
-            Cada casilla tiene un <strong>ancho de combate</strong>: en un túnel solo cabe una unidad por bando a la vez; el resto apoya desde la reserva. Atacar desde varias
-            direcciones amplía el frente y da bonificación.
+            El defensor ocupa la casilla y el atacante empuja desde las vecinas. Cada unidad combate en <strong>una sola batalla</strong>: si atacan la casilla desde la que
+            atacas, tus tropas dejan el ataque y se defienden.
+          </li>
+          <li>
+            Cada casilla tiene un <strong>ancho de combate</strong>: en un túnel solo cabe una unidad por bando a la vez. Las demás esperan en la <strong>reserva</strong> y
+            relevan a las agotadas, así que tener más tropas permite aguantar o presionar más tiempo. Los morteros disparan también desde la reserva.
+          </li>
+          <li>
+            Atacar desde <strong>varios túneles a la vez</strong> amplía el frente, divide el fuego del defensor y da bonificación de flanqueo: es la mejor forma de tomar una
+            estación bien defendida.
+          </li>
+          <li>
+            Los disparos que la <strong>defensa</strong> (al defender) o la <strong>ruptura</strong> (al atacar) de una unidad bloquean le hacen poco daño; los que no bloquea,
+            mucho más. Las <strong>barricadas</strong>, las estaciones y el <strong>atrincheramiento</strong> (una unidad quieta se atrinchera en 8 días) reducen el fuego que
+            recibe el defensor. Las tropas de asalto, los lanzallamas y las draisinas ayudan a romper esas defensas.
           </li>
           <li>
             La <strong>organización</strong> (barra verde) es la capacidad de seguir luchando; la <strong>fuerza</strong> (barra naranja), los hombres y el equipo. Una unidad
-            sin organización se retira; si no puede retirarse, se rinde.
+            sin organización se retira; si no puede retirarse porque está rodeada, se rinde.
           </li>
           <li>
-            Las <strong>barricadas</strong> y las estaciones favorecen al defensor. Las tropas de asalto, los morteros, los lanzallamas y las draisinas ayudan a romperlas.
+            Puedes <strong>replegar</strong> una unidad que está defendiendo dándole otra orden de movimiento: deja de combatir y sale de la casilla. Si el enemigo entra antes
+            de que salga, huye con media organización.
           </li>
           <li>
-            Las unidades necesitan <strong>suministro</strong>: una estación amiga a pocos tramos. Sin él pierden fuerza cada día.
+            Las unidades necesitan <strong>suministro</strong>: una estación amiga a pocos tramos. Sin él pierden fuerza cada día y combaten peor.
           </li>
         </ul>
         <p>Diseña tus propias unidades en el panel de ejército con el diseñador de plantillas.</p>

@@ -1052,6 +1052,19 @@
 .battle-sides .sel-unit {
   grid-template-columns: 1fr;
 }
+.battle-factors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.battle-factors span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
 
 /* ------------------------------------------------------------------ Modales */
 

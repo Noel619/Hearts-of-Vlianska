@@ -43,7 +43,7 @@ export const BUILDINGS: Record<
   fortificacion: {
     id: 'fortificacion',
     name: 'Barricadas',
-    desc: 'Sacos terreros, alambre y nidos de ametralladora. Cada nivel reduce el ataque enemigo un 8 % y aumenta la defensa un 8 %.',
+    desc: 'Sacos terreros, alambre y nidos de ametralladora. Cada nivel reduce un 7 % el fuego enemigo que recibe el defensor y le da un 5 % más de defensa.',
     cost: 45,
     usesSlot: false,
     max: 5,

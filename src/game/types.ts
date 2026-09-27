@@ -370,6 +370,8 @@ export interface BattalionDef {
     vision?: number;
     reinforce?: number;
     excavation?: number;
+    /** Fuego indirecto: sigue disparando desde la reserva. */
+    indirect?: boolean;
   };
 }
 
@@ -670,7 +672,10 @@ export interface Unit {
   path: string[];
   moveProgress: number;
   battle: string | null;
+  /** Se retira o se repliega: no combate y no se le puede atacar como defensora. */
   retreating: boolean;
+  /** Atrincheramiento (0..1): crece mientras la unidad no se mueve. */
+  dug?: number;
   outOfSupply: boolean;
   xp: number;
   aiTarget?: string;
@@ -687,6 +692,23 @@ export interface Battle {
   attackerLosses: number;
   defenderLosses: number;
   lastAdvantage: number;
+  /** Factores de la última hora de combate (para la interfaz). */
+  factors?: BattleFactors;
+}
+
+export interface BattleFactors {
+  /** Ancho de combate disponible y ocupado por cada bando. */
+  width: number;
+  widthA: number;
+  widthD: number;
+  /** Direcciones desde las que se ataca. */
+  dirs: number;
+  /** Multiplicador final del ataque del atacante (terreno, barricadas, flanqueo). */
+  attackMod: number;
+  /** Multiplicador de la defensa del defensor (barricadas, estación, atrincheramiento). */
+  defenseMod: number;
+  fort: number;
+  dig: number;
 }
 
 export interface War {

@@ -1,15 +1,16 @@
 // Panel contextual: estación/tramo seleccionado o unidades seleccionadas.
 import { useState } from 'react';
 import { BUILDINGS, DECISIONS, FACTIONS, MAP, STATIONS, TERRAIN_INFO } from '../../data';
-import type { BuildingId, Unit } from '../../game/types';
+import type { Battle, BuildingId, Unit } from '../../game/types';
 import { canBuild, contribution, queueBuilding, stationFood } from '../../game/economy';
 import { factionName, provinceName } from '../../game/helpers';
-import { etaHours, stopUnits, unitStats } from '../../game/military';
+import { etaHours, isDefending, stopUnits, unitStats } from '../../game/military';
+import { COMBAT } from '../../game/combat';
 import { canTakeDecision, takeDecision } from '../../game/decisions';
 import { disbandUnit } from '../../game/playerActions';
 import { revoltChance } from '../../game/resistance';
 import { Emblem } from '../components/art';
-import { Bar, Icon, ModLines, Tip, fmt, pct } from '../components/core';
+import { Bar, Icon, ModLines, Tip, fmt, fmtSigned, pct } from '../components/core';
 import { store, ui, useGame } from '../store';
 import { visibleProvinces } from '../map/mapUtil';
 import { TemplateTooltip } from '../panels/ArmyPanel';
@@ -18,7 +19,21 @@ function UnitLine({ u }: { u: Unit }) {
   const state = useGame();
   const s = unitStats(state, u);
   const tpl = state.countries[u.owner].templates.find((t) => t.id === u.template);
-  const status = u.battle ? 'En combate' : u.path.length ? `Hacia ${provinceName(u.path[u.path.length - 1])} · ${Math.max(1, Math.ceil(etaHours(state, u) / 24))} d` : 'En posición';
+  const moving = u.path.length ? `hacia ${provinceName(u.path[u.path.length - 1])} · ${Math.max(1, Math.ceil(etaHours(state, u) / 24))} d` : '';
+  const dug = u.dug ?? 0;
+  const status = u.battle
+    ? isDefending(state, u)
+      ? 'Defendiendo'
+      : 'Atacando'
+    : u.retreating
+      ? `Replegándose ${moving}`
+      : moving
+        ? moving.charAt(0).toUpperCase() + moving.slice(1)
+        : dug >= 0.99
+          ? 'Atrincherada'
+          : dug > 0.05
+            ? `Atrincherándose (${pct(dug)})`
+            : 'En posición';
   return (
     <div className="sel-unit">
       <Tip content={() => (tpl ? <TemplateTooltip tpl={tpl} /> : <div>{u.name}</div>)} as="div" className="sel-unit-name">
@@ -70,10 +85,48 @@ function BattleBox({ pid }: { pid: string }) {
           ))}
         </div>
       </div>
+      {b.factors && <BattleFactorsView b={b} />}
       <div className="dim num">
         Bajas: {fmt(b.attackerLosses)} atacantes · {fmt(b.defenderLosses)} defensores
       </div>
+      {b.defenders.some((id) => state.units[id]?.owner === state.player) && (
+        <div className="hint">Puedes replegar a tus defensores dándoles otra orden de movimiento.</div>
+      )}
     </div>
+  );
+}
+
+function BattleFactorsView({ b }: { b: Battle }) {
+  const fx = b.factors!;
+  const terrain = TERRAIN_INFO[MAP.provinces[b.province].terrain];
+  return (
+    <Tip
+      as="div"
+      content={
+        <div>
+          <h4>Factores del combate</h4>
+          <div className="tt-desc">
+            Solo combaten a la vez las unidades que caben en el ancho del frente; el resto espera en reserva y releva a las agotadas (los morteros disparan desde la reserva). Atacar desde más túneles amplía el frente y da bonificación de flanqueo.
+          </div>
+          <div className="tt-row"><span>Terreno</span><span className="num">{terrain.name} ({fmtSigned(terrain.attack * 100, 0)} % al atacante)</span></div>
+          <div className="tt-row"><span>Ancho del frente</span><span className="num">{fmt(fx.width)}</span></div>
+          <div className="tt-row"><span>Direcciones de ataque</span><span className="num">{fx.dirs}{fx.dirs >= 2 ? ` (flanqueo ×${fmt(COMBAT.FLANK[Math.min(COMBAT.FLANK.length - 1, fx.dirs)], 2)})` : ''}</span></div>
+          <div className="tt-row"><span>Barricadas</span><span className="num">{fx.fort}/5</span></div>
+          <div className="tt-row"><span>Atrincheramiento del defensor</span><span className="num">{pct(fx.dig)}</span></div>
+          <div className="tt-sep" />
+          <div className="tt-row"><span>Fuego efectivo del atacante</span><span className={`num ${fx.attackMod < 1 ? 'bad' : 'good'}`}>×{fmt(fx.attackMod, 2)}</span></div>
+          <div className="tt-row"><span>Defensa del defensor</span><span className="num good">×{fmt(fx.defenseMod, 2)}</span></div>
+        </div>
+      }
+    >
+      <div className="battle-factors">
+        <span><Icon name="MoveHorizontal" size={12} /> {fmt(fx.widthA)}/{fmt(fx.width)} · {fmt(fx.widthD)}/{fmt(fx.width)}</span>
+        <span><Icon name="Split" size={12} /> {fx.dirs}</span>
+        <span><Icon name="BrickWall" size={12} /> {fx.fort}</span>
+        <span><Icon name="Shovel" size={12} /> {pct(fx.dig)}</span>
+        <span className={fx.attackMod < 1 ? 'bad' : 'good'}><Icon name="Crosshair" size={12} /> ×{fmt(fx.attackMod, 2)}</span>
+      </div>
+    </Tip>
   );
 }
 

@@ -46,6 +46,9 @@ export interface UnitStats {
   vision: number;
   reinforce: number;
   excavation: number;
+  /** Ataque de los batallones de fuego indirecto (morteros), que disparan desde la reserva. */
+  indirectSoft: number;
+  indirectHard: number;
 }
 
 export function emptyEquipment(): Record<EquipmentId, number> {
@@ -93,6 +96,8 @@ export function templateStats(state: GameState, f: FactionId, tpl: TemplateDef):
     vision: 0,
     reinforce: 0,
     excavation: 0,
+    indirectSoft: 0,
+    indirectHard: 0,
   };
   let orgSum = 0;
   let maxArmor = 0;
@@ -128,6 +133,10 @@ export function templateStats(state: GameState, f: FactionId, tpl: TemplateDef):
       s.vision = Math.max(s.vision, sp.vision ?? 0);
       s.reinforce += sp.reinforce ?? 0;
       s.excavation += sp.excavation ?? 0;
+      if (sp.indirect) {
+        s.indirectSoft += b.soft * q;
+        s.indirectHard += b.hard * q;
+      }
     }
   }
   for (const b of line) {
@@ -147,6 +156,8 @@ export function templateStats(state: GameState, f: FactionId, tpl: TemplateDef):
   s.org = (orgSum / Math.max(1, bats.length)) * (1 + (m.organizacion ?? 0));
   s.soft *= 1 + (m.ataque ?? 0);
   s.hard *= 1 + (m.ataque ?? 0);
+  s.indirectSoft *= 1 + (m.ataque ?? 0);
+  s.indirectHard *= 1 + (m.ataque ?? 0);
   s.def *= 1 + (m.defensa ?? 0);
   s.brk *= 1 + (m.ruptura ?? 0);
   if (s.speed === 99) s.speed = 4;
@@ -354,18 +365,37 @@ export function findPath(
   return path;
 }
 
+/** ¿Está la unidad defendiendo su provincia de un ataque? */
+export function isDefending(state: GameState, u: Unit): boolean {
+  return !!u.battle && !!state.battles[u.battle]?.defenders.includes(u.id);
+}
+
+/**
+ * Ordena mover unidades. Una unidad que defiende puede replegarse: deja de combatir y
+ * sale de la provincia; si el atacante gana antes de que salga, huye con media organización.
+ */
 export function orderMove(state: GameState, unitIds: string[], target: string): number {
   let ok = 0;
   for (const id of unitIds) {
     const u = state.units[id];
-    if (!u || u.battle && state.battles[u.battle]?.defenders.includes(u.id)) continue;
+    if (!u) continue;
     const stats = unitStats(state, u);
     const path = findPath(state, u.owner, u.province, target, { noAux: stats.noAux, speed: stats.speed });
     if (!path) continue;
+    const withdrawing = isDefending(state, u);
+    if (path.length === 0) {
+      // Orden de quedarse donde está: cancela el movimiento.
+      if (!withdrawing && u.battle) leaveBattle(state, u);
+      u.path = [];
+      u.moveProgress = 0;
+      u.retreating = false;
+      ok++;
+      continue;
+    }
     if (u.battle) leaveBattle(state, u);
     if (u.path[0] !== path[0]) u.moveProgress = 0;
     u.path = path;
-    u.retreating = false;
+    u.retreating = withdrawing;
     ok++;
   }
   return ok;
@@ -375,16 +405,20 @@ export function stopUnits(state: GameState, unitIds: string[]) {
   for (const id of unitIds) {
     const u = state.units[id];
     if (!u) continue;
-    if (u.battle && state.battles[u.battle]?.attackers.includes(u.id)) leaveBattle(state, u);
+    if (u.battle && !isDefending(state, u)) leaveBattle(state, u);
     u.path = [];
     u.moveProgress = 0;
+    u.retreating = false;
   }
 }
 
 export function leaveBattle(state: GameState, u: Unit) {
   if (!u.battle) return;
   const b = state.battles[u.battle];
-  if (b) b.attackers = b.attackers.filter((x) => x !== u.id);
+  if (b) {
+    b.attackers = b.attackers.filter((x) => x !== u.id);
+    b.defenders = b.defenders.filter((x) => x !== u.id);
+  }
   u.battle = null;
 }
 
@@ -559,8 +593,14 @@ export function applyLoss(state: GameState, u: Unit, fraction: number, stats?: U
   killMen(state, u.owner, s.men * f);
 }
 
+/** Días que tarda una unidad inmóvil en atrincherarse del todo. */
+export const DIG_DAYS = 8;
+
 export function hourlyOrg(state: GameState) {
   for (const u of Object.values(state.units)) {
+    // Atrincheramiento: crece mientras la unidad no se mueve ni ataca.
+    if (u.path.length > 0 || u.retreating) u.dug = 0;
+    else if ((u.dug ?? 0) < 1) u.dug = Math.min(1, (u.dug ?? 0) + 1 / (DIG_DAYS * 24));
     if (u.battle) continue;
     const stats = unitStats(state, u);
     if (u.org >= stats.org) {
