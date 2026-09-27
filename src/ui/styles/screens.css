@@ -9,13 +9,21 @@
 .menu-map {
   position: absolute;
   inset: 0;
-  opacity: 0.85;
+}
+.menu-backdrop {
+  position: absolute;
+  inset: 0;
+}
+.menu-backdrop canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 .menu-shade {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, rgba(8, 10, 9, 0.96) 0%, rgba(8, 10, 9, 0.82) 38%, rgba(8, 10, 9, 0.15) 75%),
+    linear-gradient(90deg, rgba(8, 10, 9, 0.94) 0%, rgba(8, 10, 9, 0.7) 32%, rgba(8, 10, 9, 0) 58%),
     radial-gradient(ellipse at 20% 50%, rgba(233, 165, 60, 0.08), transparent 60%);
 }
 .menu-content {

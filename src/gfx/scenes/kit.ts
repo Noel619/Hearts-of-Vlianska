@@ -257,7 +257,7 @@ export function platformHall({ g, w, h, r }: Stage, o: { vx: number; vy: number;
   g.lineTo(w, h);
   g.closePath();
   g.fill();
-  g.strokeStyle = 'rgba(0,0,0,0.25)';
+  g.strokeStyle = 'rgba(0,0,0,0.13)';
   g.lineWidth = 1;
   for (let k = -14; k <= 14; k++) {
     g.beginPath();
@@ -483,8 +483,8 @@ export function figureShape(x: number, y: number, H: number, o: FigureOpts): Fig
   const sY = 0.815 - drop;
   const shW = (fem ? 0.095 : 0.108) * bulk;
   const hipW = (fem ? 0.058 : 0.05) * bulk;
-  const thigh = 0.078 * bulk;
-  const calf = 0.056 * bulk;
+  const thigh = 0.078 * bulk * H;
+  const calf = 0.056 * bulk * H;
   // ---- Piernas
   const leg = (hip: P2, knee: P2, ankle: P2, toe: number) => {
     capsule(body, hip, knee, thigh, calf * 1.05);
@@ -499,6 +499,11 @@ export function figureShape(x: number, y: number, H: number, o: FigureOpts): Fig
     body.push(boot);
   };
   if (sit) {
+    // Asiento: una caja o un tronco bajo la cadera
+    const seat = new Path2D();
+    const s0 = P(-0.13, hipY - 0.01);
+    seat.rect(Math.min(s0[0], s0[0] + f * H * 0.24), s0[1], H * 0.24, hipY * H + 0.01 * H);
+    gear.push(seat);
     leg(P(-0.02, hipY), P(0.17, hipY + 0.04), P(0.19, 0.04), 0.02);
     leg(P(0.03, hipY), P(0.22, hipY + 0.02), P(0.26, 0.04), 0.02);
   } else if (kneel) {
@@ -563,10 +568,11 @@ export function figureShape(x: number, y: number, H: number, o: FigureOpts): Fig
   const stick = (a: P2, b: P2, wd: number) => capsule(gear, a, b, wd * H, wd * H);
   switch (pose) {
     case 'rifle':
-      arm(shF, P(0.13, sY - 0.17), P(0.08, sY - 0.09));
-      arm(shB, P(-0.05, sY - 0.2), P(0.02, sY - 0.22));
-      stick(P(-0.07, sY - 0.34), P(0.15, sY + 0.1), 0.026);
-      hand = P(0.08, sY - 0.09);
+      // Arma terciada: culata abajo y adelante, cañón sobre el hombro
+      arm(shF, P(0.14, sY - 0.16), P(0.1, sY - 0.25));
+      arm(shB, P(0.02, sY - 0.14), P(0.02, sY - 0.06));
+      stick(P(0.12, sY - 0.34), P(-0.1, sY + 0.14), 0.026);
+      hand = P(0.1, sY - 0.25);
       break;
     case 'aim':
       arm(shF, P(0.04, sY - 0.1), P(0.03, sY - 0.02));

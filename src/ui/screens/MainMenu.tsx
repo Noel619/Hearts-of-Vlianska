@@ -12,6 +12,7 @@ import { AUTOSAVE_SLOT, hasAutosave, loadGame } from '../saves';
 import { go, nav, store, ui } from '../store';
 import { ImportSave } from '../game/Modals';
 import { HelpModal } from './Help';
+import { MenuBackdrop } from './MenuBackdrop';
 import { deleteSave, listSaves } from '../saves';
 
 function LoadModal({ onClose }: { onClose: () => void }) {
@@ -73,12 +74,11 @@ function LoadModal({ onClose }: { onClose: () => void }) {
 
 export function MainMenu() {
   const n = nav.use();
-  const demo = useMemo(() => newGame({ player: null, seed: 2033 }), []);
   const canContinue = hasAutosave();
   return (
     <div className="menu-screen">
       <div className="menu-map">
-        <MapView mode="demo" state={demo} />
+        <MenuBackdrop />
       </div>
       <div className="menu-shade" />
       <div className="menu-content">
