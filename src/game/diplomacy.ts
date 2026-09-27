@@ -255,7 +255,7 @@ export function aiAcceptsPeace(state: GameState, ai: FactionId, proposer: Factio
   if (p.surrender >= 0.2) return { ok: false, reason: 'Estamos ganando: no hay paz sin victoria.' };
   if (myStr < theirStr * 0.6) return { ok: true, reason: 'Su ejército es muy superior.' };
   if (duration > 365 && c.derived.warSupport < 0.4) return { ok: true, reason: 'La población está cansada de la guerra.' };
-  if (duration > 540) return { ok: true, reason: 'La guerra se ha estancado.' };
+  if (duration > 540 || (duration > 400 && c.surrender < 0.15 && p.surrender < 0.15)) return { ok: true, reason: 'La guerra se ha estancado.' };
   return { ok: false, reason: 'Todavía creemos que podemos ganar.' };
 }
 

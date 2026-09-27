@@ -376,8 +376,9 @@ export function aiRecruit(state: GameState, f: FactionId) {
     c.wargoals.length > 0 ||
     state.tension > 0.4 ||
     aliveFactions(state).some((o) => o !== f && state.countries[o].wargoals.some((w) => w.target === f));
-  // Reserva de mano de obra para refuerzos.
-  const reserve = units.length * 6 + (war ? 0 : 10);
+  // Reserva de mano de obra para refuerzos (menor si faltan tropas para cubrir el frente).
+  const short = (c.ai.shortage ?? 0) > 0;
+  const reserve = units.length * (short ? 3 : 6) + (war ? 0 : 10);
   if (c.derived.manpowerAvailable < stats.men + reserve) return;
   let eqRatio = 1;
   for (const eq of EQUIPMENT_IDS) {
@@ -385,7 +386,7 @@ export function aiRecruit(state: GameState, f: FactionId) {
   }
   if (eqRatio < (war ? 0.5 : 0.8)) return;
   const cap = Math.max(3, Math.round(c.derived.population / 180));
-  if (!war && units.length >= cap) return;
+  if (!war && !short && units.length >= cap) return;
   if (canRecruit(state, f, tpl.id).ok) recruit(state, f, tpl.id);
 }
 

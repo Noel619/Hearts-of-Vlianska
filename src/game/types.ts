@@ -618,6 +618,10 @@ export interface AIState {
   targetWar?: FactionId;
   focusBias?: Record<string, number>;
   rejected: Partial<Record<FactionId, number>>;
+  /** Valor de combate que falta para cubrir todas las estaciones amenazadas. */
+  shortage?: number;
+  /** Ofensiva en curso (para no cambiar de objetivo cada día). */
+  plan?: { target: string; until: number };
 }
 
 export interface CountryState {

@@ -108,7 +108,9 @@ export function aiDiplomacy(state: GameState, f: FactionId) {
     const days = (state.hour - w.start) / 24;
     const enemyPower = (mySide === 'att' ? w.defenders : w.attackers).reduce((s, e) => s + armyPower(state, e), 0);
     const losing = c.surrender >= 0.3 || (days > 90 && myPower < enemyPower * 0.5) || (days > 400 && c.surrender > state.countries[enemyLeader].surrender);
-    if (!losing || !cooldownOk(state, f, `paz_${enemyLeader}`, 60)) continue;
+    // Guerra estancada: nadie ha ganado terreno en más de un año.
+    const stalemate = days > 400 && c.surrender < 0.15 && state.countries[enemyLeader].surrender < 0.15;
+    if ((!losing && !stalemate) || !cooldownOk(state, f, `paz_${enemyLeader}`, 60)) continue;
     if (state.player === enemyLeader) fireEvent(state, enemyLeader, 'diplo_propuesta_paz', { from: f });
     else if (aiAcceptsPeace(state, enemyLeader, f).ok) whitePeace(state, f, enemyLeader);
   }
