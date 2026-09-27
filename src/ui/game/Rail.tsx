@@ -3,8 +3,9 @@ import type { ReactNode } from 'react';
 import { FACTIONS, FOCUS_BY_ID, TECH_BY_ID } from '../../data';
 import { availableFocuses, focusDaysLeft } from '../../game/focus';
 import { researchCost } from '../../game/research';
+import { constructionIdle, constructionIsIdle } from '../../game/economy';
 import { isAtWar } from '../../game/helpers';
-import { Icon, Tip, Bar } from '../components/core';
+import { Icon, Tip, Bar, fmt } from '../components/core';
 import { Medal } from '../components/art';
 import { blendCategory } from '../../gfx/medallions';
 import { ui, useGame, type PanelId } from '../store';
@@ -46,7 +47,10 @@ export function Rail() {
         }
         if (it.id === 'tech') {
           const busy = c.research.active.filter(Boolean).length;
-          badge = <span className="rail-count">{busy}/{c.research.slots}</span>;
+          badge = <span className={`rail-count ${busy < c.research.slots ? 'warn' : ''}`}>{busy}/{c.research.slots}</span>;
+        }
+        if (it.id === 'construccion' && constructionIsIdle(state, state.player!)) {
+          badge = <span className="rail-count warn">!</span>;
         }
         return (
           <Tip key={it.id} content={<div><h4>{it.label}</h4><div className="faint">Tecla <span className="kbd">{it.key}</span></div></div>} as="div">
@@ -84,8 +88,22 @@ export function Alerts() {
   if (d.milAssigned < Math.floor(d.milTotal)) {
     alerts.push({ id: 'mil', icon: 'Factory', tone: 'warn', title: 'Talleres militares sin asignar', text: `${Math.floor(d.milTotal) - d.milAssigned} taller(es) sin línea de producción.`, onClick: () => ui.set({ panel: 'produccion', overlay: null }) });
   }
-  if (c.construction.length === 0 && d.civAvailable >= 1) {
-    alerts.push({ id: 'civ', icon: 'Hammer', tone: 'warn', title: 'Construcción parada', text: 'Tus talleres civiles no están construyendo nada.', onClick: () => ui.set({ panel: 'construccion', overlay: null }) });
+  if (constructionIsIdle(state, f)) {
+    const info = constructionIdle(state, f);
+    const what = [
+      info.options.factories > 0 ? `${info.options.factories} espacio(s) para talleres o granjas` : '',
+      info.options.infra ? 'infraestructura' : '',
+      info.options.forts ? 'barricadas' : '',
+    ].filter(Boolean);
+    const empty = c.construction.length === 0;
+    alerts.push({
+      id: 'civ',
+      icon: 'Hammer',
+      tone: empty ? 'bad' : 'warn',
+      title: empty ? 'Construcción parada' : 'Talleres civiles ociosos',
+      text: `${empty ? 'Tus talleres civiles no están construyendo nada.' : `${fmt(info.idle, 1)} taller(es) civil(es) sin obra asignada.`}${info.stalled ? ` ${info.stalled} obra(s) en territorio perdido no avanzan.` : ''} Puedes construir: ${what.join(', ')}.`,
+      onClick: () => ui.set({ panel: 'construccion', overlay: null }),
+    });
   }
   const foodBal = d.foodProd - d.foodCons + d.foodTrade;
   if (foodBal < 0) {

@@ -40,3 +40,28 @@ describe('motor', () => {
     expect(serialize(b)).toBe(serialize(a));
   });
 });
+
+describe('avisos de construcción', () => {
+  it('avisa a las facciones pobres cuando sus talleres civiles están parados', async () => {
+    const { constructionIsIdle, queueBuilding } = await import('../src/game/economy');
+    const state = newGame({ player: 'CAL', seed: 3 });
+    // El Califato empieza con menos de un taller civil libre: antes nunca se avisaba.
+    expect(state.countries.CAL.derived.civAvailable).toBeLessThan(1);
+    expect(constructionIsIdle(state, 'CAL')).toBe(true);
+    playDays(state, 2);
+    expect(state.log.some((l) => l.faction === 'CAL' && l.text.includes('talleres civiles'))).toBe(true);
+    expect(queueBuilding(state, 'CAL', 'granja', 'MER')).toBe(true);
+    expect(constructionIsIdle(state, 'CAL')).toBe(false);
+  });
+
+  it('avisa cuando la cola no aprovecha todos los talleres', async () => {
+    const { constructionIdle, constructionIsIdle, queueBuilding } = await import('../src/game/economy');
+    const state = newGame({ player: 'UNI', seed: 3 });
+    queueBuilding(state, 'UNI', 'civil', 'TSE');
+    // Una sola obra usa como mucho 5 talleres; a la Unión le sobran.
+    expect(constructionIdle(state, 'UNI').idle).toBeGreaterThan(1);
+    expect(constructionIsIdle(state, 'UNI')).toBe(true);
+    queueBuilding(state, 'UNI', 'civil', 'ZVE');
+    expect(constructionIsIdle(state, 'UNI')).toBe(false);
+  });
+});

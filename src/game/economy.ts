@@ -199,12 +199,12 @@ export function dailyEconomy(state: GameState, f: FactionId) {
   const finished: string[] = [];
   for (const item of c.construction) {
     if (civLeft <= 0) break;
+    // Solo se construye en lo que controlamos; las obras paradas no retienen talleres.
+    if (state.provinces[item.location]?.controller !== f) continue;
     const civ = Math.min(MAX_CIV_PER_PROJECT, civLeft);
     civLeft -= civ;
     const stationId = MAP.provinces[item.location]?.kind === 'estacion' ? item.location : null;
     const infra = stationId ? state.stations[stationId].buildings.infraestructura : 0;
-    // Solo se construye en lo que controlamos.
-    if (state.provinces[item.location]?.controller !== f) continue;
     item.progress += civ * speed * (1 + 0.1 * infra);
     if (item.progress >= BUILDINGS[item.building].cost) finished.push(item.id);
   }
@@ -213,6 +213,7 @@ export function dailyEconomy(state: GameState, f: FactionId) {
     c.construction = c.construction.filter((x) => x.id !== id);
     completeBuilding(state, f, item.building, item.location);
   }
+  if (state.player === f) remindIdleConstruction(state, f, finished.length > 0);
 
   // Producción
   let assigned = 0;
@@ -337,10 +338,14 @@ export function buildDaysLeft(state: GameState, f: FactionId, index: number): nu
   const speed = Math.max(0.1, 1 + (m.construccion ?? 0) + (m.produccionCivil ?? 0));
   let civLeft = c.derived.civAvailable;
   for (let i = 0; i < c.construction.length; i++) {
+    const item = c.construction[i];
+    if (state.provinces[item.location]?.controller !== f) {
+      if (i === index) return null;
+      continue;
+    }
     const civ = Math.min(MAX_CIV_PER_PROJECT, Math.max(0, civLeft));
     civLeft -= civ;
     if (i === index) {
-      const item = c.construction[i];
       const sid = MAP.provinces[item.location]?.kind === 'estacion' ? item.location : null;
       const infra = sid ? state.stations[sid].buildings.infraestructura : 0;
       const perDay = civ * speed * (1 + 0.1 * infra);
@@ -349,6 +354,78 @@ export function buildDaysLeft(state: GameState, f: FactionId, index: number): nu
     }
   }
   return null;
+}
+
+export interface ConstructionIdle {
+  /** Talleres civiles que hoy no trabajan en ninguna obra. */
+  idle: number;
+  /** Obras de la cola que no avanzan (la ubicación no está bajo nuestro control). */
+  stalled: number;
+  /** Qué se podría construir ahora mismo. */
+  options: { factories: number; infra: boolean; forts: boolean };
+}
+
+/** Talleres civiles ociosos y qué se podría construir con ellos. */
+export function constructionIdle(state: GameState, f: FactionId): ConstructionIdle {
+  const c = state.countries[f];
+  let civLeft = Math.max(0, c.derived.civAvailable);
+  let stalled = 0;
+  for (const item of c.construction) {
+    if (state.provinces[item.location]?.controller !== f) {
+      stalled++;
+      continue;
+    }
+    civLeft -= Math.min(MAX_CIV_PER_PROJECT, civLeft);
+  }
+  let factories = 0;
+  let infra = false;
+  let forts = false;
+  for (const sid of Object.keys(state.stations)) {
+    if (state.stations[sid].owner !== f || state.provinces[sid].controller !== f) continue;
+    if (canBuild(state, f, 'civil', sid).ok) factories += state.stations[sid].slots - slotsUsed(state, sid, f);
+    if (canBuild(state, f, 'infraestructura', sid).ok) infra = true;
+    if (canBuild(state, f, 'fortificacion', sid).ok) forts = true;
+  }
+  return { idle: Math.max(0, civLeft), stalled, options: { factories, infra, forts } };
+}
+
+/** ¿Hay talleres civiles parados pudiendo construir algo útil? */
+export function constructionIsIdle(state: GameState, f: FactionId): boolean {
+  const info = constructionIdle(state, f);
+  const canDoSomething = info.options.factories > 0 || info.options.infra || info.options.forts;
+  // Umbral pequeño: incluso medio taller parado es producción perdida para las facciones pobres.
+  return canDoSomething && info.idle >= Math.min(0.5, state.countries[f].derived.civAvailable * 0.5) && info.idle > 0.05;
+}
+
+const IDLE_REMINDER_DAYS = 30;
+
+/** Avisa al jugador cuando la cola se vacía y le recuerda periódicamente que sus talleres están parados. */
+function remindIdleConstruction(state: GameState, f: FactionId, justFinished: boolean) {
+  const c = state.countries[f];
+  const idle = constructionIsIdle(state, f);
+  if (!idle) {
+    c.idleSince = undefined;
+    return;
+  }
+  const since = c.idleSince;
+  const empty = c.construction.length === 0;
+  if (since === undefined) {
+    c.idleSince = state.hour;
+    addLog(state, {
+      text: empty
+        ? justFinished
+          ? 'La cola de construcción se ha quedado vacía: tus talleres civiles están parados.'
+          : 'Tus talleres civiles no están construyendo nada.'
+        : 'Tienes talleres civiles sin obra asignada: añade más construcciones a la cola.',
+      kind: 'malo',
+      faction: f,
+    });
+    return;
+  }
+  if (state.hour - since >= IDLE_REMINDER_DAYS * 24) {
+    c.idleSince = state.hour;
+    addLog(state, { text: `Recordatorio: llevas ${IDLE_REMINDER_DAYS} días con talleres civiles parados.`, kind: 'malo', faction: f });
+  }
 }
 
 // ---------------------------------------------------------------------------

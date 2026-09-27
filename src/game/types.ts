@@ -653,6 +653,8 @@ export interface CountryState {
   unitCounter: number;
   manpowerBonus: number;
   overlord?: FactionId;
+  /** Hora desde la que el jugador tiene talleres civiles parados (para los recordatorios). */
+  idleSince?: number;
   derived: CountryDerived;
   ai: AIState;
 }
