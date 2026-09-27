@@ -3,7 +3,7 @@
 // Una revolución paciente ante tres preguntas:
 // - ¿Quién sucede a Morozov? La democracia de los consejos (Voronina) o el aparato de seguridad (Lysenko).
 // - ¿Qué hacer con Mertvaya? Asfixiarla hasta el asalto final o ganarse a su gente con convoyes y
-//   radio, extendiendo la influencia del Consejo sobre la Esmeralda.
+//   radio, metiendo a los comisarios del Consejo en la Esmeralda.
 // - ¿Revolución en un solo metro o revolución permanente? Consolidar y comerciar, o agitar al Norte,
 //   a los obreros de la Unión y a los de la Gran Forja de Industrialnaya.
 import type { Condition, DecisionDef, EventDef, FocusTreeDef, SpiritDef } from '../../game/types';
@@ -468,7 +468,7 @@ export const tree: FocusTreeDef = {
       y: 3,
       prereq: [['lev_ganarse']],
       bypass: SIN_CAL,
-      effects: [{ t: 'scoped', target: 'CAL', effects: [{ t: 'popularity', id: 'comunismo', v: 10 }, { t: 'influence', target: 'FROM', v: 10 }] }],
+      effects: [{ t: 'scoped', target: 'CAL', effects: [{ t: 'popularity', id: 'comunismo', v: 10 }, { t: 'stability', v: -0.02 }] }],
       ai: 14,
     },
     {
@@ -507,7 +507,7 @@ export const tree: FocusTreeDef = {
         c: 'or',
         list: [
           { c: 'scoped', target: 'CAL', cond: { c: 'subjectOf', target: 'FROM' } },
-          { c: 'scoped', target: 'CAL', cond: { c: 'influence', target: 'FROM', min: 50 } },
+          { c: 'scoped', target: 'CAL', cond: { c: 'hasSpirit', id: 'cal_comision' } },
         ],
       },
       bypass: { c: 'or', list: [SIN_CAL, { c: 'owns', station: 'MER' }] },
@@ -516,7 +516,6 @@ export const tree: FocusTreeDef = {
         { t: 'liftEmbargo', target: 'CAL' },
         { t: 'stability', v: 0.05 },
         { t: 'pp', v: 60 },
-        { t: 'scoped', target: 'CAL', effects: [{ t: 'influenceDrift', target: 'FROM', v: 1 }] },
       ],
       ai: 16,
     },
@@ -613,7 +612,7 @@ export const tree: FocusTreeDef = {
       prereq: [['lev_permanente']],
       bypass: { c: 'not', cond: { c: 'exists', target: 'NOR' } },
       effects: [
-        { t: 'scoped', target: 'NOR', effects: [{ t: 'popularity', id: 'comunismo', v: 12 }, { t: 'influence', target: 'FROM', v: 10 }, { t: 'influenceDrift', target: 'FROM', v: 1 }] },
+        { t: 'scoped', target: 'NOR', effects: [{ t: 'popularity', id: 'comunismo', v: 12 }, { t: 'stability', v: -0.03 }] },
         { t: 'relation', target: 'NOR', v: -5 },
       ],
       ai: 14,
@@ -627,7 +626,7 @@ export const tree: FocusTreeDef = {
       y: 3,
       prereq: [['lev_permanente']],
       bypass: { c: 'not', cond: { c: 'exists', target: 'UNI' } },
-      effects: [{ t: 'scoped', target: 'UNI', effects: [{ t: 'popularity', id: 'comunismo', v: 10 }, { t: 'influence', target: 'FROM', v: 5 }] }, { t: 'relation', target: 'UNI', v: -10 }],
+      effects: [{ t: 'scoped', target: 'UNI', effects: [{ t: 'popularity', id: 'comunismo', v: 10 }] }, { t: 'relation', target: 'UNI', v: -10 }],
       ai: 12,
     },
     {
@@ -816,7 +815,6 @@ export const events: EventDef[] = [
           { t: 'removeSpirit', id: 'hambruna' },
           { t: 'flag', id: 'cal_rendida' },
           { t: 'flag', id: 'cal_moderados' },
-          { t: 'influence', target: 'FROM', v: 40 },
         ],
         available: { c: 'stability', max: 0.3 },
         ai: 1,
@@ -837,8 +835,7 @@ export const events: EventDef[] = [
         effects: [
           { t: 'food', v: 90 },
           { t: 'removeSpirit', id: 'hambruna' },
-          { t: 'influence', target: 'FROM', v: 20 },
-          { t: 'influenceDrift', target: 'FROM', v: 2 },
+          { t: 'addSpirit', id: 'cal_comisarios_rojos' },
           { t: 'popularity', id: 'comunismo', v: 6 },
           { t: 'relation', target: 'FROM', v: 20 },
         ],
@@ -862,7 +859,7 @@ export const events: EventDef[] = [
     options: [
       {
         name: 'El pueblo ha hablado: ¡todo el poder a los consejos!',
-        effects: [{ t: 'setIdeology', id: 'comunismo', leader: 'lebedevaRoja' }, { t: 'joinPact', target: 'FROM' }, { t: 'influence', target: 'FROM', v: 20 }],
+        effects: [{ t: 'setIdeology', id: 'comunismo', leader: 'lebedevaRoja' }, { t: 'joinPact', target: 'FROM' }],
         ai: 1,
         aiIf: [{ cond: { c: 'popularity', id: 'comunismo', min: 45 }, factor: 3 }],
       },
@@ -871,7 +868,6 @@ export const events: EventDef[] = [
         effects: [
           { t: 'stability', v: -0.1 },
           { t: 'popularity', id: 'comunismo', v: -10 },
-          { t: 'influence', target: 'FROM', v: -20 },
           { t: 'relation', target: 'FROM', v: -40 },
           { t: 'scoped', target: 'FROM', effects: [{ t: 'wargoal', target: 'FROM' }] },
         ],
@@ -941,7 +937,7 @@ export const decisions: DecisionDef[] = [
     cost: { pp: 40 },
     cooldown: 90,
     effects: [
-      { t: 'scoped', target: 'TARGET', effects: [{ t: 'popularity', id: 'comunismo', v: 6 }, { t: 'influence', target: 'FROM', v: 4 }] },
+      { t: 'scoped', target: 'TARGET', effects: [{ t: 'popularity', id: 'comunismo', v: 6 }] },
       { t: 'relation', target: 'TARGET', v: -5 },
     ],
     ai: 10,
@@ -975,7 +971,7 @@ export const decisions: DecisionDef[] = [
       {
         t: 'scoped',
         target: 'CAL',
-        effects: [{ t: 'food', v: 40 }, { t: 'popularity', id: 'comunismo', v: 4 }, { t: 'influence', target: 'FROM', v: 5 }],
+        effects: [{ t: 'food', v: 40 }, { t: 'popularity', id: 'comunismo', v: 4 }],
       },
       { t: 'relation', target: 'CAL', v: 5 },
     ],

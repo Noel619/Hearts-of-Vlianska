@@ -9,7 +9,6 @@ Enero de 2033. Veinte años después de las bombas, ocho facciones se reparten l
 - **8 facciones jugables**, cada una con su propio árbol de enfoques nacionales (373 enfoques en total, entre 40 y 52 por facción, organizados en ramas), líder, espíritus nacionales y objetivos:
   Unión de Estaciones, Seguidores de Rusia, Levantamiento Popular, Stantsiya Staraya, Saqueadores de Vhlainska, Chernovodskaya, Califato de Izumrudnaya y República del Norte.
   Cada árbol plantea dilemas propios: el Califato puede seguir con la guerra santa, negociar con el Levantamiento (comida a cambio de comisarios y soberanía) o abrir sus puertas; el Levantamiento decide quién sucede a Morozov y si asfixia Mertvaya o se la gana; los Seguidores eligen entre los magnates y los obreros de la Gran Forja…
-- **Influencia extranjera**: tributos, deudas, protectores y negociaciones dan a otras facciones poder sobre tus decisiones. Resta poder político, extiende su ideología, abre tus túneles a sus tropas y, al máximo, fuerza una crisis de soberanía.
 - **Mapa por provincias**: estaciones y tramos de túnel (líneas principales, túneles peligrosos, auxiliares, estrechos y derrumbes), con niebla de guerra y modos de mapa (político, diplomático, terreno, peligro mutante y suministro).
 - **Política**: poder político, estabilidad, apoyo a la guerra, 7 ideologías con popularidad y cambios de gobierno, 18 leyes en 4 grupos, 34 asesores, sucesiones de líderes.
 - **Investigación**: 76 tecnologías en 6 ramas, con penalización por adelantarse a su año.

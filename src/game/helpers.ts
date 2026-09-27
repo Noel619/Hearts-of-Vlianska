@@ -107,8 +107,6 @@ export function friendly(state: GameState, a: FactionId, b: FactionId): boolean 
 export function hasAccess(state: GameState, mover: FactionId, owner: FactionId): boolean {
   if (mover === owner) return true;
   if (friendly(state, mover, owner)) return true;
-  // Bajo tutela (influencia 50 o más), las tropas de quien la ejerce pasan libremente.
-  if ((state.countries[owner].influence?.[mover] ?? 0) >= 50 && !isAtWarWith(state, mover, owner)) return true;
   return state.access.some((a) => a.from === owner && a.to === mover);
 }
 

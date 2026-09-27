@@ -5,7 +5,6 @@ import { answerEvent } from '../src/game/events';
 import { completeFocus, focusStatus, startFocus } from '../src/game/focus';
 import { canJustify } from '../src/game/diplomacy';
 import { hasAccess } from '../src/game/helpers';
-import { addInfluence, monthlyInfluence } from '../src/game/influence';
 import { modSources } from '../src/game/modifiers';
 import { FOCUS_TREES, EVENTS } from '../src/data';
 import type { FactionId, GameState } from '../src/game/types';
@@ -18,7 +17,7 @@ function take(state: GameState, f: FactionId, id: string, answer = 0) {
 }
 
 describe('enfoques: el Califato', () => {
-  it('negociar trae comida, pero el Levantamiento gana influencia y paso militar', () => {
+  it('negociar trae comida, pero los comisarios del Levantamiento deciden cada vez más', () => {
     const s = newGame({ player: 'CAL', seed: 1 });
     take(s, 'CAL', 'cal_quinto_invierno');
     take(s, 'CAL', 'cal_tregua'); // La noche de los ancianos: gobiernan Karimov y los ancianos.
@@ -27,21 +26,25 @@ describe('enfoques: el Califato', () => {
     take(s, 'CAL', 'cal_bandera_blanca'); // El Levantamiento (IA) acepta hablar.
     expect(s.countries.CAL.flags.cal_tregua_abierta).toBeDefined();
     take(s, 'CAL', 'cal_corredor'); // El Levantamiento abre el corredor con sus comisarios.
-    expect(s.countries.CAL.spirits.some((x) => x.id === 'hambruna')).toBe(false);
+    const spirits = () => s.countries.CAL.spirits.map((x) => x.id);
+    expect(spirits()).not.toContain('hambruna');
+    expect(spirits()).toContain('cal_comisarios_rojos');
     expect(s.embargoes.some((e) => e.from === 'LEV' && e.to === 'CAL')).toBe(false);
     take(s, 'CAL', 'cal_entregar_culpables');
     take(s, 'CAL', 'cal_comision_mixta');
-    const inf = s.countries.CAL.influence.LEV ?? 0;
-    expect(inf).toBeGreaterThanOrEqual(50);
-    // Bajo tutela: sus tropas cruzan nuestros túneles y no podemos justificar una guerra contra ellos.
+    // La Comisión Mixta sustituye a los comisarios: sus tropas cruzan nuestros túneles y no podemos atacarles.
+    expect(spirits()).toContain('cal_comision');
+    expect(spirits()).not.toContain('cal_comisarios_rojos');
     expect(hasAccess(s, 'LEV', 'CAL')).toBe(true);
     expect(canJustify(s, 'CAL', 'LEV').ok).toBe(false);
     // Y se nota en el poder político.
-    const drain = modSources(s, 'CAL').find((m) => m.label.startsWith('Influencia de'));
+    const drain = modSources(s, 'CAL').find((m) => m.label.includes('Comisión Mixta'));
     expect(drain?.mods.ppDiario).toBeLessThan(0);
-    // El corredor mantiene la presión: la influencia sigue creciendo cada mes.
-    monthlyInfluence(s);
-    expect(s.countries.CAL.influence.LEV ?? 0).toBeGreaterThan(inf);
+    // Mientras dure, la Comisión vuelve cada pocos meses con nuevas exigencias.
+    expect(EVENTS.cal_exigencias.once).toBe(false);
+    s.player = null;
+    advanceDays(s, 400);
+    expect(s.countries.CAL.firedEvents.cal_exigencias ?? 0).toBeGreaterThan(0);
   });
 
   it('recuperar la soberanía expulsa a los comisarios', () => {
@@ -51,8 +54,8 @@ describe('enfoques: el Califato', () => {
     s.countries.CAL.derived.foodProd = 50;
     s.countries.CAL.derived.foodCons = 10;
     take(s, 'CAL', 'cal_recuperar_soberania');
-    expect(s.countries.CAL.influence.LEV ?? 0).toBeLessThan(50);
-    expect(s.countries.CAL.influenceDrift.LEV ?? 0).toBe(0);
+    expect(s.countries.CAL.spirits.some((x) => x.id === 'cal_comision')).toBe(false);
+    expect(hasAccess(s, 'LEV', 'CAL')).toBe(false);
     expect(focusStatus(s, 'CAL', 'cal_autonomia_tutelada')).toBe('excluded');
   });
 
@@ -62,7 +65,6 @@ describe('enfoques: el Califato', () => {
     take(s, 'CAL', 'cal_abrir_puertas');
     expect(s.countries.CAL.overlord).toBe('LEV');
     expect(s.countries.CAL.alive).toBe(true);
-    expect(s.countries.CAL.influence.LEV ?? 0).toBeGreaterThanOrEqual(40);
     take(s, 'CAL', 'cal_amnistia');
     take(s, 'CAL', 'cal_comisarios');
     take(s, 'CAL', 'cal_esmeralda_roja');
@@ -93,12 +95,17 @@ describe('enfoques: sistema', () => {
     expect(s.countries.LEV.pp).toBe(pp);
   });
 
-  it('una influencia total provoca una crisis de soberanía', () => {
-    const s = newGame({ player: null, seed: 6 });
-    addInfluence(s, 'NOR', 'UNI', 100);
-    // La IA del Norte elige entre protectorado o ruptura; en ambos casos la crisis se resuelve.
-    const c = s.countries.NOR;
-    expect(c.overlord === 'UNI' || (c.influence.UNI ?? 0) < 100).toBe(true);
+  it('la Unión ofrece el protectorado a Staraya y la negativa tiene consecuencias', () => {
+    const s = newGame({ player: 'STA', seed: 6 });
+    completeFocus(s, 'UNI', 'uni_reforzar_staraya');
+    completeFocus(s, 'UNI', 'uni_mano_staraya');
+    expect(s.countries.STA.spirits.some((x) => x.id === 'sta_mano_union')).toBe(true);
+    completeFocus(s, 'UNI', 'uni_protectorado_staraya');
+    expect(s.playerEvents.map((e) => e.id)).toContain('uni_oferta_protectorado');
+    answerEvent(s, s.playerEvents.find((e) => e.id === 'uni_oferta_protectorado')!.uid, 1);
+    expect(s.countries.STA.overlord).toBeUndefined();
+    expect(s.countries.STA.spirits.some((x) => x.id === 'sta_mano_union')).toBe(false);
+    expect(s.countries.UNI.wargoals.some((w) => w.target === 'STA')).toBe(true);
   });
 
   it('todos los eventos de los árboles tienen opciones válidas', () => {

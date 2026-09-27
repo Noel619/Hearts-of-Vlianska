@@ -94,12 +94,6 @@ const SECTIONS: { id: string; title: string; icon: string; body: ReactNode }[] =
           consecuencias reales. Algunos enfoques dependen de lo que respondan otras facciones; los que pierden su sentido (porque su objetivo ha desaparecido, por
           ejemplo) se pueden omitir al instante.
         </p>
-        <p>
-          La <strong>influencia extranjera</strong> mide cuánto controla otra facción tus decisiones: negociar desde la debilidad, pagar tributos o aceptar comisarios
-          la hacen crecer. Te resta poder político y extiende su ideología entre tu gente; a partir de 50 sus tropas cruzan tus túneles y no puedes justificar una guerra
-          contra ella; al llegar a 100 estalla una crisis de soberanía: aceptar ser su protectorado o romper con ella. Sin presión activa, se desvanece poco a poco. La
-          ves en el panel de Gobierno (Soberanía) y en Diplomacia.
-        </p>
       </>
     ),
   },

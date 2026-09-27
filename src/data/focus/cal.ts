@@ -4,7 +4,8 @@
 // - La guerra santa: Baghdadi resiste, radicaliza la estación y busca romper el cerco por la fuerza.
 //   Es lo que haría el Califa (y lo que elige la IA mientras aguante).
 // - La tregua: los ancianos o la guardia apartan a Baghdadi y negocian. Cada concesión trae comida,
-//   pero también comisarios del Levantamiento: su influencia crece y la estación deja de decidir sola.
+//   pero también comisarios del Levantamiento: primero cuentan los sacos, luego se sientan en una
+//   Comisión Mixta, sus patrullas cruzan los andenes y cada pocos meses llegan nuevas exigencias.
 //   Al final hay que elegir entre aceptar la tutela, recuperar la soberanía o apoyarse en la Unión.
 // - Abrir las puertas: rendirse con condiciones. Después, integrarse en la revolución o esperar en
 //   silencio el momento de volver a levantarse.
@@ -99,6 +100,22 @@ export const spirits: SpiritDef[] = [
     modifiers: { alimentos: 0.25, estabilidad: 0.05, crecimientoPoblacion: 0.3 },
   },
   {
+    id: 'cal_comisarios_rojos',
+    name: 'Comisarios en el andén',
+    desc: 'Los repartidores del Levantamiento cuentan cada saco de comida... y cada queja. Cada semana deciden un poco más.',
+    icon: 'Eye',
+    negative: true,
+    modifiers: { ppDiario: -0.15, popComunismo: 0.02 },
+  },
+  {
+    id: 'cal_comision',
+    name: 'La Comisión Mixta',
+    desc: 'El Consejo Revolucionario supervisa el reparto, los talleres y "la seguridad". Sus patrullas cruzan nuestros andenes cuando quieren y cada pocos meses llega una lista nueva de exigencias.',
+    icon: 'ClipboardList',
+    negative: true,
+    modifiers: { ppDiario: -0.3, popComunismo: 0.03, estabilidad: 0.03, costeDecisiones: 0.15 },
+  },
+  {
     id: 'cal_autonomia',
     name: 'Autonomía tutelada',
     desc: 'Gobernamos nuestros andenes; el Consejo Revolucionario gobierna lo demás.',
@@ -177,7 +194,7 @@ export const tree: FocusTreeDef = {
   branches: [
     { name: 'Sobrevivir al asedio', desc: 'Comida, agua y la vieja galería hacia Mostovaya. Útil en cualquier camino.', x0: 0, x1: 3 },
     { name: 'La guerra santa', desc: 'Baghdadi resiste: purgas, mártires y la ruptura del cerco por la fuerza.', x0: 4, x1: 7 },
-    { name: 'La tregua', desc: 'Apartar al Califa y negociar. Cada concesión trae pan y comisarios: la influencia del Levantamiento no deja de crecer.', x0: 8, x1: 12 },
+    { name: 'La tregua', desc: 'Apartar al Califa y negociar. Cada concesión trae pan... y comisarios que deciden cada vez más por nosotros.', x0: 8, x1: 12 },
     { name: 'Abrir las puertas', desc: 'Rendirse con condiciones. Después, abrazar la revolución o esperar el momento de levantarse.', x0: 13, x1: 16 },
     { name: 'La Guardia Esmeralda', desc: 'Armas, trampas y soldados para cualquier camino.', x0: 17, x1: 19 },
   ],
@@ -534,7 +551,6 @@ export const tree: FocusTreeDef = {
         { t: 'stability', v: -0.04 },
         { t: 'warSupport', v: -0.1 },
         { t: 'relation', target: 'LEV', v: 20 },
-        { t: 'influence', target: 'LEV', v: 10 },
         { t: 'addSpirit', id: 'cal_fieles_resentidos', days: 240 },
       ],
       ai: 14,
@@ -550,7 +566,9 @@ export const tree: FocusTreeDef = {
       available: CORREDOR,
       effects: [
         { t: 'nap', target: 'LEV', days: 1095 },
-        { t: 'influence', target: 'LEV', v: 15 },
+        { t: 'removeSpirit', id: 'cal_comisarios_rojos' },
+        { t: 'addSpirit', id: 'cal_comision' },
+        { t: 'access', target: 'LEV' },
         { t: 'popularity', id: 'comunismo', v: 8 },
         { t: 'building', station: 'MER', b: 'civil', v: 1 },
         { t: 'slots', station: 'MER', v: 1 },
@@ -569,7 +587,8 @@ export const tree: FocusTreeDef = {
       bypass: SIN_LEV,
       effects: [
         { t: 'scoped', target: 'LEV', effects: [{ t: 'makeSubject', target: 'FROM' }] },
-        { t: 'influenceDrift', target: 'LEV', v: 0, set: true },
+        { t: 'removeSpirit', id: 'cal_comision' },
+        { t: 'removeSpirit', id: 'cal_comisarios_rojos' },
         { t: 'addSpirit', id: 'cal_autonomia' },
         { t: 'removeSpirit', id: 'cal_fieles_resentidos' },
       ],
@@ -586,8 +605,9 @@ export const tree: FocusTreeDef = {
       exclusive: ['cal_autonomia_tutelada', 'cal_puente'],
       available: { c: 'foodBalance', min: 0 },
       effects: [
-        { t: 'influence', target: 'LEV', v: -45 },
-        { t: 'influenceDrift', target: 'LEV', v: 0, set: true },
+        { t: 'removeSpirit', id: 'cal_comision' },
+        { t: 'removeSpirit', id: 'cal_comisarios_rojos' },
+        { t: 'revokeAccess', target: 'LEV' },
         { t: 'addSpirit', id: 'cal_soberania' },
         { t: 'removeSpirit', id: 'cal_corredor' },
         { t: 'relation', target: 'LEV', v: -30 },
@@ -606,9 +626,10 @@ export const tree: FocusTreeDef = {
       exclusive: ['cal_autonomia_tutelada', 'cal_recuperar_soberania'],
       available: { c: 'and', list: [{ c: 'hasFocus', id: 'cal_galeria' }, { c: 'exists', target: 'UNI' }] },
       effects: [
-        { t: 'influence', target: 'LEV', v: -25 },
-        { t: 'influenceDrift', target: 'LEV', v: 0, set: true },
-        { t: 'influence', target: 'UNI', v: 15 },
+        { t: 'removeSpirit', id: 'cal_comision' },
+        { t: 'removeSpirit', id: 'cal_comisarios_rojos' },
+        { t: 'revokeAccess', target: 'LEV' },
+        { t: 'relation', target: 'LEV', v: -10 },
         { t: 'nap', target: 'UNI', days: 1095 },
         { t: 'addSpirit', id: 'cal_puente' },
       ],
@@ -677,7 +698,7 @@ export const tree: FocusTreeDef = {
       y: 2,
       prereq: [['cal_abrir_puertas']],
       available: RENDIDOS,
-      effects: [{ t: 'addSpirit', id: 'cal_administracion_roja' }, { t: 'influenceDrift', target: 'LEV', v: 2 }, { t: 'building', station: 'MER', b: 'granja', v: 1 }],
+      effects: [{ t: 'addSpirit', id: 'cal_administracion_roja' }, { t: 'access', target: 'LEV' }, { t: 'building', station: 'MER', b: 'granja', v: 1 }],
       ai: 16,
     },
     {
@@ -717,7 +738,7 @@ export const tree: FocusTreeDef = {
       x: 13,
       y: 4,
       prereq: [['cal_esmeralda_roja']],
-      effects: [{ t: 'pp', v: 60 }, { t: 'researchBonus', cat: 'industria', v: 1, uses: 2, label: 'Delegados en el Consejo' }, { t: 'influenceDrift', target: 'LEV', v: -2 }],
+      effects: [{ t: 'pp', v: 60 }, { t: 'researchBonus', cat: 'industria', v: 1, uses: 2, label: 'Delegados en el Consejo' }],
       ai: 12,
     },
     {
@@ -739,7 +760,7 @@ export const tree: FocusTreeDef = {
       x: 15,
       y: 4,
       prereq: [['cal_resistencia_silenciosa']],
-      effects: [{ t: 'stock', eq: 'armas', v: 50 }, { t: 'manpowerBonus', v: 20 }, { t: 'influence', target: 'LEV', v: -10 }],
+      effects: [{ t: 'stock', eq: 'armas', v: 50 }, { t: 'manpowerBonus', v: 20 }],
       ai: 8,
     },
     {
@@ -755,7 +776,8 @@ export const tree: FocusTreeDef = {
         c: 'and',
         list: [
           { c: 'exists', target: 'LEV' },
-          { c: 'or', list: [{ c: 'scoped', target: 'LEV', cond: { c: 'atWar' } }, { c: 'scoped', target: 'LEV', cond: { c: 'stability', max: 0.45 } }, { c: 'influence', target: 'LEV', max: 40 }] },
+          { c: 'hasFlag', id: 'cal_red_clandestina', label: 'La red clandestina está preparada (decisión «Preparar el levantamiento»)' },
+          { c: 'or', list: [{ c: 'scoped', target: 'LEV', cond: { c: 'atWar' } }, { c: 'scoped', target: 'LEV', cond: { c: 'stability', max: 0.45 } }] },
         ],
       },
       effects: [{ t: 'event', id: 'cal_esmeralda_se_levanta', target: 'LEV' }, { t: 'addSpirit', id: 'fervor' }, { t: 'warSupport', v: 0.15 }],
@@ -770,7 +792,7 @@ export const tree: FocusTreeDef = {
       y: 6,
       prereq: [['cal_levantamiento_esmeralda']],
       available: { c: 'not', cond: { c: 'isSubject' } },
-      effects: [{ t: 'removeSpirit', id: 'cal_clandestinos' }, { t: 'stability', v: 0.1 }, { t: 'influence', target: 'LEV', v: -100 }, { t: 'influenceDrift', target: 'LEV', v: 0, set: true }],
+      effects: [{ t: 'removeSpirit', id: 'cal_clandestinos' }, { t: 'revokeAccess', target: 'LEV' }, { t: 'stability', v: 0.1 }],
       ai: 12,
     },
     // ================= La Guardia Esmeralda
@@ -931,7 +953,7 @@ export const events: EventDef[] = [
     options: [
       {
         name: 'Escucharemos sus condiciones.',
-        effects: [{ t: 'relation', target: 'FROM', v: 15 }, { t: 'scoped', target: 'FROM', effects: [{ t: 'flag', id: 'cal_tregua_abierta' }, { t: 'influence', target: 'FROM', v: 10 }] }],
+        effects: [{ t: 'relation', target: 'FROM', v: 15 }, { t: 'scoped', target: 'FROM', effects: [{ t: 'flag', id: 'cal_tregua_abierta' }] }],
         ai: 3,
         aiIf: [{ cond: { c: 'scoped', target: 'FROM', cond: { c: 'hasFocus', id: 'cal_liberar_cautivos' } }, factor: 2 }],
       },
@@ -956,7 +978,7 @@ export const events: EventDef[] = [
         effects: [
           { t: 'pp', v: -25 },
           { t: 'relation', target: 'FROM', v: 20 },
-          { t: 'scoped', target: 'FROM', effects: [{ t: 'flag', id: 'cal_tregua_abierta' }, { t: 'influence', target: 'FROM', v: 10 }] },
+          { t: 'scoped', target: 'FROM', effects: [{ t: 'flag', id: 'cal_tregua_abierta' }] },
         ],
         ai: 2,
       },
@@ -984,8 +1006,7 @@ export const events: EventDef[] = [
               { t: 'removeSpirit', id: 'hambruna' },
               { t: 'addSpirit', id: 'cal_corredor' },
               { t: 'food', v: 80 },
-              { t: 'influence', target: 'FROM', v: 15 },
-              { t: 'influenceDrift', target: 'FROM', v: 2 },
+              { t: 'addSpirit', id: 'cal_comisarios_rojos' },
             ],
           },
         ],
@@ -1017,7 +1038,7 @@ export const events: EventDef[] = [
           {
             t: 'scoped',
             target: 'FROM',
-            effects: [{ t: 'flag', id: 'cal_rendida' }, { t: 'removeSpirit', id: 'hambruna' }, { t: 'food', v: 100 }, { t: 'influence', target: 'FROM', v: 40 }],
+            effects: [{ t: 'flag', id: 'cal_rendida' }, { t: 'removeSpirit', id: 'hambruna' }, { t: 'food', v: 100 }],
           },
         ],
         ai: 3,
@@ -1052,6 +1073,35 @@ export const events: EventDef[] = [
     ],
   },
   {
+    id: 'cal_exigencias',
+    title: 'La Comisión exige',
+    desc: 'El presidente de la Comisión Mixta llega con otra lista: fusiles para las brigadas del Consejo, un comisario en cada taller, los sermones revisados antes del viernes. Técnicamente, es una petición.',
+    picture: 'ClipboardList',
+    factions: ['CAL'],
+    trigger: { c: 'and', list: [{ c: 'hasSpirit', id: 'cal_comision' }, { c: 'exists', target: 'LEV' }, { c: 'not', cond: { c: 'isSubject' } }] },
+    mtth: 45,
+    once: false,
+    options: [
+      {
+        name: 'Firmad. No podemos arriesgar los convoyes.',
+        effects: [
+          { t: 'stock', eq: 'armas', v: -15 },
+          { t: 'popularity', id: 'comunismo', v: 5 },
+          { t: 'popularity', id: 'teocracia', v: -3 },
+          { t: 'stability', v: 0.02 },
+          { t: 'relation', target: 'LEV', v: 10 },
+        ],
+        ai: 3,
+      },
+      {
+        name: 'Esto lo decide la Esmeralda.',
+        effects: [{ t: 'relation', target: 'LEV', v: -15 }, { t: 'food', v: -25 }, { t: 'stability', v: -0.03 }, { t: 'warSupport', v: 0.03 }],
+        ai: 1,
+        aiIf: [{ cond: { c: 'food', min: 80 }, factor: 3 }],
+      },
+    ],
+  },
+  {
     id: 'cal_mensaje_sdr',
     title: 'Un mensaje de Izumrudnaya',
     desc: 'El Califa de Izumrudnaya nos escribe: el Levantamiento es enemigo de ambos. Pide armas. Promete gratitud, y lo que haga falta.',
@@ -1064,7 +1114,7 @@ export const events: EventDef[] = [
         effects: [
           { t: 'stock', eq: 'armas', v: -40 },
           { t: 'relation', target: 'FROM', v: 25 },
-          { t: 'scoped', target: 'FROM', effects: [{ t: 'stock', eq: 'armas', v: 60 }, { t: 'influence', target: 'FROM', v: 15 }] },
+          { t: 'scoped', target: 'FROM', effects: [{ t: 'stock', eq: 'armas', v: 60 }, { t: 'relation', target: 'FROM', v: 10 }] },
         ],
         ai: 2,
         aiIf: [{ cond: { c: 'relation', target: 'LEV', max: -20 }, factor: 2 }],
@@ -1150,7 +1200,7 @@ export const decisions: DecisionDef[] = [
     unlockedBy: 'cal_resistencia_silenciosa',
     cost: { pp: 30 },
     cooldown: 120,
-    effects: [{ t: 'influence', target: 'LEV', v: -8 }, { t: 'stock', eq: 'armas', v: 10 }, { t: 'manpowerBonus', v: 5 }],
+    effects: [{ t: 'flag', id: 'cal_red_clandestina' }, { t: 'stock', eq: 'armas', v: 10 }, { t: 'manpowerBonus', v: 5 }],
     ai: 12,
   },
 ];

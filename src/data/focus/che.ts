@@ -545,7 +545,7 @@ export const tree: FocusTreeDef = {
       y: 4,
       prereq: [['che_venganza']],
       available: { c: 'and', list: [{ c: 'exists', target: 'SDR' }, { c: 'not', cond: { c: 'inPact' } }] },
-      effects: [{ t: 'event', id: 'che_propuesta_eje', target: 'SDR' }, { t: 'stock', eq: 'armas', v: 40 }, { t: 'influence', target: 'SDR', v: 15 }],
+      effects: [{ t: 'event', id: 'che_propuesta_eje', target: 'SDR' }, { t: 'stock', eq: 'armas', v: 40 }, { t: 'relation', target: 'SDR', v: 10 }],
       ai: 10,
       aiIf: [{ cond: { c: 'ideology', id: 'nacionalismo' }, factor: 2 }],
     },

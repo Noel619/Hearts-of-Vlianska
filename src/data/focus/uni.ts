@@ -529,7 +529,7 @@ export const tree: FocusTreeDef = {
       prereq: [['uni_reforzar_staraya']],
       available: { c: 'exists', target: 'STA' },
       bypass: SIN_STA,
-      effects: [{ t: 'scoped', target: 'STA', effects: [{ t: 'influence', target: 'FROM', v: 15 }, { t: 'influenceDrift', target: 'FROM', v: 2 }] }, { t: 'pp', v: 30 }],
+      effects: [{ t: 'scoped', target: 'STA', effects: [{ t: 'addSpirit', id: 'sta_mano_union' }] }, { t: 'pp', v: 30 }],
       ai: 12,
     },
     {
@@ -548,14 +548,14 @@ export const tree: FocusTreeDef = {
     {
       id: 'uni_protectorado_staraya',
       name: 'Staraya, protectorado de la Unión',
-      desc: 'Es hora de formalizar lo que ya es un hecho.',
+      desc: 'Es hora de poner por escrito lo que ya es un hecho. Si el Consejo Mercantil se niega, sabremos a qué atenernos.',
       icon: 'Scroll',
       x: 14,
       y: 4,
       prereq: [['uni_mano_staraya']],
-      available: { c: 'scoped', target: 'STA', cond: { c: 'influence', target: 'FROM', min: 60 } },
+      available: { c: 'scoped', target: 'STA', cond: { c: 'and', list: [{ c: 'hasSpirit', id: 'sta_mano_union' }, { c: 'not', cond: { c: 'isSubject' } }] } },
       bypass: { c: 'or', list: [SIN_STA, { c: 'scoped', target: 'STA', cond: { c: 'subjectOf', target: 'FROM' } }] },
-      effects: [{ t: 'makeSubject', target: 'STA' }, { t: 'relation', target: 'STA', v: 10 }],
+      effects: [{ t: 'event', id: 'uni_oferta_protectorado', target: 'STA' }],
       ai: 10,
     },
     {
@@ -635,7 +635,7 @@ export const tree: FocusTreeDef = {
       prereq: [['uni_reinstitucionalizacion']],
       available: { c: 'exists', target: 'NOR' },
       bypass: SIN_NOR,
-      effects: [{ t: 'pp', v: 30 }, { t: 'scoped', target: 'NOR', effects: [{ t: 'influence', target: 'FROM', v: 10 }] }],
+      effects: [{ t: 'pp', v: 30 }],
       ai: 16,
     },
     {
@@ -666,7 +666,7 @@ export const tree: FocusTreeDef = {
       bypass: SIN_NOR,
       effects: [
         { t: 'relation', target: 'NOR', v: 40 },
-        { t: 'scoped', target: 'NOR', effects: [{ t: 'removeSpirit', id: 'tributo_union' }, { t: 'influence', target: 'FROM', v: -20 }, { t: 'influenceDrift', target: 'FROM', v: 0, set: true }] },
+        { t: 'scoped', target: 'NOR', effects: [{ t: 'removeSpirit', id: 'tributo_union' }, { t: 'removeSpirit', id: 'nor_tributo_pagado' }] },
         { t: 'stability', v: 0.03 },
       ],
       ai: 5,
@@ -683,7 +683,7 @@ export const tree: FocusTreeDef = {
       effects: [
         { t: 'addSpirit', id: 'uni_contrasubversion' },
         { t: 'popularity', id: 'comunismo', v: -8 },
-        { t: 'if', cond: { c: 'exists', target: 'LEV' }, then: [{ t: 'influence', target: 'LEV', v: -20 }, { t: 'influenceDrift', target: 'LEV', v: 0, set: true }] },
+        { t: 'if', cond: { c: 'exists', target: 'LEV' }, then: [{ t: 'relation', target: 'LEV', v: -15 }] },
       ],
       ai: 10,
     },
@@ -775,6 +775,38 @@ export const events: EventDef[] = [
         ai: 2,
       },
       { name: 'La independencia no se negocia.', effects: [{ t: 'relation', target: 'FROM', v: -25 }], ai: 2 },
+    ],
+  },
+  {
+    id: 'uni_oferta_protectorado',
+    title: 'La estrella azul pide una firma',
+    desc: "El embajador de la Unión trae un tratado ya redactado: Staraya seguirá gobernando sus andenes y cobrando el peaje, pero su política exterior y su defensa pasarán a Tsentral'naya. Sus brigadas ya están aquí; sus consejeros, también.",
+    picture: 'Scroll',
+    factions: ['STA'],
+    triggeredOnly: true,
+    options: [
+      {
+        name: 'Firmamos: mejor protegidos que solos.',
+        effects: [{ t: 'scoped', target: 'FROM', effects: [{ t: 'makeSubject', target: 'FROM' }] }, { t: 'removeSpirit', id: 'sta_mano_union' }, { t: 'stability', v: 0.03 }],
+        ai: 2,
+        aiIf: [
+          { cond: { c: 'hasFocus', id: 'sta_ala_union' }, factor: 3 },
+          { cond: { c: 'stability', max: 0.35 }, factor: 2 },
+          { cond: { c: 'hasFocus', id: 'sta_neutralidad' }, factor: 0.1 },
+        ],
+      },
+      {
+        name: 'Staraya no es de nadie.',
+        effects: [
+          { t: 'removeSpirit', id: 'sta_mano_union' },
+          { t: 'removeSpirit', id: 'brigadas_union' },
+          { t: 'revokeAccess', target: 'FROM' },
+          { t: 'relation', target: 'FROM', v: -30 },
+          { t: 'stability', v: -0.03 },
+          { t: 'scoped', target: 'FROM', effects: [{ t: 'withdrawUnits', from: 'STA' }, { t: 'wargoal', target: 'FROM' }] },
+        ],
+        ai: 1,
+      },
     ],
   },
   {

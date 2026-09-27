@@ -592,7 +592,7 @@ export const events: EventDef[] = [
     picture: 'Coins',
     triggeredOnly: true,
     options: [
-      { name: 'Trato hecho.', effects: [{ t: 'makeSubject', target: 'FROM' }, { t: 'relation', target: 'FROM', v: 40 }, { t: 'scoped', target: 'FROM', effects: [{ t: 'influence', target: 'FROM', v: 40 }] }], ai: 3 },
+      { name: 'Trato hecho.', effects: [{ t: 'makeSubject', target: 'FROM' }, { t: 'relation', target: 'FROM', v: 40 }], ai: 3 },
       { name: 'No tratamos con bandidos.', effects: [{ t: 'relation', target: 'FROM', v: -20 }], ai: 1 },
     ],
   },

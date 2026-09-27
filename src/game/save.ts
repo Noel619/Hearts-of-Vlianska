@@ -29,8 +29,10 @@ export function deserialize(json: string): GameState {
     c.derived = { ...emptyDerived(), ...(c.derived ?? {}) };
     c.recentLosses ??= 0;
     c.manpowerBonus ??= 0;
-    c.influence ??= {};
-    c.influenceDrift ??= {};
+    // La influencia extranjera existió en la versión 2 y se retiró después.
+    const legacy = c as Partial<Record<'influence' | 'influenceDrift', unknown>>;
+    delete legacy.influence;
+    delete legacy.influenceDrift;
     // Los árboles de enfoques cambiaron en la versión 2: se descartan los enfoques que ya no existen.
     c.focus.done = c.focus.done.filter((id) => FOCUS_BY_ID[id]);
     if (c.focus.current && !FOCUS_BY_ID[c.focus.current]) {

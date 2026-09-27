@@ -15,7 +15,6 @@ import { dailyEvents, processScheduled } from './events';
 import { dailyPopularityDrift } from './politics';
 import { runAI } from './ai';
 import { monthlyResistance } from './resistance';
-import { monthlyInfluence } from './influence';
 import { dateOf, hourOfDate, isNewMonth } from './time';
 
 export const END_HOUR = hourOfDate('2040-01-01');
@@ -134,7 +133,6 @@ export function advanceDay(state: GameState) {
   if (isNewMonth(state.hour)) {
     for (const f of aliveFactions(state)) monthlyPopulation(state, f);
     monthlyResistance(state);
-    monthlyInfluence(state);
     snapshot(state);
   }
   checkEnd(state);

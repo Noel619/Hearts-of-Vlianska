@@ -185,8 +185,6 @@ export type Condition =
   | { c: 'strongerThan'; target: Target; ratio?: number }
   | { c: 'hasWargoal'; target: Target }
   | { c: 'surrender'; min?: number }
-  /** Influencia de TARGET sobre nosotros (0..100). */
-  | { c: 'influence'; target: Target; min?: number; max?: number }
   | { c: 'leader'; id: string }
   | { c: 'and'; list: Condition[] }
   | { c: 'or'; list: Condition[] }
@@ -252,11 +250,7 @@ export type Effect =
   | { t: 'if'; cond: Condition; then: Effect[]; else?: Effect[] }
   | { t: 'random'; chance: number; then: Effect[]; else?: Effect[] }
   | { t: 'scoped'; target: Target; effects: Effect[] }
-  | { t: 'custom'; id: string; desc: string; arg?: string | number }
-  /** Cambia la influencia de TARGET sobre nosotros. */
-  | { t: 'influence'; target: Target; v: number }
-  /** Cambia cuánto crece (o baja) cada mes la influencia de TARGET sobre nosotros. */
-  | { t: 'influenceDrift'; target: Target; v: number; set?: boolean };
+  | { t: 'custom'; id: string; desc: string; arg?: string | number };
 
 // ---------------------------------------------------------------------------
 // Definiciones de contenido
@@ -337,9 +331,6 @@ export interface FactionDef {
   relations: Partial<Record<FactionId, number>>;
   aiTargets: { target: FactionId; weight: number }[];
   aiFriends: FactionId[];
-  /** Influencia inicial de otras facciones sobre esta y su cambio mensual. */
-  influence?: Partial<Record<FactionId, number>>;
-  influenceDrift?: Partial<Record<FactionId, number>>;
   unitNames: string;
 }
 
@@ -684,10 +675,6 @@ export interface CountryState {
   unitCounter: number;
   manpowerBonus: number;
   overlord?: FactionId;
-  /** Influencia (0..100) que otras facciones tienen sobre nuestras decisiones. */
-  influence: Partial<Record<FactionId, number>>;
-  /** Cambio mensual de esa influencia (comisarios, tributos, deudas...). */
-  influenceDrift: Partial<Record<FactionId, number>>;
   /** Hora desde la que el jugador tiene talleres civiles parados (para los recordatorios). */
   idleSince?: number;
   derived: CountryDerived;

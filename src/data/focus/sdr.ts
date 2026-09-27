@@ -527,7 +527,17 @@ export const tree: FocusTreeDef = {
       y: 3,
       prereq: [['sdr_presion_staraya']],
       exclusive: ['sdr_ratas_staraya'],
-      available: { c: 'and', list: [{ c: 'exists', target: 'STA' }, { c: 'scoped', target: 'STA', cond: { c: 'influence', target: 'FROM', min: 30 } }] },
+      available: {
+        c: 'and',
+        list: [
+          { c: 'exists', target: 'STA' },
+          {
+            c: 'scoped',
+            target: 'STA',
+            cond: { c: 'or', list: [{ c: 'hasFlag', id: 'sta_cede_peaje', label: 'Staraya ha cedido ante el bloqueo de las caravanas' }, { c: 'hasFocus', id: 'sta_socio_ruso' }, { c: 'stability', max: 0.35 }] },
+          },
+        ],
+      },
       bypass: { c: 'or', list: [{ c: 'not', cond: { c: 'exists', target: 'STA' } }, STA_NUESTRA] },
       effects: [{ t: 'event', id: 'sdr_oferta_protectorado', target: 'STA' }],
       ai: 12,
@@ -882,13 +892,13 @@ export const events: EventDef[] = [
     options: [
       {
         name: 'Rebajaremos el peaje a los rusos.',
-        effects: [{ t: 'influence', target: 'FROM', v: 20 }, { t: 'relation', target: 'FROM', v: 15 }, { t: 'pp', v: -20 }],
+        effects: [{ t: 'flag', id: 'sta_cede_peaje' }, { t: 'addSpirit', id: 'sta_peaje_rebajado' }, { t: 'relation', target: 'FROM', v: 15 }, { t: 'pp', v: -20 }],
         ai: 1,
         aiIf: [{ cond: { c: 'relation', target: 'UNI', max: 30 }, factor: 3 }],
       },
       {
         name: 'Staraya no se arrodilla.',
-        effects: [{ t: 'relation', target: 'FROM', v: -15 }, { t: 'stability', v: -0.03 }, { t: 'influence', target: 'FROM', v: 5 }],
+        effects: [{ t: 'relation', target: 'FROM', v: -15 }, { t: 'stability', v: -0.03 }, { t: 'addSpirit', id: 'sta_caravanas_desviadas', days: 120 }],
         ai: 2,
       },
     ],
@@ -905,7 +915,7 @@ export const events: EventDef[] = [
         name: 'Aceptamos: mejor rusos que muertos.',
         effects: [{ t: 'scoped', target: 'FROM', effects: [{ t: 'makeSubject', target: 'FROM' }] }, { t: 'removeSpirit', id: 'brigadas_union' }, { t: 'withdrawUnits', from: 'STA' }],
         ai: 1,
-        aiIf: [{ cond: { c: 'influence', target: 'FROM', min: 50 }, factor: 3 }],
+        aiIf: [{ cond: { c: 'or', list: [{ c: 'hasFlag', id: 'sta_cede_peaje' }, { c: 'stability', max: 0.35 }] }, factor: 3 }],
       },
       {
         name: 'Nunca.',
@@ -967,7 +977,7 @@ export const decisions: DecisionDef[] = [
     available: { c: 'not', cond: { c: 'atWarWith', target: 'STA' } },
     cost: { pp: 25 },
     cooldown: 90,
-    effects: [{ t: 'scoped', target: 'STA', effects: [{ t: 'influence', target: 'FROM', v: 8 }, { t: 'stability', v: -0.02 }] }, { t: 'relation', target: 'STA', v: -5 }],
+    effects: [{ t: 'scoped', target: 'STA', effects: [{ t: 'addSpirit', id: 'sta_caravanas_desviadas', days: 90 }, { t: 'stability', v: -0.02 }] }, { t: 'relation', target: 'STA', v: -5 }],
     ai: 14,
   },
 ];

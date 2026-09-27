@@ -30,7 +30,6 @@ import {
 } from './diplomacy';
 import { addTemplate, spawnUnit } from './military';
 import { crushRevolt, liberateStation } from './resistance';
-import { addInfluence, setInfluenceDrift, influenceDrift } from './influence';
 
 export function applyEffects(state: GameState, effects: Effect[] | undefined, ctx: Ctx) {
   if (!effects) return;
@@ -323,16 +322,6 @@ export function applyEffect(state: GameState, e: Effect, ctx: Ctx) {
     case 'custom':
       runCustom(state, e.id, ctx, e.arg);
       break;
-    case 'influence': {
-      const t = resolveTarget(state, ctx, e.target);
-      if (t && t !== ctx.root && state.countries[t].alive) addInfluence(state, ctx.root, t, e.v);
-      break;
-    }
-    case 'influenceDrift': {
-      const t = resolveTarget(state, ctx, e.target);
-      if (t && t !== ctx.root) setInfluenceDrift(state, ctx.root, t, e.set ? e.v : influenceDrift(state, ctx.root, t) + e.v);
-      break;
-    }
   }
 }
 

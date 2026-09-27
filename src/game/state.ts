@@ -82,8 +82,6 @@ export function newGame(opts: NewGameOptions): GameState {
       recentLosses: 0,
       unitCounter: 0,
       manpowerBonus: 0,
-      influence: { ...(f.influence ?? {}) },
-      influenceDrift: { ...(f.influenceDrift ?? {}) },
       derived: emptyDerived(),
       ai: { strategy: 'normal', lastDiplo: 0, rejected: {} },
     };

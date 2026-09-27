@@ -101,6 +101,29 @@ export const spirits: SpiritDef[] = [
     icon: 'Landmark',
     modifiers: { produccionCivil: 0.1, estabilidad: 0.08, defensaEstacion: 0.1 },
   },
+  {
+    id: 'sta_mano_union',
+    name: 'Consejeros de la Unión',
+    desc: "Préstamos, brigadas y comerciantes de Tsentral'naya. El Consejo Mercantil ya no decide nada sin consultar antes a la embajada.",
+    icon: 'Landmark',
+    modifiers: { defensa: 0.05, produccionCivil: 0.05, ppDiario: -0.2 },
+  },
+  {
+    id: 'sta_peaje_rebajado',
+    name: 'El peaje de los rusos',
+    desc: 'Las caravanas del tridente pagan menos que nadie. En Kholodnogo ya lo consideran un derecho.',
+    icon: 'HandCoins',
+    negative: true,
+    modifiers: { civExtra: -0.5, ppDiario: -0.1 },
+  },
+  {
+    id: 'sta_caravanas_desviadas',
+    name: 'Caravanas desviadas',
+    desc: 'Las caravanas rusas rodean la Encrucijada. Los mercaderes pierden dinero cada día.',
+    icon: 'Route',
+    negative: true,
+    modifiers: { produccionCivil: -0.1, estabilidad: -0.02 },
+  },
 ];
 
 export const tree: FocusTreeDef = {
@@ -110,7 +133,7 @@ export const tree: FocusTreeDef = {
   branches: [
     { name: 'El Consejo Mercantil', desc: 'Oligarquía, asamblea de gremios o la mano firme de Orlova.', x0: 0, x1: 3 },
     { name: 'El peaje', desc: 'Mercados, caravanas y cuánto cobrar por pasar.', x0: 4, x1: 7 },
-    { name: 'Entre la estrella y el tridente', desc: 'La Unión, los Seguidores o nadie. Cada protector se cobra su influencia.', x0: 8, x1: 12 },
+    { name: 'Entre la estrella y el tridente', desc: 'La Unión, los Seguidores o nadie. Cada protector acaba cobrándose su precio.', x0: 8, x1: 12 },
     { name: 'Los cinco túneles', desc: 'Mercenarios, barricadas y el problema de Vhlainska.', x0: 13, x1: 16 },
   ],
   focuses: [
@@ -418,7 +441,7 @@ export const tree: FocusTreeDef = {
       prereq: [['sta_encrucijada_politica']],
       exclusive: ['sta_neutralidad', 'sta_socio_ruso'],
       bypass: { c: 'not', cond: { c: 'exists', target: 'UNI' } },
-      effects: [{ t: 'relation', target: 'UNI', v: 25 }, { t: 'influence', target: 'UNI', v: 10 }, { t: 'influenceDrift', target: 'UNI', v: 1 }],
+      effects: [{ t: 'relation', target: 'UNI', v: 25 }, { t: 'addSpirit', id: 'sta_mano_union' }],
       ai: 14,
     },
     {
@@ -435,8 +458,7 @@ export const tree: FocusTreeDef = {
         { t: 'addSpirit', id: 'sta_neutral' },
         { t: 'revokeAccess', target: 'UNI' },
         { t: 'if', cond: { c: 'exists', target: 'UNI' }, then: [{ t: 'scoped', target: 'UNI', effects: [{ t: 'withdrawUnits', from: 'STA' }] }, { t: 'relation', target: 'UNI', v: -15 }] },
-        { t: 'influence', target: 'UNI', v: -30 },
-        { t: 'influenceDrift', target: 'UNI', v: 0, set: true },
+        { t: 'removeSpirit', id: 'sta_mano_union' },
         { t: 'if', cond: { c: 'exists', target: 'SDR' }, then: [{ t: 'relation', target: 'SDR', v: 15 }] },
       ],
       ai: 8,
@@ -451,7 +473,7 @@ export const tree: FocusTreeDef = {
       prereq: [['sta_encrucijada_politica']],
       exclusive: ['sta_ala_union', 'sta_neutralidad'],
       available: { c: 'exists', target: 'SDR' },
-      effects: [{ t: 'addSpirit', id: 'sta_socio_ruso' }, { t: 'event', id: 'sta_rebaja_peaje', target: 'SDR' }, { t: 'influence', target: 'SDR', v: 15 }],
+      effects: [{ t: 'addSpirit', id: 'sta_socio_ruso' }, { t: 'event', id: 'sta_rebaja_peaje', target: 'SDR' }],
       ai: 5,
       aiIf: [{ cond: { c: 'not', cond: { c: 'exists', target: 'UNI' } }, factor: 4 }],
     },
@@ -464,7 +486,7 @@ export const tree: FocusTreeDef = {
       y: 3,
       prereq: [['sta_ala_union']],
       available: { c: 'exists', target: 'UNI' },
-      effects: [{ t: 'addSpirit', id: 'sta_mercado_comun' }, { t: 'influence', target: 'UNI', v: 10 }],
+      effects: [{ t: 'addSpirit', id: 'sta_mercado_comun' }],
       ai: 12,
     },
     {
@@ -476,7 +498,7 @@ export const tree: FocusTreeDef = {
       y: 4,
       prereq: [['sta_mercado_comun']],
       available: { c: 'and', list: [{ c: 'exists', target: 'UNI' }, { c: 'not', cond: { c: 'inPact' } }] },
-      effects: [{ t: 'event', id: 'sta_peticion_union', target: 'UNI' }, { t: 'influenceDrift', target: 'UNI', v: 0, set: true }],
+      effects: [{ t: 'event', id: 'sta_peticion_union', target: 'UNI' }],
       ai: 12,
     },
     {
@@ -514,7 +536,7 @@ export const tree: FocusTreeDef = {
       x: 12,
       y: 3,
       prereq: [['sta_socio_ruso']],
-      effects: [{ t: 'relation', target: 'SDR', v: 20 }, { t: 'pp', v: 40 }, { t: 'influence', target: 'SDR', v: 5 }],
+      effects: [{ t: 'relation', target: 'SDR', v: 20 }, { t: 'pp', v: 40 }],
       ai: 12,
     },
     {
@@ -539,10 +561,8 @@ export const tree: FocusTreeDef = {
       prereq: [['sta_liga', 'sta_ciudad_libre', 'sta_proteccion_rusa']],
       effects: [
         { t: 'addSpirit', id: 'sta_equilibrio' },
-        { t: 'influence', target: 'UNI', v: -20 },
-        { t: 'influence', target: 'SDR', v: -20 },
-        { t: 'influenceDrift', target: 'UNI', v: 0, set: true },
-        { t: 'influenceDrift', target: 'SDR', v: 0, set: true },
+        { t: 'removeSpirit', id: 'sta_mano_union' },
+        { t: 'removeSpirit', id: 'sta_peaje_rebajado' },
       ],
       ai: 14,
     },
@@ -739,7 +759,7 @@ export const events: EventDef[] = [
     options: [
       {
         name: 'Staraya estará bajo nuestra protección.',
-        effects: [{ t: 'guarantee', target: 'FROM' }, { t: 'relation', target: 'FROM', v: 20 }, { t: 'scoped', target: 'FROM', effects: [{ t: 'influence', target: 'FROM', v: 15 }, { t: 'influenceDrift', target: 'FROM', v: 1 }] }],
+        effects: [{ t: 'guarantee', target: 'FROM' }, { t: 'relation', target: 'FROM', v: 20 }],
         ai: 3,
       },
       { name: 'Que se protejan solos.', effects: [{ t: 'relation', target: 'FROM', v: -10 }], ai: 1 },
@@ -805,7 +825,7 @@ export const decisions: DecisionDef[] = [
     cost: { pp: 40 },
     cooldown: 120,
     effects: [
-      { t: 'scoped', target: 'TARGET', effects: [{ t: 'pp', v: 30 }, { t: 'influence', target: 'FROM', v: 8 }] },
+      { t: 'scoped', target: 'TARGET', effects: [{ t: 'pp', v: 30 }] },
       { t: 'relation', target: 'TARGET', v: 15 },
     ],
     ai: 8,

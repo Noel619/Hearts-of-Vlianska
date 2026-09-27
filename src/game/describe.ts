@@ -53,11 +53,6 @@ function scopedRoot(t: Target, ctx?: Partial<Ctx>): FactionId | undefined {
   return t;
 }
 
-/** "nosotros" si los efectos son del jugador; si no, el nombre de la facción. */
-function whoName(state?: GameState, ctx?: Partial<Ctx>): string {
-  return ctx?.root && state?.player && state.player !== ctx.root ? FACTIONS[ctx.root].name : 'nosotros';
-}
-
 function stationName(ref: string, state?: GameState, ctx?: Partial<Ctx>): string {
   if (ref === 'CAPITAL') {
     if (state && ctx?.root) return `${STATIONS[state.countries[ctx.root].capital].shortName} (capital)`;
@@ -232,21 +227,6 @@ export function describeEffect(e: Effect, state?: GameState, ctx?: Partial<Ctx>,
     }
     case 'custom':
       return L(e.desc, 'neutral');
-    case 'influence': {
-      const who = targetName(e.target, ctx);
-      const over = whoName(state, ctx);
-      // Que otros ganen influencia sobre nosotros es malo; que la ganemos nosotros sobre otros, bueno.
-      const tone = over === 'nosotros' ? toneOf(e.v, false) : state?.player && scopedRoot(e.target, ctx) === state.player ? toneOf(e.v) : 'neutral';
-      return L(`Influencia de ${who} sobre ${over}: ${e.v > 0 ? '+' : '−'}${Math.abs(e.v)}`, tone);
-    }
-    case 'influenceDrift': {
-      const who = targetName(e.target, ctx);
-      const over = whoName(state, ctx);
-      const tone = over === 'nosotros' ? toneOf(e.v, false) : 'neutral';
-      if (e.set && e.v === 0) return L(`La influencia de ${who} sobre ${over} deja de crecer`, 'neutral');
-      if (e.set) return L(`Influencia de ${who} sobre ${over}: ${e.v > 0 ? '+' : '−'}${Math.abs(e.v)} al mes`, tone);
-      return L(`Influencia de ${who} sobre ${over}: ${e.v > 0 ? '+' : '−'}${Math.abs(e.v)} más al mes`, tone);
-    }
   }
   return [];
 }
@@ -346,8 +326,6 @@ export function conditionText(cond: Condition, ctx?: Partial<Ctx>): string {
       return `Objetivo de guerra contra ${targetName(cond.target, ctx)}`;
     case 'surrender':
       return `Capitulación de al menos ${Math.round((cond.min ?? 0) * 100)} %`;
-    case 'influence':
-      return range(`Influencia de ${targetName(cond.target, ctx)} sobre nosotros`, cond.min, cond.max, (v) => String(v));
     case 'leader':
       return `Gobierna ${LEADERS[cond.id]?.name ?? cond.id}${LEADERS[cond.id] ? ` (${LEADERS[cond.id].title})` : ''}`;
     case 'and':

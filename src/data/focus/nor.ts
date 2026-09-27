@@ -5,7 +5,7 @@
 //   Y ante la agitación roja: tolerarla o ilegalizarla.
 // - La superficie: expediciones, stalkers, tecnología rescatada y la señal de radio.
 // - El Refugio de la Esperanza: el hospital, las granjas y los talleres.
-// - Entre gigantes: seguir pagando el tributo de 2031 (y aceptar la influencia de la Unión) o
+// - Entre gigantes: seguir pagando el tributo de 2031 (y aceptar que la Unión opine de todo) o
 //   romperlo; el Frente de la Libertad, volver a la alianza de la Unión o ser la puerta de todos.
 // - La Guardia del Terminal: defender los túneles más peligrosos del metro.
 import type { DecisionDef, EventDef, FocusTreeDef, SpiritDef } from '../../game/types';
@@ -58,7 +58,7 @@ export const spirits: SpiritDef[] = [
     name: 'El tributo, al día',
     desc: 'Pagamos puntualmente a la Unión. Ellos nos dejan en paz... y opinan de todo.',
     icon: 'HandCoins',
-    modifiers: { estabilidad: 0.03, tension: -0.05 },
+    modifiers: { estabilidad: 0.03, tension: -0.05, ppDiario: -0.1 },
   },
   {
     id: 'nor_puerta_todos',
@@ -160,7 +160,7 @@ export const tree: FocusTreeDef = {
       effects: [
         { t: 'addSpirit', id: 'nor_partido_ilegal' },
         { t: 'popularity', id: 'comunismo', v: -10 },
-        { t: 'if', cond: { c: 'exists', target: 'LEV' }, then: [{ t: 'influence', target: 'LEV', v: -25 }, { t: 'influenceDrift', target: 'LEV', v: 0, set: true }, { t: 'relation', target: 'LEV', v: -25 }] },
+        { t: 'if', cond: { c: 'exists', target: 'LEV' }, then: [{ t: 'relation', target: 'LEV', v: -25 }] },
       ],
       ai: 10,
       aiIf: [{ cond: { c: 'popularity', id: 'comunismo', min: 25 }, factor: 2 }],
@@ -174,7 +174,7 @@ export const tree: FocusTreeDef = {
       y: 4,
       prereq: [['nor_cuestion_roja']],
       exclusive: ['nor_ilegalizar'],
-      effects: [{ t: 'addSpirit', id: 'nor_prensa_libre' }, { t: 'if', cond: { c: 'exists', target: 'LEV' }, then: [{ t: 'influence', target: 'LEV', v: -10 }] }],
+      effects: [{ t: 'addSpirit', id: 'nor_prensa_libre' }],
       ai: 8,
     },
     {
@@ -447,7 +447,7 @@ export const tree: FocusTreeDef = {
       exclusive: ['nor_fin_tributo'],
       available: { c: 'exists', target: 'UNI' },
       bypass: { c: 'not', cond: { c: 'exists', target: 'UNI' } },
-      effects: [{ t: 'addSpirit', id: 'nor_tributo_pagado' }, { t: 'relation', target: 'UNI', v: 25 }, { t: 'influenceDrift', target: 'UNI', v: 1 }],
+      effects: [{ t: 'addSpirit', id: 'nor_tributo_pagado' }, { t: 'relation', target: 'UNI', v: 25 }],
       ai: 8,
     },
     {
@@ -461,8 +461,6 @@ export const tree: FocusTreeDef = {
       exclusive: ['nor_pagar_tributo'],
       effects: [
         { t: 'removeSpirit', id: 'tributo_union' },
-        { t: 'influence', target: 'UNI', v: -30 },
-        { t: 'influenceDrift', target: 'UNI', v: 0, set: true },
         { t: 'if', cond: { c: 'exists', target: 'UNI' }, then: [{ t: 'relation', target: 'UNI', v: -30 }, { t: 'event', id: 'nor_impago', target: 'UNI' }] },
       ],
       ai: 14,
