@@ -9,7 +9,7 @@ function summary(state: ReturnType<typeof newGame>) {
   const rows = FACTION_IDS.map((f) => {
     const c = state.countries[f];
     const units = Object.values(state.units).filter((u) => u.owner === f).length;
-    return `${f} ${c.alive ? 'vivo ' : 'MUERTO'} est=${ownedStations(state, f).length} uds=${units} civ=${c.derived.civTotal.toFixed(1)} mil=${c.derived.milTotal.toFixed(1)} mp=${Math.round(c.derived.manpowerAvailable)}/${Math.round(c.derived.manpowerMax)} pp=${Math.round(c.pp)} comida=${Math.round(c.food)} (${(c.derived.foodProd - c.derived.foodCons + c.derived.foodTrade).toFixed(1)}) estab=${Math.round(c.derived.stability * 100)} arm=${Math.round(c.stockpile.armas)} foc=${c.focus.done.length} tec=${c.research.done.length}`;
+    return `${f} ${c.alive ? 'vivo ' : 'MUERTO'} est=${ownedStations(state, f).length} uds=${units} civ=${c.derived.civTotal.toFixed(1)} mil=${c.derived.milTotal.toFixed(1)} mp=${Math.round(c.derived.manpowerAvailable)}/${Math.round(c.derived.manpowerMax)} pp=${Math.round(c.pp)} comida=${Math.round(c.food)} (${(c.derived.foodProd - c.derived.foodCons + c.derived.foodTrade).toFixed(1)}) estab=${Math.round(c.derived.stability * 100)} arm=${Math.round(c.stockpile.armas)} foc=${c.focus.done.length} tec=${c.research.done.length}${Object.entries(c.influence ?? {}).map(([k, v]) => ` inf:${k}=${Math.round(v ?? 0)}`).join('')}${c.overlord ? ` señor=${c.overlord}` : ''} ${c.leader}`;
   });
   return rows.join('\n');
 }

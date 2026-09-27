@@ -9,6 +9,8 @@ import { Medal, Portrait } from '../components/art';
 import { categoryColor } from '../../gfx/medallions';
 import { Icon, Lines, ModLines, Panel, Section, Tip } from '../components/core';
 import { store, ui, useGame } from '../store';
+import { InfluenceRow, influencers } from '../components/Influence';
+import { FACTION_IDS } from '../../game/types';
 
 function IdeologyPie({ pop }: { pop: Record<IdeologyId, number> }) {
   let acc = 0;
@@ -137,6 +139,17 @@ export function PoliticsPanel() {
           </div>
         </div>
       </Section>
+
+      {(influencers(state, f).length > 0 || FACTION_IDS.some((o) => o !== f && influencers(state, o).includes(f))) && (
+        <Section title="Soberanía">
+          {influencers(state, f).map((by) => (
+            <InfluenceRow key={by} state={state} over={f} by={by} label={`Influencia de ${FACTIONS[by].shortName}`} />
+          ))}
+          {FACTION_IDS.filter((o) => o !== f && state.countries[o].alive && influencers(state, o).includes(f)).map((o) => (
+            <InfluenceRow key={`o${o}`} state={state} over={o} by={f} label={`Nuestra influencia sobre ${FACTIONS[o].shortName}`} />
+          ))}
+        </Section>
+      )}
 
       <Section title="Espíritus nacionales">
         <div className="spirits">

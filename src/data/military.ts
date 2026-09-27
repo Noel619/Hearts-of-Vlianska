@@ -359,6 +359,12 @@ export const SPECIAL_TEMPLATES: Record<string, { id: string; name: string; line:
     support: ['zapadores'],
   },
   cal_martires: { id: 'cal_martires', name: 'Mártires de la Esmeralda', line: ['milicia', 'milicia', 'milicia', 'fusileros'], support: [] },
+  cal_guardia_esmeralda: {
+    id: 'cal_guardia_esmeralda',
+    name: 'Guardia Esmeralda',
+    line: ['fusileros', 'fusileros', 'ametralladoras', 'fusileros'],
+    support: ['stalkers'],
+  },
   nor_stalkers: { id: 'nor_stalkers', name: 'Stalkers del Norte', line: ['fusileros', 'fusileros', 'fusileros'], support: ['stalkers', 'medicos'] },
   milicia_voluntaria: { id: 'milicia_voluntaria', name: 'Voluntarios', line: ['milicia', 'milicia', 'milicia'], support: [] },
 };

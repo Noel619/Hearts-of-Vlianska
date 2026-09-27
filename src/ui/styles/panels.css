@@ -1400,3 +1400,28 @@
 .slider-row .num {
   text-align: right;
 }
+
+/* ------------------------------------------------------------------ Influencia */
+
+.influence-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.influence-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.influence-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+.influence-main .small {
+  font-size: 11px;
+}

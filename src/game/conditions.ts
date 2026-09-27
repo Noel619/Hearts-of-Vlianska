@@ -175,6 +175,12 @@ export function check(state: GameState, cond: Condition | undefined, ctx: Ctx): 
     }
     case 'surrender':
       return c.surrender >= (cond.min ?? 0);
+    case 'influence': {
+      const t = resolveTarget(state, ctx, cond.target);
+      return !!t && inRange(c.influence?.[t] ?? 0, cond.min, cond.max);
+    }
+    case 'leader':
+      return c.leader === cond.id;
     case 'and':
       return cond.list.every((x) => check(state, x, ctx));
     case 'or':

@@ -332,6 +332,54 @@ export const GLOBAL_EVENTS: EventDef[] = [
       { name: 'Rechazamos la propuesta.', effects: [{ t: 'relation', target: 'FROM', v: -10 }], ai: 1 },
     ],
   },
+  // ------------------------------------------------------------------ Influencia extranjera
+  {
+    id: 'inf_tutela',
+    title: 'Bajo la tutela de [FROM]',
+    desc: 'Los representantes de [FROM] ya no se limitan a opinar: revisan nuestras cuentas, asisten a nuestros consejos y sus patrullas cruzan nuestros andenes cuando quieren. En los mercados se dice que las decisiones importantes se toman fuera de la estación.',
+    picture: 'Eye',
+    triggeredOnly: true,
+    options: [
+      { name: 'No tenemos fuerza para impedirlo.', effects: [{ t: 'stability', v: 0.02 }], ai: 2 },
+      {
+        name: 'Protestad formalmente: seguimos siendo libres.',
+        effects: [{ t: 'influence', target: 'FROM', v: -10 }, { t: 'relation', target: 'FROM', v: -15 }, { t: 'pp', v: -25 }],
+        available: { c: 'pp', min: 25 },
+        ai: 1,
+      },
+    ],
+  },
+  {
+    id: 'inf_crisis',
+    title: 'Crisis de soberanía',
+    desc: '[FROM] controla nuestros túneles, nuestras reservas y a la mitad de nuestros funcionarios. Su embajador lo dice sin rodeos: o formalizamos lo que ya es un hecho, o rompemos con todo lo que nos une a ellos. Y romper tendrá un precio.',
+    picture: 'Scale',
+    triggeredOnly: true,
+    options: [
+      {
+        name: 'Aceptamos ser su protectorado.',
+        effects: [
+          { t: 'scoped', target: 'FROM', effects: [{ t: 'makeSubject', target: 'FROM' }] },
+          { t: 'influenceDrift', target: 'FROM', v: 0, set: true },
+          { t: 'influence', target: 'FROM', v: -30 },
+          { t: 'stability', v: 0.03 },
+        ],
+        ai: 2,
+      },
+      {
+        name: 'Rompemos con [FROM], cueste lo que cueste.',
+        effects: [
+          { t: 'influenceDrift', target: 'FROM', v: 0, set: true },
+          { t: 'influence', target: 'FROM', v: -70 },
+          { t: 'stability', v: -0.1 },
+          { t: 'warSupport', v: 0.1 },
+          { t: 'relation', target: 'FROM', v: -50 },
+          { t: 'scoped', target: 'FROM', effects: [{ t: 'wargoal', target: 'FROM' }, { t: 'embargo', target: 'FROM' }] },
+        ],
+        ai: 1,
+      },
+    ],
+  },
   {
     id: 'diplo_propuesta_nap',
     title: 'Propuesta de no agresión',

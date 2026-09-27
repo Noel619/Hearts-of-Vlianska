@@ -1,8 +1,8 @@
 // Árbol de enfoques nacionales a pantalla completa.
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FOCUS_BY_ID, FOCUS_TREES } from '../../data';
 import type { FocusDef } from '../../game/types';
-import { cancelFocus, focusDays, focusDaysLeft, focusSpeed, focusStatus, startFocus, type FocusStatus } from '../../game/focus';
+import { canBypass, cancelFocus, focusDays, focusDaysLeft, focusSpeed, focusStatus, startFocus, type FocusStatus } from '../../game/focus';
 import { describeCondition, describeEffects } from '../../game/describe';
 import { Emblem, Medal } from '../components/art';
 import { blendCategory } from '../../gfx/medallions';
@@ -14,6 +14,8 @@ const CELL_W = 152;
 const CELL_H = 128;
 const NODE_W = 136;
 const PAD = 40;
+/** Espacio para los nombres de las ramas. */
+const HEAD_H = 46;
 
 const STATUS_LABEL: Record<FocusStatus, string> = {
   done: 'Completado',
@@ -67,6 +69,13 @@ function FocusTooltip({ focus }: { focus: FocusDef }) {
         <span className="num">{Math.ceil(focusDays(focus) / focusSpeed(state, f))} días</span>
       </div>
       <div className={status === 'available' || status === 'done' || status === 'current' ? 'good' : 'bad'}>{STATUS_LABEL[status]}</div>
+      {focus.bypass && (
+        <>
+          <div className="tt-sub">Se omite si</div>
+          <Lines lines={describeCondition(focus.bypass, state, { root: f })} />
+          {canBypass(state, f, focus) && status === 'available' && <div className="warn">Ya no tiene sentido: al elegirlo se completará al instante, sin efectos.</div>}
+        </>
+      )}
       {focus.prereq && focus.prereq.length > 0 && (
         <>
           <div className="tt-sub">Requiere</div>
@@ -109,8 +118,20 @@ export function FocusTreeView() {
   const maxX = Math.max(...tree.focuses.map((x) => x.x));
   const maxY = Math.max(...tree.focuses.map((x) => x.y));
   const width = (maxX + 1) * CELL_W + PAD * 2;
-  const height = (maxY + 1) * CELL_H + PAD * 2;
-  const pos = (focus: FocusDef) => ({ x: PAD + focus.x * CELL_W + (CELL_W - NODE_W) / 2, y: PAD + focus.y * CELL_H });
+  const height = (maxY + 1) * CELL_H + PAD * 2 + HEAD_H;
+  const pos = (focus: FocusDef) => ({ x: PAD + focus.x * CELL_W + (CELL_W - NODE_W) / 2, y: PAD + HEAD_H + focus.y * CELL_H });
+  const doneCount = tree.focuses.filter((x) => c.focus.done.includes(x.id)).length;
+  // Al abrir, centra la vista en el enfoque en curso o, si no hay, en la raíz del árbol.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const target = (c.focus.current && tree.focuses.find((x) => x.id === c.focus.current)) || tree.focuses.find((x) => !x.prereq?.length) || tree.focuses[0];
+    const p = pos(target);
+    el.scrollLeft = Math.max(0, p.x + NODE_W / 2 - el.clientWidth / 2);
+    el.scrollTop = Math.max(0, p.y - 120);
+    // Solo al abrir el árbol.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const byId = Object.fromEntries(tree.focuses.map((x) => [x.id, x]));
   const current = c.focus.current ? FOCUS_BY_ID[c.focus.current] : null;
 
@@ -167,10 +188,12 @@ export function FocusTreeView() {
     <div className="overlay focus-overlay">
       <header className="overlay-head">
         <Emblem faction={f} size={36} />
-        <div>
-          <div className="label">Enfoque nacional</div>
-          <h2>{tree.name}</h2>
-        </div>
+        <Tip content={<div><h4>{tree.name}</h4>{tree.desc && <div className="tt-desc">{tree.desc}</div>}<div className="dim">{doneCount} de {tree.focuses.length} enfoques completados</div></div>}>
+          <div>
+            <div className="label">Enfoque nacional · {doneCount}/{tree.focuses.length}</div>
+            <h2>{tree.name}</h2>
+          </div>
+        </Tip>
         <div className="overlay-current">
           {current ? (
             <>
@@ -195,6 +218,13 @@ export function FocusTreeView() {
       </header>
       <div className="tree-scroll" ref={ref} {...handlers}>
         <div className="tree-canvas" style={{ width, height }}>
+          {tree.branches?.map((br, i) => (
+            <div key={br.name} className={`tree-branch ${i % 2 ? 'odd' : ''}`} style={{ left: PAD + br.x0 * CELL_W, width: (br.x1 - br.x0 + 1) * CELL_W, height: height - 8 }}>
+              <Tip content={<div><h4>{br.name}</h4>{br.desc && <div className="tt-desc">{br.desc}</div>}</div>}>
+                <span className="tree-branch-name">{br.name}</span>
+              </Tip>
+            </div>
+          ))}
           <svg className="tree-lines" width={width} height={height} aria-hidden>
             {lines.map((l, i) => (
               <path key={i} d={l.d} className={`tree-line ${l.done ? 'done' : ''}`} strokeDasharray={l.dashed ? '6 5' : undefined} />
@@ -212,7 +242,11 @@ export function FocusTreeView() {
             const status = focusStatus(state, f, focus.id);
             return (
               <Tip key={focus.id} content={() => <FocusTooltip focus={focus} />} as="div" className="focus-node-wrap" style={{ left: p.x, top: p.y, width: NODE_W }}>
-                <button className={`focus-node ${status}`} onClick={() => click(focus)} aria-label={`${focus.name}: ${STATUS_LABEL[status]}`}>
+                <button
+                  className={`focus-node ${status} ${status === 'available' && canBypass(state, f, focus) ? 'bypass' : ''}`}
+                  onClick={() => click(focus)}
+                  aria-label={`${focus.name}: ${STATUS_LABEL[status]}`}
+                >
                   <span className="focus-icon">
                     <Medal icon={focus.icon} shape="shield" color={blendCategory(focus.icon, FACTIONS[f].color)} metal={status === 'done' ? 'gold' : 'brass'} size={76} />
                     {status === 'done' && <span className="focus-check" aria-hidden />}

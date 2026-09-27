@@ -40,7 +40,12 @@ export function fireEvent(state: GameState, f: FactionId, id: string, opts: { fr
 
 function aiAnswer(state: GameState, f: FactionId, ev: EventDef, opts: { from?: FactionId; target?: string }) {
   const ctx: Ctx = { root: f, from: opts.from, target: opts.target };
-  const options = ev.options.map((o, i) => ({ item: i, weight: check(state, o.available, ctx) ? (o.ai ?? (i === 0 ? 2 : 1)) : 0 }));
+  const options = ev.options.map((o, i) => {
+    if (!check(state, o.available, ctx)) return { item: i, weight: 0 };
+    let w = o.ai ?? (i === 0 ? 2 : 1);
+    for (const r of o.aiIf ?? []) if (check(state, r.cond, ctx)) w *= r.factor;
+    return { item: i, weight: w };
+  });
   if (state.historicalAI) {
     // En modo histórico se toma siempre la opción de mayor peso.
     options.sort((a, b) => b.weight - a.weight);

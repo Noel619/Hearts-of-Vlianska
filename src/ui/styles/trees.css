@@ -386,3 +386,37 @@
     flex: 1 1 100%;
   }
 }
+
+/* Ramas del árbol de enfoques */
+.tree-branch {
+  position: absolute;
+  top: 4px;
+  border-left: 1px dashed rgba(201, 162, 94, 0.14);
+  border-right: 1px dashed rgba(201, 162, 94, 0.14);
+  background: linear-gradient(180deg, rgba(201, 162, 94, 0.07), rgba(201, 162, 94, 0.015) 120px, transparent 60%);
+  pointer-events: none;
+}
+.tree-branch .tree-branch-name {
+  pointer-events: auto;
+}
+.tree-branch.odd {
+  background: linear-gradient(180deg, rgba(120, 150, 130, 0.08), rgba(120, 150, 130, 0.02) 120px, transparent 60%);
+}
+.tree-branch-name {
+  display: block;
+  padding: 8px 10px 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--brass-2);
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.focus-node.bypass .focus-name {
+  font-style: italic;
+  opacity: 0.8;
+}

@@ -1,5 +1,7 @@
 // Panel de diplomacia: relaciones, guerras, alianzas y acuerdos.
 import { useState } from 'react';
+import { INFLUENCE, influenceDrift, influenceOf } from '../../game/influence';
+import { InfluenceRow } from '../components/Influence';
 import { FACTIONS, IDEOLOGIES, LEADERS } from '../../data';
 import type { FactionId } from '../../game/types';
 import { FACTION_IDS } from '../../game/types';
@@ -71,6 +73,9 @@ export function DiplomacyPanel() {
     const wg = c.wargoals.find((w) => w.target === t);
     if (wg) chips.push({ text: wg.ready ? 'Objetivo listo' : `Justificando ${Math.round(wg.progress * 100)} %`, cls: 'war' });
     if (state.countries[t].wargoals.some((w) => w.target === f)) chips.push({ text: '¡Nos amenaza!', cls: 'war' });
+    if (influenceOf(state, f, t) >= INFLUENCE.TUTELAGE) chips.push({ text: 'Nos tutela', cls: 'war' });
+    else if (influenceOf(state, f, t) > 0) chips.push({ text: `Influencia ${Math.round(influenceOf(state, f, t))}`, cls: 'info' });
+    if (influenceOf(state, t, f) >= INFLUENCE.TUTELAGE) chips.push({ text: 'Bajo nuestra tutela', cls: 'gold' });
     return chips;
   };
 
@@ -141,6 +146,12 @@ export function DiplomacyPanel() {
                   <span>Opinión de {factionName(target)}</span>
                   <span className={`num ${relTone(relation(state, target, f))}`}>{Math.round(relation(state, target, f))}</span>
                 </div>
+                {(influenceOf(state, f, target) > 0 || influenceDrift(state, f, target) !== 0) && (
+                  <InfluenceRow state={state} over={f} by={target} label="Su influencia sobre nosotros" />
+                )}
+                {(influenceOf(state, target, f) > 0 || influenceDrift(state, target, f) !== 0) && (
+                  <InfluenceRow state={state} over={target} by={f} label="Nuestra influencia sobre ellos" />
+                )}
                 <div className="diplo-actions">
                   <Tip content={<div>Coste: {IMPROVE_COST} PP. +15 de relaciones. Una vez al mes.</div>}>
                     <button className="btn small" disabled={atWar || c.pp < IMPROVE_COST || (c.cooldowns[`mejorar_${target}`] ?? 0) > state.hour} onClick={() => store.act((st) => improveRelations(st, f, target))}>

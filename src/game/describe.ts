@@ -45,6 +45,19 @@ function targetName(t: Target, ctx?: Partial<Ctx>): string {
   return FACTIONS[t]?.name ?? t;
 }
 
+/** Facción sobre la que actúa un bloque `scoped`, si se conoce. */
+function scopedRoot(t: Target, ctx?: Partial<Ctx>): FactionId | undefined {
+  if (t === 'ROOT') return ctx?.root;
+  if (t === 'FROM') return ctx?.from;
+  if (t === 'TARGET') return ctx?.target && (FACTION_IDS as string[]).includes(ctx.target) ? (ctx.target as FactionId) : undefined;
+  return t;
+}
+
+/** "nosotros" si los efectos son del jugador; si no, el nombre de la facción. */
+function whoName(state?: GameState, ctx?: Partial<Ctx>): string {
+  return ctx?.root && state?.player && state.player !== ctx.root ? FACTIONS[ctx.root].name : 'nosotros';
+}
+
 function stationName(ref: string, state?: GameState, ctx?: Partial<Ctx>): string {
   if (ref === 'CAPITAL') {
     if (state && ctx?.root) return `${STATIONS[state.countries[ctx.root].capital].shortName} (capital)`;
@@ -143,8 +156,10 @@ export function describeEffect(e: Effect, state?: GameState, ctx?: Partial<Ctx>,
       return L(`Desbloquea la decisión «${DECISIONS[e.id]?.name ?? e.id}»`, 'good');
     case 'annex':
       return L(`Anexión pacífica de ${targetName(e.target, ctx)}`, 'neutral');
-    case 'makeSubject':
-      return L(`${targetName(e.target, ctx)} pasa a ser tu protectorado`, 'good');
+    case 'makeSubject': {
+      const owner = ctx?.root && state?.player !== ctx.root ? `protectorado de ${FACTIONS[ctx.root].name}` : 'tu protectorado';
+      return L(`${targetName(e.target, ctx)} pasa a ser ${owner}`, 'good');
+    }
     case 'releaseSubject':
       return L(`${targetName(e.target, ctx)} deja de ser tu protectorado`, 'neutral');
     case 'createPact':
@@ -212,11 +227,26 @@ export function describeEffect(e: Effect, state?: GameState, ctx?: Partial<Ctx>,
     }
     case 'scoped': {
       const lines: Line[] = [{ text: `${targetName(e.target, ctx)}:`, tone: 'neutral', indent }];
-      lines.push(...describeEffects(e.effects, state, { root: undefined, from: ctx?.root, target: ctx?.target }, indent + 1));
+      lines.push(...describeEffects(e.effects, state, { root: scopedRoot(e.target, ctx), from: ctx?.root, target: ctx?.target }, indent + 1));
       return lines;
     }
     case 'custom':
       return L(e.desc, 'neutral');
+    case 'influence': {
+      const who = targetName(e.target, ctx);
+      const over = whoName(state, ctx);
+      // Que otros ganen influencia sobre nosotros es malo; que la ganemos nosotros sobre otros, bueno.
+      const tone = over === 'nosotros' ? toneOf(e.v, false) : state?.player && scopedRoot(e.target, ctx) === state.player ? toneOf(e.v) : 'neutral';
+      return L(`Influencia de ${who} sobre ${over}: ${e.v > 0 ? '+' : '−'}${Math.abs(e.v)}`, tone);
+    }
+    case 'influenceDrift': {
+      const who = targetName(e.target, ctx);
+      const over = whoName(state, ctx);
+      const tone = over === 'nosotros' ? toneOf(e.v, false) : 'neutral';
+      if (e.set && e.v === 0) return L(`La influencia de ${who} sobre ${over} deja de crecer`, 'neutral');
+      if (e.set) return L(`Influencia de ${who} sobre ${over}: ${e.v > 0 ? '+' : '−'}${Math.abs(e.v)} al mes`, tone);
+      return L(`Influencia de ${who} sobre ${over}: ${e.v > 0 ? '+' : '−'}${Math.abs(e.v)} más al mes`, tone);
+    }
   }
   return [];
 }
@@ -235,7 +265,7 @@ export function conditionText(cond: Condition, ctx?: Partial<Ctx>): string {
     case 'hasTech':
       return `Tener la tecnología «${TECH_BY_ID[cond.id]?.name ?? cond.id}»`;
     case 'hasFlag':
-      return 'Haber tomado la decisión adecuada antes';
+      return cond.label ?? 'Haber tomado la decisión adecuada antes';
     case 'hasGlobalFlag':
       return 'Que haya ocurrido cierto suceso';
     case 'hasSpirit':
@@ -316,11 +346,16 @@ export function conditionText(cond: Condition, ctx?: Partial<Ctx>): string {
       return `Objetivo de guerra contra ${targetName(cond.target, ctx)}`;
     case 'surrender':
       return `Capitulación de al menos ${Math.round((cond.min ?? 0) * 100)} %`;
+    case 'influence':
+      return range(`Influencia de ${targetName(cond.target, ctx)} sobre nosotros`, cond.min, cond.max, (v) => String(v));
+    case 'leader':
+      return `Gobierna ${LEADERS[cond.id]?.name ?? cond.id}${LEADERS[cond.id] ? ` (${LEADERS[cond.id].title})` : ''}`;
     case 'and':
       return 'Todo lo siguiente';
     case 'or':
       return 'Uno de los siguientes';
     case 'not':
+      if (cond.cond.c === 'exists') return `${targetName(cond.cond.target, ctx)} ha desaparecido`;
       return `NO: ${conditionText(cond.cond, ctx)}`;
     case 'scoped':
       return `${targetName(cond.target, ctx)}: ${conditionText(cond.cond, { root: undefined, from: ctx?.root })}`;

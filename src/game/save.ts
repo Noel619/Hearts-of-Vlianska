@@ -4,6 +4,7 @@ import { FACTION_IDS } from './types';
 import { SAVE_VERSION } from './state';
 import { emptyDerived, updateDerived } from './economy';
 import { invalidateMods } from './modifiers';
+import { FOCUS_BY_ID } from '../data';
 
 export function serialize(state: GameState): string {
   return JSON.stringify(state);
@@ -28,6 +29,14 @@ export function deserialize(json: string): GameState {
     c.derived = { ...emptyDerived(), ...(c.derived ?? {}) };
     c.recentLosses ??= 0;
     c.manpowerBonus ??= 0;
+    c.influence ??= {};
+    c.influenceDrift ??= {};
+    // Los árboles de enfoques cambiaron en la versión 2: se descartan los enfoques que ya no existen.
+    c.focus.done = c.focus.done.filter((id) => FOCUS_BY_ID[id]);
+    if (c.focus.current && !FOCUS_BY_ID[c.focus.current]) {
+      c.focus.current = null;
+      c.focus.progress = 0;
+    }
   }
   invalidateMods(state);
   for (const f of FACTION_IDS) if (state.countries[f].alive) updateDerived(state, f);

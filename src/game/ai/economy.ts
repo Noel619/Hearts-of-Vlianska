@@ -3,7 +3,7 @@ import { ADVISOR_BY_ID, FACTIONS, LAWS, MAP, MILITARY_SLOTS, POLITICAL_SLOTS, la
 import type { EquipmentId, FactionId, GameState, ModifierKey, ResourceId, TechCategory } from '../types';
 import { EQUIPMENT_IDS, RESOURCE_IDS } from '../types';
 import { aliveFactions, isAtWar, neighbors, ownedStations, relation } from '../helpers';
-import { availableFocuses, startFocus } from '../focus';
+import { aiFocusWeight, availableFocuses, startFocus } from '../focus';
 import { availableTechs, researchCost, startResearch, templateSlots, unlockedBattalions } from '../research';
 import { advisorCost, availableAdvisors, canEnactLaw, enactLaw, hireAdvisor, lawCost } from '../politics';
 import { addProductionLine, addTrade, canBuild, canTrade, exportable, queueBuilding, removeProductionLine, slotsUsed } from '../economy';
@@ -43,7 +43,7 @@ export function aiFocus(state: GameState, f: FactionId) {
     let best = options[0];
     let bestW = -1;
     for (const o of options) {
-      const w = (o.ai ?? 10) + rand(state) * 0.5;
+      const w = aiFocusWeight(state, f, o) + rand(state) * 0.5;
       if (w > bestW) {
         bestW = w;
         best = o;
@@ -54,7 +54,7 @@ export function aiFocus(state: GameState, f: FactionId) {
   }
   const pick = weightedPick(
     state,
-    options.map((o) => ({ item: o.id, weight: Math.max(0.5, o.ai ?? 10) })),
+    options.map((o) => ({ item: o.id, weight: Math.max(0.5, aiFocusWeight(state, f, o)) })),
   );
   if (pick) startFocus(state, f, pick);
 }

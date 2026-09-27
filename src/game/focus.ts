@@ -22,8 +22,14 @@ export function focusStatus(state: GameState, fac: FactionId, id: string): Focus
   if (c.focus.current === id) return 'current';
   if (f.exclusive?.some((x) => c.focus.done.includes(x) || c.focus.current === x)) return 'excluded';
   if (f.prereq && !f.prereq.every((group) => group.some((p) => c.focus.done.includes(p)))) return 'locked';
+  if (canBypass(state, fac, f)) return 'available';
   if (!check(state, f.available, { root: fac })) return 'blocked';
   return 'available';
+}
+
+/** ¿Ha perdido sentido el enfoque (por ejemplo, su objetivo ya no existe)? Entonces se omite. */
+export function canBypass(state: GameState, fac: FactionId, f: FocusDef): boolean {
+  return !!f.bypass && check(state, f.bypass, { root: fac });
 }
 
 export function startFocus(state: GameState, fac: FactionId, id: string): boolean {
@@ -31,9 +37,22 @@ export function startFocus(state: GameState, fac: FactionId, id: string): boolea
   if (c.focus.current) return false;
   if (FOCUS_BY_ID[id]?.faction !== fac) return false;
   if (focusStatus(state, fac, id) !== 'available') return false;
+  if (canBypass(state, fac, FOCUS_BY_ID[id])) {
+    completeFocus(state, fac, id, true);
+    return true;
+  }
   c.focus.current = id;
   c.focus.progress = 0;
   return true;
+}
+
+/** Peso con el que la IA elige un enfoque, ajustado a la situación. */
+export function aiFocusWeight(state: GameState, fac: FactionId, f: FocusDef): number {
+  let w = f.ai ?? 10;
+  for (const r of f.aiIf ?? []) if (check(state, r.cond, { root: fac })) w *= r.factor;
+  // Omitir un enfoque sin sentido no cuesta nada: la IA lo hace en cuanto puede.
+  if (canBypass(state, fac, f)) w += 100;
+  return w;
 }
 
 export function cancelFocus(state: GameState, fac: FactionId) {
@@ -53,7 +72,7 @@ export function focusDaysLeft(state: GameState, fac: FactionId): number {
   return Math.max(0, (focusDays(f) - c.focus.progress) / focusSpeed(state, fac));
 }
 
-export function completeFocus(state: GameState, fac: FactionId, id: string) {
+export function completeFocus(state: GameState, fac: FactionId, id: string, bypassed = false) {
   const c = state.countries[fac];
   const f = FOCUS_BY_ID[id];
   if (!f || c.focus.done.includes(id)) return;
@@ -61,6 +80,10 @@ export function completeFocus(state: GameState, fac: FactionId, id: string) {
   if (c.focus.current === id) {
     c.focus.current = null;
     c.focus.progress = 0;
+  }
+  if (bypassed) {
+    if (state.player === fac) addLog(state, { text: `Se omite el enfoque «${f.name}»: ya no tiene sentido.`, kind: 'info', faction: fac });
+    return;
   }
   applyEffects(state, f.effects, { root: fac });
   addLog(state, { text: `${factionName(fac)} completa el enfoque nacional «${f.name}».`, kind: state.player === fac ? 'bueno' : 'diplo', faction: fac });
@@ -72,6 +95,10 @@ export function dailyFocus(state: GameState, fac: FactionId) {
   const f = FOCUS_BY_ID[c.focus.current];
   if (!f) {
     c.focus.current = null;
+    return;
+  }
+  if (canBypass(state, fac, f)) {
+    completeFocus(state, fac, f.id, true);
     return;
   }
   if (!check(state, f.available, { root: fac })) {

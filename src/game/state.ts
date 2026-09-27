@@ -6,7 +6,7 @@ import { emptyDerived, updateDerived, START_EFFICIENCY } from './economy';
 import { invalidateMods } from './modifiers';
 import { spawnUnit } from './military';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export interface NewGameOptions {
   player: FactionId | null;
@@ -82,6 +82,8 @@ export function newGame(opts: NewGameOptions): GameState {
       recentLosses: 0,
       unitCounter: 0,
       manpowerBonus: 0,
+      influence: { ...(f.influence ?? {}) },
+      influenceDrift: { ...(f.influenceDrift ?? {}) },
       derived: emptyDerived(),
       ai: { strategy: 'normal', lastDiplo: 0, rejected: {} },
     };

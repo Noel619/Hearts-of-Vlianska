@@ -211,6 +211,9 @@ export const FACTIONS: Record<FactionId, FactionDef> = {
     relations: { UNI: 50, SDR: -30, VHL: -70, LEV: 5, NOR: 10, CHE: 0, CAL: 0 },
     aiTargets: [{ target: 'VHL', weight: 2 }],
     aiFriends: ['UNI'],
+    // Las brigadas de la Unión en la Encrucijada pesan en cada decisión del Consejo.
+    influence: { UNI: 25 },
+    influenceDrift: { UNI: 0.5 },
     unitNames: 'Compañía',
   },
   VHL: {
@@ -382,6 +385,9 @@ export const FACTIONS: Record<FactionId, FactionDef> = {
     relations: { CHE: 40, UNI: -20, LEV: 5, SDR: 0, STA: 10, VHL: 0, CAL: -10 },
     aiTargets: [],
     aiFriends: ['CHE'],
+    // El tributo del Acuerdo de 2031 mantiene a la Unión metida en los asuntos del Norte.
+    influence: { UNI: 15 },
+    influenceDrift: { UNI: 0.5 },
     unitNames: 'Guardia',
   },
 };

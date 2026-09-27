@@ -6,17 +6,19 @@ Enero de 2033. Veinte años después de las bombas, ocho facciones se reparten l
 
 ## Contenido
 
-- **8 facciones jugables**, cada una con su propio árbol de enfoques nacionales (184 enfoques en total), líder, espíritus nacionales y objetivos:
+- **8 facciones jugables**, cada una con su propio árbol de enfoques nacionales (373 enfoques en total, entre 40 y 52 por facción, organizados en ramas), líder, espíritus nacionales y objetivos:
   Unión de Estaciones, Seguidores de Rusia, Levantamiento Popular, Stantsiya Staraya, Saqueadores de Vhlainska, Chernovodskaya, Califato de Izumrudnaya y República del Norte.
+  Cada árbol plantea dilemas propios: el Califato puede seguir con la guerra santa, negociar con el Levantamiento (comida a cambio de comisarios y soberanía) o abrir sus puertas; el Levantamiento decide quién sucede a Morozov y si asfixia Mertvaya o se la gana; los Seguidores eligen entre los magnates y los obreros de la Gran Forja…
+- **Influencia extranjera**: tributos, deudas, protectores y negociaciones dan a otras facciones poder sobre tus decisiones. Resta poder político, extiende su ideología, abre tus túneles a sus tropas y, al máximo, fuerza una crisis de soberanía.
 - **Mapa por provincias**: estaciones y tramos de túnel (líneas principales, túneles peligrosos, auxiliares, estrechos y derrumbes), con niebla de guerra y modos de mapa (político, diplomático, terreno, peligro mutante y suministro).
 - **Política**: poder político, estabilidad, apoyo a la guerra, 7 ideologías con popularidad y cambios de gobierno, 18 leyes en 4 grupos, 34 asesores, sucesiones de líderes.
 - **Investigación**: 76 tecnologías en 6 ramas, con penalización por adelantarse a su año.
 - **Economía**: talleres civiles y militares, cola de construcción, líneas de producción con eficiencia, recursos (chatarra, pólvora, combustible), comida y hambrunas, comercio entre facciones.
-- **Ejército**: plantillas y diseñador de unidades, reclutamiento, suministro, desgaste, peligro mutante y combate con ancho de frente, reservas, flanqueo, barricadas y blindaje.
+- **Ejército**: plantillas y diseñador de unidades, reclutamiento, suministro, desgaste y peligro mutante. En combate cuentan el ancho del frente, los relevos desde la reserva (los morteros disparan desde atrás), el flanqueo al atacar desde varios túneles, la cobertura de barricadas, estaciones y atrincheramiento, la defensa frente a la ruptura y el blindaje. Las unidades que defienden pueden replegarse.
 - **Diplomacia**: justificación de guerra, tensión del metro, alianzas, pactos de no agresión, acceso militar, garantías, embargos, capitulación, anexión y protectorados.
-- **Eventos y decisiones**: 50 eventos y 22 decisiones (expediciones a la superficie, batidas contra mutantes, excavar derrumbes, recolonizar Tenevskaya…).
+- **Eventos y decisiones**: 75 eventos y 30 decisiones (expediciones a la superficie, batidas contra mutantes, excavar derrumbes, recolonizar Tenevskaya, convoyes a la Esmeralda, desviar las caravanas rusas…).
 - **Ocupación y revueltas**: las estaciones conquistadas pueden sublevarse y resucitar a su antigua facción.
-- **IA** para todas las facciones: enfoques, investigación, leyes, construcción, producción, comercio, diplomacia y operaciones militares.
+- **IA** para todas las facciones: enfoques (que eligen según la situación), investigación, leyes, construcción, producción, comercio, diplomacia y operaciones militares. La IA guarnece todas sus estaciones amenazadas, repliega a las unidades superadas y solo ataca con superioridad local, reuniendo tropas y atacando desde varios túneles.
 - Guardado y carga (con autoguardado mensual), crónica del metro, guía de juego y atajos de teclado. Se puede jugar con ratón o en pantalla táctil.
 
 ## Gráficos y sonido
@@ -55,7 +57,7 @@ Hace falta [Node.js](https://nodejs.org/) 20.19 o superior.
 ```bash
 npm install
 npm run dev          # servidor de desarrollo en http://localhost:5173
-npm test             # pruebas del motor, del contenido y del combate
+npm test             # pruebas del motor, del contenido, del combate, de la IA y de los enfoques
 npm run build        # versión de producción en dist/
 npm run build:single # un único archivo dist-single/index.html que se abre con doble clic
 ```

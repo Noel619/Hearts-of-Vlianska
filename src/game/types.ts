@@ -145,7 +145,7 @@ export type StationRef = string; // id de estación, 'CAPITAL' o 'TARGET'
 export type Condition =
   | { c: 'hasFocus'; id: string }
   | { c: 'hasTech'; id: string }
-  | { c: 'hasFlag'; id: string }
+  | { c: 'hasFlag'; id: string; label?: string }
   | { c: 'hasGlobalFlag'; id: string }
   | { c: 'hasSpirit'; id: string }
   | { c: 'atWar' }
@@ -185,6 +185,9 @@ export type Condition =
   | { c: 'strongerThan'; target: Target; ratio?: number }
   | { c: 'hasWargoal'; target: Target }
   | { c: 'surrender'; min?: number }
+  /** Influencia de TARGET sobre nosotros (0..100). */
+  | { c: 'influence'; target: Target; min?: number; max?: number }
+  | { c: 'leader'; id: string }
   | { c: 'and'; list: Condition[] }
   | { c: 'or'; list: Condition[] }
   | { c: 'not'; cond: Condition }
@@ -249,7 +252,11 @@ export type Effect =
   | { t: 'if'; cond: Condition; then: Effect[]; else?: Effect[] }
   | { t: 'random'; chance: number; then: Effect[]; else?: Effect[] }
   | { t: 'scoped'; target: Target; effects: Effect[] }
-  | { t: 'custom'; id: string; desc: string; arg?: string | number };
+  | { t: 'custom'; id: string; desc: string; arg?: string | number }
+  /** Cambia la influencia de TARGET sobre nosotros. */
+  | { t: 'influence'; target: Target; v: number }
+  /** Cambia cuánto crece (o baja) cada mes la influencia de TARGET sobre nosotros. */
+  | { t: 'influenceDrift'; target: Target; v: number; set?: boolean };
 
 // ---------------------------------------------------------------------------
 // Definiciones de contenido
@@ -330,6 +337,9 @@ export interface FactionDef {
   relations: Partial<Record<FactionId, number>>;
   aiTargets: { target: FactionId; weight: number }[];
   aiFriends: FactionId[];
+  /** Influencia inicial de otras facciones sobre esta y su cambio mensual. */
+  influence?: Partial<Record<FactionId, number>>;
+  influenceDrift?: Partial<Record<FactionId, number>>;
   unitNames: string;
 }
 
@@ -447,14 +457,27 @@ export interface FocusDef {
   prereq?: string[][];
   exclusive?: string[];
   available?: Condition;
+  /** Si se cumple, el enfoque puede omitirse: se completa al instante, sin efectos. */
   bypass?: Condition;
   effects: Effect[];
   ai?: number;
+  /** Multiplicadores del peso de la IA según la situación. */
+  aiIf?: { cond: Condition; factor: number }[];
+}
+
+export interface FocusBranchDef {
+  name: string;
+  desc?: string;
+  /** Columnas (incluidas) que ocupa la rama en el árbol. */
+  x0: number;
+  x1: number;
 }
 
 export interface FocusTreeDef {
   faction: FactionId;
   name: string;
+  desc?: string;
+  branches?: FocusBranchDef[];
   focuses: FocusDef[];
 }
 
@@ -462,6 +485,8 @@ export interface EventOption {
   name: string;
   effects: Effect[];
   ai?: number;
+  /** Multiplicadores del peso de la IA según la situación. */
+  aiIf?: { cond: Condition; factor: number }[];
   available?: Condition;
 }
 
@@ -659,6 +684,10 @@ export interface CountryState {
   unitCounter: number;
   manpowerBonus: number;
   overlord?: FactionId;
+  /** Influencia (0..100) que otras facciones tienen sobre nuestras decisiones. */
+  influence: Partial<Record<FactionId, number>>;
+  /** Cambio mensual de esa influencia (comisarios, tributos, deudas...). */
+  influenceDrift: Partial<Record<FactionId, number>>;
   /** Hora desde la que el jugador tiene talleres civiles parados (para los recordatorios). */
   idleSince?: number;
   derived: CountryDerived;

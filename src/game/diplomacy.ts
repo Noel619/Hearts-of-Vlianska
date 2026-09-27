@@ -56,6 +56,7 @@ export function canJustify(state: GameState, f: FactionId, t: FactionId): { ok: 
   if (hasNap(state, f, t)) return { ok: false, reason: 'Tenéis un pacto de no agresión' };
   if (samePact(state, f, t)) return { ok: false, reason: 'Sois aliados' };
   if (state.countries[t].overlord === f) return { ok: false, reason: 'Es tu protectorado' };
+  if ((c.influence?.[t] ?? 0) >= 50) return { ok: false, reason: `${factionName(t)} controla demasiado nuestra política` };
   const needed = IDEOLOGIES[c.ideology].canJustifyAtTension;
   if (state.tension < needed && !hasClaimOn(state, f, t)) {
     return { ok: false, reason: `Tu gobierno ${IDEOLOGIES[c.ideology].adjective} necesita una tensión del ${Math.round(needed * 100)} % o una reclamación` };

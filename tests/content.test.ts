@@ -74,6 +74,9 @@ function checkCond(c: Condition | undefined, where: string) {
     case 'provinceDanger':
       if (!MAP.provinces[c.province]) errors.push(`${where}: provincia desconocida ${c.province}`);
       break;
+    case 'leader':
+      if (!LEADERS[c.id]) errors.push(`${where}: líder desconocido ${c.id}`);
+      break;
     case 'and':
     case 'or':
       c.list.forEach((x) => checkCond(x, where));
@@ -193,6 +196,8 @@ describe('contenido', () => {
         if (pos.has(key)) errors.push(`${where}: posición repetida ${key}`);
         pos.add(key);
         checkCond(focus.available, where);
+        checkCond(focus.bypass, where);
+        for (const r of focus.aiIf ?? []) checkCond(r.cond, where);
         checkEffects(focus.effects, where, f);
       }
     }
@@ -201,6 +206,7 @@ describe('contenido', () => {
       if (!ev.triggeredOnly && !ev.mtth) errors.push(`evento ${ev.id}: sin mtth ni triggeredOnly`);
       for (const o of ev.options) {
         checkCond(o.available, `evento ${ev.id}`);
+        for (const r of o.aiIf ?? []) checkCond(r.cond, `evento ${ev.id}`);
         checkEffects(o.effects, `evento ${ev.id}`, ev.factions?.length === 1 ? ev.factions[0] : undefined);
       }
     }
@@ -219,6 +225,57 @@ describe('contenido', () => {
     for (const a of ADVISORS) if (a.faction && !FACTIONS[a.faction]) errors.push(`asesor ${a.id}: facción desconocida`);
     for (const tpl of Object.values(SPECIAL_TEMPLATES)) for (const b of [...tpl.line, ...tpl.support]) if (!BATTALIONS[b]) errors.push(`plantilla ${tpl.id}: batallón ${b}`);
     expect(errors).toEqual([]);
+  });
+
+  it('los árboles de enfoques están bien construidos', () => {
+    const problems: string[] = [];
+    const unlockable = new Set<string>();
+    const collect = (list: Effect[] | undefined) => {
+      for (const e of list ?? []) {
+        if (e.t === 'unlockDecision') unlockable.add(e.id);
+        if (e.t === 'if') {
+          collect(e.then);
+          collect(e.else);
+        }
+        if (e.t === 'random') {
+          collect(e.then);
+          collect(e.else);
+        }
+        if (e.t === 'scoped') collect(e.effects);
+      }
+    };
+    for (const f of FACTION_IDS) {
+      const tree = FOCUS_TREES[f];
+      const byId = new Map(tree.focuses.map((x) => [x.id, x]));
+      // Árboles largos: dan para toda la partida.
+      if (tree.focuses.length < 30) problems.push(`${f}: solo ${tree.focuses.length} enfoques`);
+      const roots = tree.focuses.filter((x) => !x.prereq?.length);
+      if (roots.length !== 1) problems.push(`${f}: debe tener una sola raíz (tiene ${roots.map((r) => r.id).join(', ')})`);
+      for (const focus of tree.focuses) {
+        collect(focus.effects);
+        for (const x of focus.exclusive ?? []) {
+          if (!byId.get(x)?.exclusive?.includes(focus.id)) problems.push(`${focus.id}: la exclusión con ${x} no es mutua`);
+        }
+        for (const group of focus.prereq ?? []) {
+          for (const p of group) {
+            const parent = byId.get(p);
+            if (parent && parent.y >= focus.y) problems.push(`${focus.id}: su requisito ${p} no está por encima`);
+          }
+        }
+        if (tree.branches && !tree.branches.some((b) => focus.x >= b.x0 && focus.x <= b.x1)) problems.push(`${focus.id}: fuera de cualquier rama`);
+      }
+      const branches = [...(tree.branches ?? [])].sort((a, b) => a.x0 - b.x0);
+      for (let i = 1; i < branches.length; i++) if (branches[i].x0 <= branches[i - 1].x1) problems.push(`${f}: ramas solapadas`);
+      if (!tree.desc) problems.push(`${f}: el árbol no tiene descripción`);
+    }
+    for (const ev of Object.values(EVENTS)) for (const o of ev.options) collect(o.effects);
+    for (const d of Object.values(DECISIONS)) {
+      if (d.unlockedBy) {
+        if (!Object.values(FOCUS_TREES).some((t) => t.focuses.some((x) => x.id === d.unlockedBy))) problems.push(`decisión ${d.id}: enfoque ${d.unlockedBy} desconocido`);
+        if (!unlockable.has(d.id)) problems.push(`decisión ${d.id}: nada la desbloquea`);
+      }
+    }
+    expect(problems).toEqual([]);
   });
 
   it('el mapa respeta las conexiones del metro', () => {

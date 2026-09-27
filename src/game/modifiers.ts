@@ -1,6 +1,7 @@
 // Agregación de modificadores de todas las fuentes de una facción.
 import { ADVISOR_BY_ID, IDEOLOGIES, LAWS, LEADERS, SPIRITS, STATIONS, TECH_BY_ID, TRAITS } from '../data';
 import type { FactionId, GameState, ModifierKey, Modifiers } from './types';
+import { influenceModSources } from './influence';
 
 export interface ModInfo {
   name: string;
@@ -120,6 +121,7 @@ export function modSources(state: GameState, f: FactionId): ModSource[] {
       if (feat) out.push({ label: `${STATIONS[sid].shortName}: ${feat.name}`, mods: feat.modifiers });
     }
   }
+  out.push(...influenceModSources(state, f));
   const diff = state.player === f ? DIFFICULTY_PLAYER[state.difficulty] : state.player ? DIFFICULTY_AI[state.difficulty] : {};
   if (diff && Object.keys(diff).length) out.push({ label: 'Dificultad', mods: diff });
   return out;
