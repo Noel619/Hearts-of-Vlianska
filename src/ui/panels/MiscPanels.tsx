@@ -7,6 +7,8 @@ import { describeCondition, describeEffects } from '../../game/describe';
 import { formatDate, formatShortDate } from '../../game/time';
 import { Bar, Empty, Icon, Lines, Panel, Section, Tip } from '../components/core';
 import { centerMapOn, store, ui, useGame } from '../store';
+import { Medal } from '../components/art';
+import { categoryColor } from '../../gfx/medallions';
 
 function DecisionCard({ d }: { d: DecisionDef }) {
   const state = useGame();
@@ -54,7 +56,7 @@ function DecisionCard({ d }: { d: DecisionDef }) {
           </div>
         )}
       >
-        <Icon name={d.icon} size={24} className="amber" />
+        <Medal icon={d.icon} shape="circle" color={categoryColor(d.icon)} size={40} />
         <div>
           <strong>{d.name}</strong>
           <div className="dim">{costText || 'Gratis'}{d.days ? ` · ${d.days} días` : ''}</div>
@@ -96,7 +98,7 @@ export function DecisionsPanel() {
             const left = a.until - state.hour;
             return (
               <div key={i} className="queue-item">
-                <Icon name={d.icon} size={18} className="amber" />
+                <Medal icon={d.icon} shape="circle" color={categoryColor(d.icon)} size={30} />
                 <div className="queue-main">
                   <div>{d.name}</div>
                   <Bar value={1 - left / total} thin />

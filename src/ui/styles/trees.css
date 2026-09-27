@@ -111,27 +111,19 @@
   z-index: 1;
   display: grid;
   place-items: center;
-  width: 64px;
-  height: 64px;
-  border-radius: 10px;
-  transform: rotate(45deg);
-  background: linear-gradient(135deg, #3a3f35, #1d211b);
-  border: 2px solid #5a5f52;
-  box-shadow:
-    0 0 0 3px #0b0d0c,
-    0 6px 14px rgba(0, 0, 0, 0.6);
+  width: 76px;
+  height: 76px;
   transition:
-    transform 0.12s,
-    border-color 0.12s;
+    transform 0.14s,
+    filter 0.14s;
 }
-.focus-icon svg {
-  transform: rotate(-45deg);
-  color: #cfc6b1;
+.focus-icon .medal {
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.7));
 }
 .focus-name {
   position: relative;
   z-index: 2;
-  margin-top: -6px;
+  margin-top: -8px;
   width: 100%;
   min-height: 34px;
   display: grid;
@@ -152,66 +144,70 @@
   margin-top: 3px;
 }
 .focus-node:hover .focus-icon {
-  transform: rotate(45deg) scale(1.06);
+  transform: translateY(-2px) scale(1.05);
 }
-.focus-node.available .focus-icon {
-  border-color: var(--brass);
-  background: linear-gradient(135deg, #5a4c2a, #2a2414);
-}
-.focus-node.available .focus-icon svg {
-  color: var(--amber-2);
+.focus-node.available .focus-icon .medal {
+  filter: drop-shadow(0 0 7px rgba(233, 165, 60, 0.45)) drop-shadow(0 6px 8px rgba(0, 0, 0, 0.7));
 }
 .focus-node.available .focus-name {
   border-color: var(--brass);
   color: var(--brass-2);
 }
 .focus-node.current .focus-icon {
-  border-color: var(--amber-2);
-  background: linear-gradient(135deg, #a8701d, #4a300a);
   animation: glow 1.6s ease-in-out infinite;
-}
-.focus-node.current .focus-icon svg {
-  color: #fff4dc;
 }
 .focus-node.current .focus-name {
   border-color: var(--amber);
   color: var(--amber-2);
 }
-.focus-node.done .focus-icon {
-  border-color: #8cc063;
-  background: linear-gradient(135deg, #3d5a2a, #1d2b14);
-}
-.focus-node.done .focus-icon svg {
-  color: #d9f2c3;
-}
 .focus-node.done .focus-name {
   border-color: #5b7f43;
   color: #cfe8b9;
 }
+.focus-check {
+  position: absolute;
+  right: 6px;
+  bottom: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f4ffe8' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7'/%3E%3C/svg%3E") center / 15px no-repeat,
+    radial-gradient(circle at 35% 30%, #9fd37a, #3f6a26);
+  border: 2px solid #182712;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.7);
+}
+.focus-cross {
+  position: absolute;
+  inset: 16px;
+  background:
+    linear-gradient(45deg, transparent 45%, rgba(224, 97, 74, 0.85) 45% 55%, transparent 55%),
+    linear-gradient(-45deg, transparent 45%, rgba(224, 97, 74, 0.85) 45% 55%, transparent 55%);
+}
+.focus-node.locked .focus-icon,
+.focus-node.blocked .focus-icon {
+  filter: grayscale(0.75) brightness(0.62);
+}
 .focus-node.locked,
 .focus-node.blocked {
-  opacity: 0.62;
+  opacity: 0.8;
 }
 .focus-node.blocked .focus-name {
   border-color: #6d5a22;
 }
-.focus-node.excluded {
-  opacity: 0.35;
-}
 .focus-node.excluded .focus-icon {
-  border-color: #7a3325;
+  filter: grayscale(1) brightness(0.45);
+}
+.focus-node.excluded {
+  opacity: 0.55;
 }
 @keyframes glow {
   0%,
   100% {
-    box-shadow:
-      0 0 0 3px #0b0d0c,
-      0 0 0 5px rgba(233, 165, 60, 0.2);
+    filter: drop-shadow(0 0 4px rgba(233, 165, 60, 0.35));
   }
   50% {
-    box-shadow:
-      0 0 0 3px #0b0d0c,
-      0 0 18px 6px rgba(233, 165, 60, 0.45);
+    filter: drop-shadow(0 0 16px rgba(255, 199, 102, 0.95));
   }
 }
 
@@ -325,9 +321,9 @@
   cursor: pointer;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
 }
-.tech-node svg {
+.tech-node .medal {
   flex: none;
-  color: #9d9684;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6));
 }
 .tech-text {
   display: flex;
@@ -353,9 +349,6 @@
 .tech-node.available {
   border-color: var(--brass);
 }
-.tech-node.available svg {
-  color: var(--amber-2);
-}
 .tech-node.available.ahead {
   border-color: #8a6a2a;
 }
@@ -363,18 +356,16 @@
   border-color: var(--info);
   background: linear-gradient(180deg, #1f2d38, #16202a);
 }
-.tech-node.active svg {
-  color: #b5d7ef;
-}
 .tech-node.done {
   border-color: #5b7f43;
   background: linear-gradient(180deg, #25351c, #192412);
 }
-.tech-node.done svg {
-  color: #b9e094;
-}
 .tech-node.locked {
-  opacity: 0.55;
+  opacity: 0.6;
+}
+.tech-node.locked .medal,
+.tech-node.excluded .medal {
+  filter: grayscale(0.8) brightness(0.7);
 }
 .tech-node.excluded {
   opacity: 0.3;

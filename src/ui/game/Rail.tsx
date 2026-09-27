@@ -1,10 +1,12 @@
 // Barra lateral de paneles y avisos al estilo HoI4.
 import type { ReactNode } from 'react';
-import { FOCUS_BY_ID, TECH_BY_ID } from '../../data';
+import { FACTIONS, FOCUS_BY_ID, TECH_BY_ID } from '../../data';
 import { availableFocuses, focusDaysLeft } from '../../game/focus';
 import { researchCost } from '../../game/research';
 import { isAtWar } from '../../game/helpers';
 import { Icon, Tip, Bar } from '../components/core';
+import { Medal } from '../components/art';
+import { blendCategory } from '../../gfx/medallions';
 import { ui, useGame, type PanelId } from '../store';
 
 const ITEMS: { id: PanelId | 'focus' | 'tech'; icon: string; label: string; key: string }[] = [
@@ -130,7 +132,7 @@ export function FocusTicker() {
   return (
     <div className="ticker">
       <button className="ticker-item" onClick={() => ui.set({ overlay: 'focus' })}>
-        <Icon name={cur?.icon ?? 'Target'} size={18} className={cur ? 'amber' : 'faint'} />
+        {cur ? <Medal icon={cur.icon} shape="shield" color={blendCategory(cur.icon, FACTIONS[f].color)} size={34} /> : <Icon name="Target" size={18} className="faint" />}
         <div className="ticker-text">
           <span className="label">Enfoque</span>
           <span>{cur ? cur.name : 'Ninguno'}</span>

@@ -4,7 +4,9 @@ import { FOCUS_BY_ID, FOCUS_TREES } from '../../data';
 import type { FocusDef } from '../../game/types';
 import { cancelFocus, focusDays, focusDaysLeft, focusSpeed, focusStatus, startFocus, type FocusStatus } from '../../game/focus';
 import { describeCondition, describeEffects } from '../../game/describe';
-import { Emblem } from '../components/art';
+import { Emblem, Medal } from '../components/art';
+import { blendCategory } from '../../gfx/medallions';
+import { FACTIONS } from '../../data';
 import { Bar, Icon, Lines, Tip } from '../components/core';
 import { store, ui, useGame } from '../store';
 
@@ -121,7 +123,7 @@ export function FocusTreeView() {
         const a = pos(parent);
         const b = pos(focus);
         const x1 = a.x + NODE_W / 2;
-        const y1 = a.y + 88;
+        const y1 = a.y + 102;
         const x2 = b.x + NODE_W / 2;
         const y2 = b.y + 4;
         const my = y2 - 18;
@@ -142,7 +144,7 @@ export function FocusTreeView() {
       const b = pos(other);
       const left = a.x < b.x ? a : b;
       const right = a.x < b.x ? b : a;
-      exclusives.push({ x1: left.x + NODE_W / 2 + 34, x2: right.x + NODE_W / 2 - 34, y: a.y + 34 });
+      exclusives.push({ x1: left.x + NODE_W / 2 + 36, x2: right.x + NODE_W / 2 - 36, y: a.y + 36 });
     }
   }
 
@@ -172,7 +174,7 @@ export function FocusTreeView() {
         <div className="overlay-current">
           {current ? (
             <>
-              <Icon name={current.icon} size={26} className="amber" />
+              <Medal icon={current.icon} shape="shield" color={blendCategory(current.icon, FACTIONS[f].color)} size={42} />
               <div className="overlay-current-text">
                 <strong>{current.name}</strong>
                 <Bar value={c.focus.progress / focusDays(current)} />
@@ -212,7 +214,9 @@ export function FocusTreeView() {
               <Tip key={focus.id} content={() => <FocusTooltip focus={focus} />} as="div" className="focus-node-wrap" style={{ left: p.x, top: p.y, width: NODE_W }}>
                 <button className={`focus-node ${status}`} onClick={() => click(focus)} aria-label={`${focus.name}: ${STATUS_LABEL[status]}`}>
                   <span className="focus-icon">
-                    <Icon name={focus.icon} size={30} strokeWidth={1.8} />
+                    <Medal icon={focus.icon} shape="shield" color={blendCategory(focus.icon, FACTIONS[f].color)} metal={status === 'done' ? 'gold' : 'brass'} size={76} />
+                    {status === 'done' && <span className="focus-check" aria-hidden />}
+                    {status === 'excluded' && <span className="focus-cross" aria-hidden />}
                   </span>
                   <span className="focus-name">{focus.name}</span>
                   {status === 'current' && (

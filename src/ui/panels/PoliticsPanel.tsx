@@ -5,7 +5,8 @@ import type { AdvisorDef, IdeologyId } from '../../game/types';
 import { advisorCost, availableAdvisors, canEnactLaw, canHireAdvisor, enactLaw, fireAdvisor, hireAdvisor, lawCost } from '../../game/politics';
 import { describeCondition } from '../../game/describe';
 import { formatDate } from '../../game/time';
-import { Portrait } from '../components/art';
+import { Medal, Portrait } from '../components/art';
+import { categoryColor } from '../../gfx/medallions';
 import { Icon, Lines, ModLines, Panel, Section, Tip } from '../components/core';
 import { store, ui, useGame } from '../store';
 
@@ -156,7 +157,7 @@ export function PoliticsPanel() {
                 }
               >
                 <div className={`spirit ${sp.negative ? 'negative' : ''}`}>
-                  <Icon name={sp.icon} size={22} />
+                  <Medal icon={sp.icon} shape="square" color={sp.negative ? '#5e1f18' : categoryColor(sp.icon, '#4a5a3a')} metal={sp.negative ? 'iron' : 'brass'} size={48} />
                 </div>
               </Tip>
             );

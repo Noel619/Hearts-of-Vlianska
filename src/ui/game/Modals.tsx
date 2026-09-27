@@ -9,7 +9,7 @@ import { describeEffects } from '../../game/describe';
 import { formatDate, formatMonth } from '../../game/time';
 import { controlledStations, ownedStations, populationOf } from '../../game/helpers';
 import { deserialize, serialize } from '../../game/save';
-import { Emblem } from '../components/art';
+import { Emblem, EventScene } from '../components/art';
 import { Icon, Lines, Modal, Tip, fmt } from '../components/core';
 import { deleteSave, listSaves, loadGame, newSlotId, saveGame, type SaveMeta } from '../saves';
 import { go, store, ui, useGame } from '../store';
@@ -33,8 +33,8 @@ export function EventModal() {
   return (
     <Modal className="event-modal">
       <div className="event-picture">
-        <Icon name={ev.picture} size={64} strokeWidth={1.4} />
-        {pe.from && pe.from !== state.player && <Emblem faction={pe.from} size={46} className="event-from" />}
+        <EventScene picture={ev.picture} from={pe.from ?? null} player={state.player ?? null} />
+        {pe.from && pe.from !== state.player && <Emblem faction={pe.from} size={50} className="event-from" />}
       </div>
       <div className="event-body">
         <div className="label">{formatDate(pe.hour)}{state.playerEvents.length > 1 ? ` · ${state.playerEvents.length - 1} evento(s) más` : ''}</div>

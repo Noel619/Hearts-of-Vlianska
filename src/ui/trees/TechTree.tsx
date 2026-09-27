@@ -8,6 +8,17 @@ import { yearOf } from '../../game/time';
 import { Bar, Icon, Lines, ModLines, Tip, fmt } from '../components/core';
 import { store, ui, useGame } from '../store';
 import { useDragScroll } from './FocusTree';
+import { Medal } from '../components/art';
+
+/** Color del esmalte de las medallas por rama tecnológica. */
+const TECH_COLORS: Record<string, string> = {
+  armamento: '#7c2c22',
+  apoyo: '#6a5326',
+  vehiculos: '#2a4d63',
+  industria: '#7a5220',
+  supervivencia: '#2f5e2c',
+  doctrina: '#512c63',
+};
 
 const COL_W = 212;
 const ROW_H = 86;
@@ -136,7 +147,7 @@ export function TechTreeView() {
             const t = TECH_BY_ID[a.tech];
             return (
               <Tip key={i} content={() => <TechTooltip t={t} />} as="div" className="research-slot">
-                <Icon name={t.icon} size={22} className="amber" />
+                <Medal icon={t.icon} shape="square" color={TECH_COLORS[t.cat]} metal="steel" size={34} />
                 <div className="research-slot-text">
                   <strong>{t.name}</strong>
                   <Bar value={a.progress / researchCost(state, t)} color="blue" thin />
@@ -219,7 +230,7 @@ export function TechTreeView() {
             return (
               <Tip key={t.id} content={() => <TechTooltip t={t} />} as="div" className="tech-node-wrap" style={{ left: p.x, top: p.y, width: NODE_W, height: NODE_H }}>
                 <button className={`tech-node ${status} ${t.year > year ? 'ahead' : ''}`} onClick={() => click(t)}>
-                  <Icon name={t.icon} size={24} strokeWidth={1.8} />
+                  <Medal icon={t.icon} shape="square" color={TECH_COLORS[t.cat]} metal={status === 'done' ? 'brass' : 'steel'} size={40} />
                   <span className="tech-text">
                     <span className="tech-name">{t.name}</span>
                     <span className="tech-meta num">

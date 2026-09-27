@@ -4,7 +4,9 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { FACTION_IDS } from '../../game/types';
 import { emblemCanvas } from '../../gfx/emblems';
 import { paintPortrait } from '../../gfx/portraits';
-import { LEADERS } from '../../data';
+import { LEADERS, FOCUS_TREES } from '../../data';
+import { categoryColor, paintMedal } from '../../gfx/medallions';
+import { paintEventScene } from '../../gfx/scenes/events';
 
 function CanvasBox({ make, scale = 1, label }: { make: () => HTMLCanvasElement; scale?: number; label?: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -34,6 +36,16 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 export function GfxLab() {
   return (
     <div style={{ height: '100%', overflow: 'auto', padding: 20, background: '#101311' }}>
+      <Section title="Escenas de eventos">
+        {['Handshake', 'Mail', 'Users', 'Medal', 'Swords', 'Siren', 'Shield', 'Pickaxe', 'Flame', 'Coins', 'Package', 'Waves', 'Soup', 'Snowflake', 'Skull', 'Biohazard', 'Rat', 'Radio', 'PlugZap', 'Ghost', 'Eye', 'Heart', 'HandMetal', 'Fingerprint', 'BookOpen', 'Ban'].map((p) => (
+          <CanvasBox key={p} make={() => paintEventScene(p, 'VHL', 'UNI', 1)} scale={0.6} label={p} />
+        ))}
+      </Section>
+      <Section title="Medallas">
+        {[...new Set(FOCUS_TREES.UNI.focuses.map((f) => f.icon))].slice(0, 16).map((icon, i) => (
+          <CanvasBox key={icon} make={() => paintMedal(icon, (['shield', 'square', 'circle', 'hex'] as const)[i % 4], categoryColor(icon), i % 3 === 0 ? 'steel' : 'brass', 128)} scale={0.75} label={icon} />
+        ))}
+      </Section>
       <Section title="Retratos">
         {Object.values(LEADERS).map((l) => (
           <CanvasBox key={l.id} make={() => paintPortrait(l.portrait, 2)} scale={0.5} label={l.name} />

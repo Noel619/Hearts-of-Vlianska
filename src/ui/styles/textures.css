@@ -128,3 +128,17 @@ img.emblem {
     opacity: 0.6;
   }
 }
+
+/* Medallas */
+.medal {
+  display: inline-block;
+  flex: none;
+  object-fit: contain;
+}
+.medal-loading {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 20%;
+  background: radial-gradient(circle at 40% 30%, #3a3d2a, #1a1c14);
+  color: var(--brass-2);
+}
