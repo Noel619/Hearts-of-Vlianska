@@ -165,6 +165,7 @@ const SECTIONS: { id: string; title: string; icon: string; body: ReactNode }[] =
             ['E', 'Ejército'],
             ['X', 'Decisiones'],
             ['L', 'Registro'],
+            ['M', 'Silenciar / activar el sonido'],
             ['Esc', 'Cerrar / menú'],
             ['Clic derecho', 'Mover unidades'],
             ['Rueda', 'Zoom'],

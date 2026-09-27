@@ -19,6 +19,19 @@ Enero de 2033. Veinte años después de las bombas, ocho facciones se reparten l
 - **IA** para todas las facciones: enfoques, investigación, leyes, construcción, producción, comercio, diplomacia y operaciones militares.
 - Guardado y carga (con autoguardado mensual), crónica del metro, guía de juego y atajos de teclado. Se puede jugar con ratón o en pantalla táctil.
 
+## Gráficos y sonido
+
+Todo el apartado visual y sonoro se genera por código en el navegador: el juego no incluye ni una imagen ni un archivo de audio (solo las fuentes tipográficas).
+
+- **Mapa animado en canvas**: el subsuelo visto en planta, con roca, vetas y humedad, el trazado fantasma de la ciudad en superficie y el río. Los túneles tienen vías, traviesas, tuberías y cables con el color de su dueño; cada estación es un andén pintado con tiendas, hogueras, vagones y detalles propios (el hospital de Nadezhdy, la fábrica de Industrialnaya, el mercado de Staraya, los ventiladores de Kholodnogo Vozduha…). Hay luces que parpadean, humo, brasas, polvo, ojos de mutantes en la oscuridad, frentes con alambradas, niebla de guerra, y batallas con fogonazos, trazadoras y explosiones. Las unidades son soldados animados con el uniforme de cada facción (o draisinas blindadas y stalkers con farol) que avanzan por los túneles.
+- **Retratos pintados** de líderes y asesores, **emblemas** de metal esmaltado, **medallas** para enfoques, tecnologías, decisiones y espíritus nacionales, y **texturas** de acero, hormigón y papel para la interfaz.
+- **Ilustraciones de eventos**: escenas en perspectiva (túneles de tubbing, andenes, la superficie nevada) con siluetas a contraluz, fuego y humo, teñidas con los colores de las facciones implicadas.
+- **Menú animado**: una noche en el andén, con un guitarrista junto a la hoguera.
+- **Música generativa** que nunca se repite igual: canción de andén con guitarra y bayán en el menú, y ambientes de paz, tensión y guerra que cambian según la situación. Los instrumentos se sintetizan con Web Audio (guitarra por Karplus-Strong, bayán, cuerdas, campanas FM, taikos, metales).
+- **Ambiente y efectos**: aire en los túneles, goteos, crujidos, aullidos lejanos, tiroteos cuando hay batallas a la vista, telégrafo de eventos, sirena de guerra, fanfarrias… Los volúmenes se ajustan en *Ajustes*; la tecla `M` silencia.
+
+El código está en `src/gfx` (gráficos) y `src/audio` (sonido). Abriendo la página con `#lab` al final de la dirección se ve un laboratorio con todos los sprites generados.
+
 ## Cómo se juega
 
 | Tecla | Acción |
@@ -29,6 +42,7 @@ Enero de 2033. Veinte años después de las bombas, ocho facciones se reparten l
 | `D` `C` | Diplomacia · Comercio |
 | `B` `P` | Construcción · Producción |
 | `E` `X` `L` | Ejército · Decisiones · Registro |
+| `M` | Silenciar / activar el sonido |
 | Clic derecho | Mover las unidades seleccionadas |
 | Rueda / pellizco | Zoom |
 
@@ -54,7 +68,9 @@ npm run build:single # un único archivo dist-single/index.html que se abre con 
 src/
   data/     contenido: mapa, facciones, líderes, leyes, tecnologías, enfoques, eventos, decisiones, crónica
   game/     motor: estado, reloj, economía, investigación, política, diplomacia, combate, IA, guardado
-  ui/       interfaz en React: mapa SVG, paneles, árboles de enfoques y tecnologías, menús
+  gfx/      gráficos procedurales: mapa en canvas, andenes, unidades, retratos, emblemas, medallas, escenas
+  audio/    sonido sintetizado: motor Web Audio, instrumentos, música generativa, ambiente y efectos
+  ui/       interfaz en React: paneles, árboles de enfoques y tecnologías, menús
 tests/      pruebas con Vitest
 ```
 
@@ -79,4 +95,4 @@ Las conexiones entre estaciones siguen la lista del autor. Tenevskaya está aban
 
 Universo, historia y mapa de Vlianska: Noel619. Algunos detalles de Stantsiya Staraya y de Vhlainska (nombres de líderes y parte de su historia) son inventados para el juego y se pueden cambiar en `src/data/`.
 
-Inspirado en *Hearts of Iron IV* (Paradox Interactive) y en la saga *Metro 2033* (Dmitry Glukhovsky). Fuentes: Big Shoulders Stencil, PT Sans y PT Mono (SIL Open Font License). Iconos: [Lucide](https://lucide.dev) (ISC).
+Inspirado en *Hearts of Iron IV* (Paradox Interactive) y en la saga *Metro 2033* (Dmitry Glukhovsky). Fuentes: Big Shoulders Stencil, PT Sans y PT Mono (SIL Open Font License). Iconos: trazos de [Lucide](https://lucide.dev) (ISC), dibujados y estampados por código.

@@ -190,9 +190,22 @@ export class MapRenderer {
   private hall(sid: string, owner: FactionId | null): HallSprite {
     const key = `${sid}|${owner ?? '-'}`;
     let h = hallCache.get(key);
-    if (!h) {
-      h = paintHall(sid, owner, 5);
+    if (h) {
+      // Uso reciente: se mueve al final (caché LRU)
+      hallCache.delete(key);
       hallCache.set(key, h);
+      return h;
+    }
+    h = paintHall(sid, owner, 5);
+    hallCache.set(key, h);
+    while (hallCache.size > 36) {
+      const oldest = hallCache.keys().next().value as string;
+      const old = hallCache.get(oldest);
+      if (old) {
+        old.canvas.width = 0;
+        old.canvas.height = 0;
+      }
+      hallCache.delete(oldest);
     }
     return h;
   }

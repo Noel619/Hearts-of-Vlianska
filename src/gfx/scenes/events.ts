@@ -2,7 +2,7 @@
 // evento y de las facciones implicadas.
 import { FACTIONS } from '../../data';
 import type { FactionId } from '../../game/types';
-import { ctx2d, grain, makeCanvas, spriteURL } from '../canvas';
+import { ctx2d, grain, makeCanvas, spriteURLOnce } from '../canvas';
 import { mix, rgba, shade } from '../color';
 import { pick, range, rng } from '../rng';
 import { crate, figure, fire, flag, glowAt, grade, hangingLamp, lightCone, platformHall, rubble, sandbags, smoke, snowfall, surface, tunnel, type FigureOpts, type Stage } from './kit';
@@ -782,5 +782,5 @@ export function paintEventScene(picture: string, from: FactionId | null, player:
 }
 
 export function eventSceneURL(picture: string, from: FactionId | null, player: FactionId | null): string {
-  return spriteURL(`scene-${picture}-${from ?? ''}-${player ?? ''}`, () => paintEventScene(picture, from, player));
+  return spriteURLOnce(`scene-${picture}-${from ?? ''}-${player ?? ''}`, () => paintEventScene(picture, from, player), 'image/jpeg', 0.88);
 }

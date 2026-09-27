@@ -1,7 +1,7 @@
 // Retratos pintados por código: fondo de túnel, busto con ropa, cabeza con
 // rasgos, pelo, sombreros y accesorios, iluminación de lámpara y grano.
 import type { PortraitParams } from '../game/types';
-import { blurCanvas, ctx2d, drawBlurred, grain, makeCanvas, spriteURL, vignette, type Ctx } from './canvas';
+import { blurCanvas, ctx2d, drawBlurred, grain, makeCanvas, spriteURLOnce, vignette, type Ctx } from './canvas';
 import { hexToRgb, luminance, mix, rgba, shade } from './color';
 import { pick, range, rng, type Rand } from './rng';
 
@@ -1585,5 +1585,5 @@ export function paintPortrait(p: PortraitParams, scale = 2): HTMLCanvasElement {
 }
 
 export function portraitURL(p: PortraitParams): string {
-  return spriteURL(`portrait-${JSON.stringify(p)}`, () => paintPortrait(p, 2));
+  return spriteURLOnce(`portrait-${JSON.stringify(p)}`, () => paintPortrait(p, 2), 'image/jpeg', 0.92);
 }

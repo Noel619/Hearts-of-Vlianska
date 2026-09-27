@@ -215,6 +215,22 @@ export function spriteURL(key: string, make: () => HTMLCanvasElement): string {
   return u;
 }
 
+/**
+ * URL de un sprite grande que no hace falta conservar como lienzo (retratos,
+ * escenas): se guarda comprimido y se libera la memoria del lienzo.
+ */
+export function spriteURLOnce(key: string, make: () => HTMLCanvasElement, type: 'image/png' | 'image/jpeg' = 'image/jpeg', quality = 0.9): string {
+  let u = urlCache.get(key);
+  if (!u) {
+    const c = make();
+    u = c.toDataURL(type, quality);
+    urlCache.set(key, u);
+    c.width = 0;
+    c.height = 0;
+  }
+  return u;
+}
+
 export function forgetSprite(key: string) {
   canvasCache.delete(key);
   urlCache.delete(key);
