@@ -12,6 +12,7 @@ import {
   fullscreenSupported,
   isDesktopApp,
   isFullscreen,
+  onFullscreenChange,
   setFullscreen,
 } from '../video';
 import { Icon, Tip } from './core';
@@ -30,11 +31,7 @@ const TOGGLES: { key: BoolKey; label: string; hint: string }[] = [
 
 function useFullscreen() {
   const [on, setOn] = useState(isFullscreen);
-  useEffect(() => {
-    const update = () => setOn(isFullscreen());
-    document.addEventListener('fullscreenchange', update);
-    return () => document.removeEventListener('fullscreenchange', update);
-  }, []);
+  useEffect(() => onFullscreenChange(() => setOn(isFullscreen())), []);
   return on;
 }
 

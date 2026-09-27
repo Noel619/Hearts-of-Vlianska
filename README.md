@@ -29,6 +29,7 @@ Todo el apartado visual y sonoro se genera por código en el navegador: el juego
 - **Ilustraciones de eventos**: escenas en perspectiva (túneles de tubbing, andenes, la superficie nevada) con siluetas a contraluz, fuego y humo, teñidas con los colores de las facciones implicadas.
 - **Menú animado**: una noche en el andén, con un guitarrista junto a la hoguera.
 - **Música generativa** que nunca se repite igual: canción de andén con guitarra y bayán en el menú, y ambientes de paz, tensión y guerra que cambian según la situación. Los instrumentos se sintetizan con Web Audio (guitarra por Karplus-Strong, bayán, cuerdas, campanas FM, taikos, metales).
+- **Vídeo y rendimiento**: preajustes de calidad (Baja, Media, Alta, elegido según el equipo la primera vez), resolución del mapa, límite de 30/60 FPS, partículas, luces, detalle de túneles, postprocesado, animaciones y sombras de la interfaz, contador de FPS y pantalla completa.
 - **Ambiente y efectos**: aire en los túneles, goteos, crujidos, aullidos lejanos, tiroteos cuando hay batallas a la vista, telégrafo de eventos, sirena de guerra, fanfarrias… Los volúmenes se ajustan en *Ajustes*; la tecla `M` silencia.
 
 El código está en `src/gfx` (gráficos) y `src/audio` (sonido). Abriendo la página con `#lab` al final de la dirección se ve un laboratorio con todos los sprites generados.
@@ -49,6 +50,18 @@ El código está en `src/gfx` (gráficos) y `src/audio` (sonido). Abriendo la p�
 
 Ganas si controlas 11 de las 16 estaciones; pierdes si tu facción desaparece. La guía completa está en el menú, en «Cómo jugar».
 
+## Versión de escritorio
+
+El juego se puede descargar como programa, sin instalar nada más:
+
+- **Windows**: `Hearts-of-Vlianska-X.Y.Z-portable.exe` (se abre con doble clic, no necesita instalación) o `Hearts-of-Vlianska-X.Y.Z-instalador.exe` (crea accesos directos y se desinstala desde el Panel de control).
+- **Linux**: `Hearts-of-Vlianska-X.Y.Z-linux-x86_64.AppImage` (darle permiso de ejecución y abrirlo).
+- **macOS**: `.dmg` para Apple Silicon e Intel (la primera vez: clic derecho → Abrir).
+
+Cada push compila los tres en GitHub Actions (workflow *Ejecutables*: los archivos están en la sección *Artifacts* de cada run), y al subir una etiqueta `vX.Y.Z` se publican en una *Release*. Los ejecutables no van firmados, así que Windows puede mostrar «Windows protegió su PC»: *Más información → Ejecutar de todas formas*.
+
+En la versión de escritorio `F11` alterna la pantalla completa, la música empieza sin tener que hacer clic, las partidas se guardan en el perfil del usuario y el menú principal tiene *Salir del juego*. El código está en `desktop/` (Electron).
+
 ## Ejecutarlo
 
 Hace falta [Node.js](https://nodejs.org/) 20.19 o superior.
@@ -59,7 +72,13 @@ npm run dev          # servidor de desarrollo en http://localhost:5173
 npm test             # pruebas del motor, del contenido, del combate, de la IA y de los enfoques
 npm run build        # versión de producción en dist/
 npm run build:single # un único archivo dist-single/index.html que se abre con doble clic
+npm run desktop      # abre el juego en su ventana de escritorio (Electron)
+npm run dist:win     # ejecutable portable e instalador de Windows en release/
+npm run dist:linux   # AppImage de Linux en release/
+npm run dist:mac     # .dmg de macOS en release/ (desde un Mac)
 ```
+
+Desde Linux, `npm run dist:win` genera el portable sin problemas; el instalador necesita [Wine](https://www.winehq.org/) (en GitHub Actions se compila en Windows y no hace falta).
 
 `npm run sim` lanza una partida entre IA durante varios años y muestra la evolución de cada facción (`YEARS=5 SEED=42 npm run sim` para cambiar la duración o la semilla).
 
@@ -71,7 +90,8 @@ src/
   game/     motor: estado, reloj, economía, investigación, política, diplomacia, combate, IA, guardado
   gfx/      gráficos procedurales: mapa en canvas, andenes, unidades, retratos, emblemas, medallas, escenas
   audio/    sonido sintetizado: motor Web Audio, instrumentos, música generativa, ambiente y efectos
-  ui/       interfaz en React: paneles, árboles de enfoques y tecnologías, menús
+  ui/       interfaz en React: paneles, árboles de enfoques y tecnologías, menús, ajustes
+desktop/    versión de escritorio (Electron): ventana, icono y puente con el juego
 tests/      pruebas con Vitest
 ```
 

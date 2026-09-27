@@ -146,6 +146,9 @@ export class FrameLimiter {
 export interface DesktopBridge {
   platform: string;
   quit: () => void;
+  setFullscreen: (on: boolean) => void;
+  isFullscreen: () => boolean;
+  onFullscreenChange: (fn: (on: boolean) => void) => () => void;
 }
 
 export function desktopBridge(): DesktopBridge | undefined {
@@ -154,29 +157,32 @@ export function desktopBridge(): DesktopBridge | undefined {
 
 export const isDesktopApp = () => !!desktopBridge();
 
-/** En la versión de escritorio, F11 alterna la pantalla completa (en el navegador ya lo hace él). */
-export function installFullscreenKey() {
-  if (!isDesktopApp()) return;
-  window.addEventListener('keydown', (e) => {
-    if (e.key !== 'F11') return;
-    e.preventDefault();
-    void setFullscreen(!isFullscreen());
-  });
-}
-
+// En la versión de escritorio se usa la pantalla completa de la ventana (F11), que no
+// captura la tecla Esc: el juego la necesita para cerrar paneles y abrir el menú.
 export function isFullscreen(): boolean {
+  const d = desktopBridge();
+  if (d) return d.isFullscreen();
   return typeof document !== 'undefined' && !!document.fullscreenElement;
 }
 
 export function fullscreenSupported(): boolean {
-  return typeof document !== 'undefined' && !!document.documentElement.requestFullscreen;
+  return isDesktopApp() || (typeof document !== 'undefined' && !!document.documentElement.requestFullscreen);
 }
 
 export async function setFullscreen(on: boolean) {
+  const d = desktopBridge();
+  if (d) return d.setFullscreen(on);
   try {
     if (on && !document.fullscreenElement) await document.documentElement.requestFullscreen();
     else if (!on && document.fullscreenElement) await document.exitFullscreen();
   } catch {
     /* el navegador lo ha impedido */
   }
+}
+
+export function onFullscreenChange(fn: () => void): () => void {
+  const d = desktopBridge();
+  if (d) return d.onFullscreenChange(() => fn());
+  document.addEventListener('fullscreenchange', fn);
+  return () => document.removeEventListener('fullscreenchange', fn);
 }

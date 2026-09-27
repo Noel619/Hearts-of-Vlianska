@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#262c25"/>
+      <stop offset="1" stop-color="#0b0d0b"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.46" r="0.5">
+      <stop offset="0" stop-color="#e8a33d" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#e8a33d" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="brass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd27a"/>
+      <stop offset="0.55" stop-color="#e8a33d"/>
+      <stop offset="1" stop-color="#9a6420"/>
+    </linearGradient>
+  </defs>
+  <rect x="40" y="40" width="944" height="944" rx="200" fill="url(#bg)"/>
+  <rect x="40" y="40" width="944" height="944" rx="200" fill="url(#glow)"/>
+  <!-- Bóveda del túnel -->
+  <path d="M170 900V520a342 342 0 0 1 684 0v380" fill="none" stroke="#3a4136" stroke-width="26"/>
+  <path d="M250 900V530a262 262 0 0 1 524 0v370" fill="none" stroke="#2c3229" stroke-width="18"/>
+  <!-- Raíles -->
+  <path d="M430 900l40-200M594 900l-40-200" stroke="#4a4f45" stroke-width="16" stroke-linecap="round"/>
+  <!-- Emblema del metro -->
+  <circle cx="512" cy="470" r="250" fill="#131613" stroke="url(#brass)" stroke-width="44"/>
+  <path d="M372 590V350l140 170 140-170v240" fill="none" stroke="url(#brass)" stroke-width="62" stroke-linejoin="round" stroke-linecap="round"/>
+  <rect x="40" y="40" width="944" height="944" rx="200" fill="none" stroke="#9a6420" stroke-opacity="0.6" stroke-width="12"/>
+</svg>

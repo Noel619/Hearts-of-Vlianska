@@ -3,6 +3,8 @@
   "private": true,
   "version": "1.0.0",
   "description": "Gran estrategia al estilo Hearts of Iron IV en el metro de Vlianska, 2033.",
+  "author": "Noel619",
+  "main": "desktop/main.cjs",
   "type": "module",
   "scripts": {
     "icons": "node scripts/gen-icons.mjs",
@@ -12,25 +14,73 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "sim": "vitest run tests/simulation.test.ts --disableConsoleIntercept"
+    "sim": "vitest run tests/simulation.test.ts --disableConsoleIntercept",
+    "desktop": "npm run build && electron .",
+    "dist:win": "npm run build && electron-builder --win --x64",
+    "dist:linux": "npm run build && electron-builder --linux --x64",
+    "dist:mac": "npm run build && electron-builder --mac"
   },
-  "dependencies": {
+  "devDependencies": {
     "@fontsource/big-shoulders-stencil-display": "^5.3.0",
     "@fontsource/pt-mono": "^5.3.0",
     "@fontsource/pt-sans": "^5.3.0",
     "@fontsource/pt-sans-narrow": "^5.3.0",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0"
-  },
-  "devDependencies": {
     "@types/node": "^26.6.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
     "lucide-react": "^1.48.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "typescript": "~5.9.3",
     "vite": "^8.3.1",
     "vite-plugin-singlefile": "^2.3.3",
     "vitest": "^5.0.2"
+  },
+  "build": {
+    "appId": "io.github.noel619.heartsofvlianska",
+    "productName": "Hearts of Vlianska",
+    "copyright": "Universo, historia y mapa de Vlianska: Noel619",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "desktop/main.cjs",
+      "desktop/preload.cjs",
+      "desktop/icon.png",
+      "package.json"
+    ],
+    "icon": "desktop/icon.png",
+    "artifactName": "Hearts-of-Vlianska-${version}-${os}-${arch}.${ext}",
+    "win": {
+      "target": [
+        "portable",
+        "nsis"
+      ]
+    },
+    "portable": {
+      "artifactName": "Hearts-of-Vlianska-${version}-portable.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Hearts of Vlianska",
+      "artifactName": "Hearts-of-Vlianska-${version}-instalador.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Game"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.strategy-games"
+    }
   }
 }

@@ -6,6 +6,7 @@ import { isAtWar } from '../game/helpers';
 import { mapActivity } from '../ui/map/MapView';
 import { nav, store, ui } from '../ui/store';
 import { audio, type Mood } from './index';
+import { isDesktopApp } from '../ui/video';
 
 interface Snapshot {
   hour: number;
@@ -70,10 +71,11 @@ export function installAudio() {
   };
   applyVolumes();
 
-  // El navegador solo deja sonar tras un gesto del usuario
+  // El navegador solo deja sonar tras un gesto del usuario; la versión de escritorio, desde el principio.
   const unlock = () => audio.unlock();
   window.addEventListener('pointerdown', unlock, { capture: true });
   window.addEventListener('keydown', unlock, { capture: true });
+  if (isDesktopApp()) unlock();
 
   // Clics y hover de la interfaz
   document.addEventListener(

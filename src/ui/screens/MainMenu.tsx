@@ -15,6 +15,7 @@ import { MuteButton, useAudioUnlocked } from '../components/SoundSettings';
 import { HelpModal } from './Help';
 import { MenuBackdrop } from './MenuBackdrop';
 import { deleteSave, listSaves } from '../saves';
+import { desktopBridge } from '../video';
 
 function LoadModal({ onClose }: { onClose: () => void }) {
   const [saves, setSaves] = useState(listSaves());
@@ -78,6 +79,7 @@ export function MainMenu() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const unlocked = useAudioUnlocked();
   const canContinue = hasAutosave();
+  const desktop = desktopBridge();
   return (
     <div className="menu-screen">
       <div className="menu-map">
@@ -122,6 +124,11 @@ export function MainMenu() {
           <button className="btn big" onClick={() => setSettingsOpen(true)}>
             <Icon name="Settings" size={18} /> Ajustes
           </button>
+          {desktop && (
+            <button className="btn big" onClick={() => desktop.quit()}>
+              <Icon name="LogOut" size={18} /> Salir del juego
+            </button>
+          )}
         </div>
         <footer className="menu-footer">
           <span>Universo, historia y mapa de Vlianska: Noel619.</span>
