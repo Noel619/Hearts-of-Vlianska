@@ -5,11 +5,11 @@ import { FACTIONS, MAP, MAP_HEIGHT, MAP_WIDTH, TERRAIN_INFO } from '../../data';
 import type { FactionId, GameState } from '../../game/types';
 import { provinceName } from '../../game/helpers';
 import { orderMove, unitStats } from '../../game/military';
-import { DPR } from '../../gfx/canvas';
 import { audio } from '../../audio';
 import { mapLayersReady, MapRenderer, prepareMapLayers, type Camera, type CounterHit } from '../../gfx/map/renderer';
 import { Bar, fmt, hideTip, showHoverTip, showTip } from '../components/core';
 import { centerMapOn, store, ui, type MapMode } from '../store';
+import { FrameLimiter, mapQuality, renderDpr } from '../video';
 
 export interface MapViewProps {
   mode: 'game' | 'preview' | 'demo';
@@ -19,8 +19,11 @@ export interface MapViewProps {
   mapMode?: MapMode;
 }
 
-/** Nivel de combate visible en el mapa de la partida (lo usa el sonido). */
-export const mapActivity = { battle: 0, renderMs: 0 };
+/** Nivel de combate visible en el mapa de la partida (lo usa el sonido) y rendimiento del dibujo. */
+export const mapActivity = { battle: 0, renderMs: 0, fps: 0 };
+
+/** Fotogramas por segundo cuando no pasa nada en el mapa, para ahorrar batería. */
+const IDLE_FPS = 30;
 
 const MIN_VIEW_W = 300;
 const MAX_VIEW_W = 2700;
@@ -49,7 +52,7 @@ export function MapView({ mode, state, highlight, onPickFaction, mapMode: forced
   const renderer = useRef<MapRenderer | null>(null);
   const cam = useRef<Camera>({ x: MAP_WIDTH / 2, y: MAP_HEIGHT / 2, zoom: 0.8 });
   const goal = useRef<Camera | null>(null);
-  const size = useRef({ w: 1, h: 1, init: false });
+  const size = useRef({ w: 1, h: 1, dpr: 1, init: false });
   const hover = useRef<{ id: string | null; counter: string | null }>({ id: null, counter: null });
   const lastInput = useRef(performance.now());
   const [ready, setReady] = useState(mapLayersReady());
@@ -65,7 +68,7 @@ export function MapView({ mode, state, highlight, onPickFaction, mapMode: forced
     let raf = 0;
     let alive = true;
     let last = performance.now();
-    let frame = 0;
+    const limiter = new FrameLimiter();
     const start = () => {
       r.prepare();
       if (!alive) return;
@@ -73,14 +76,20 @@ export function MapView({ mode, state, highlight, onPickFaction, mapMode: forced
       const loop = (now: number) => {
         if (!alive) return;
         raf = requestAnimationFrame(loop);
-        const dt = Math.min(0.1, (now - last) / 1000);
-        frame++;
-        const p = props.current;
-        // A 30 fps cuando no pasa nada, para ahorrar batería
-        const busy = now - lastInput.current < 2500 || store.speed > 0 || goal.current !== null || p.mode === 'demo';
-        if (!busy && frame % 2 === 1) return;
-        last = now;
         if (document.hidden) return;
+        const p = props.current;
+        const settings = store.settings;
+        const busy = now - lastInput.current < 2500 || store.speed > 0 || goal.current !== null || p.mode === 'demo';
+        const cap = busy ? settings.fpsCap : Math.min(settings.fpsCap || IDLE_FPS, IDLE_FPS);
+        if (!limiter.ready(now, cap)) return;
+        const dt = Math.min(0.1, (now - last) / 1000);
+        last = now;
+        // La resolución del mapa puede cambiar desde los ajustes en cualquier momento.
+        const dpr = renderDpr(settings);
+        if (dpr !== size.current.dpr) {
+          size.current.dpr = dpr;
+          r.resize(size.current.w, size.current.h, dpr);
+        }
         const c = cam.current;
         if (p.mode === 'demo') {
           const k = now / 1000;
@@ -109,14 +118,18 @@ export function MapView({ mode, state, highlight, onPickFaction, mapMode: forced
             hover: hover.current.id,
             hoverCounter: hover.current.counter,
             moveMode: u.moveMode,
-            fog: store.settings.fog,
+            fog: settings.fog,
             time: now / 1000,
             dt,
+            quality: mapQuality(settings),
           },
           cam.current,
         );
         mapActivity.renderMs = mapActivity.renderMs * 0.9 + (performance.now() - t0) * 0.1;
-        if (p.mode === 'game') mapActivity.battle = r.battleLevel;
+        if (p.mode === 'game') {
+          mapActivity.battle = r.battleLevel;
+          mapActivity.fps = limiter.fps;
+        }
       };
       raf = requestAnimationFrame(loop);
     };
@@ -139,7 +152,8 @@ export function MapView({ mode, state, highlight, onPickFaction, mapMode: forced
       const h = Math.max(1, rect.height);
       size.current.w = w;
       size.current.h = h;
-      renderer.current?.resize(w, h, DPR());
+      size.current.dpr = renderDpr(store.settings);
+      renderer.current?.resize(w, h, size.current.dpr);
       if (!size.current.init && w > 10) {
         size.current.init = true;
         cam.current = initialCamera(props.current.mode, props.current.state, w, h);

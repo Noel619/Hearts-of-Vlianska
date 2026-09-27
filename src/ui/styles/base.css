@@ -383,3 +383,29 @@ input:focus {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ------------------------------------------------------------------ Vídeo y rendimiento */
+
+/* Sin efectos de la interfaz: fuera las sombras difuminadas y los desenfoques, lo más caro de pintar. */
+.gfx-lite .modal-backdrop {
+  backdrop-filter: none;
+}
+.gfx-lite img.emblem,
+.gfx-lite .spirit .medal,
+.gfx-lite .focus-icon .medal,
+.gfx-lite .focus-node.available .focus-icon .medal,
+.gfx-lite .tech-node .medal {
+  filter: none;
+}
+.gfx-lite .modal {
+  box-shadow: none;
+}
+
+/* Sin animaciones: todo aparece al instante y nada parpadea. */
+.gfx-still *,
+.gfx-still *::before,
+.gfx-still *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}

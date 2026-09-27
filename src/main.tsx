@@ -21,6 +21,7 @@ import { installTextures } from './gfx/textures';
 import { mapActivity } from './ui/map/MapView';
 import { installAudio } from './audio/hooks';
 import { audio } from './audio';
+import { installFullscreenKey } from './ui/video';
 
 // Conserva la partida si la página se actualiza en caliente dentro de un Artifact.
 interface HotApi {
@@ -36,6 +37,7 @@ const hot = (window as unknown as { claude?: { hot?: HotApi } }).claude?.hot;
 function start(data: unknown) {
   installTextures();
   installAudio();
+  installFullscreenKey();
   const saved = (data as { game?: string } | undefined)?.game;
   if (saved) {
     try {

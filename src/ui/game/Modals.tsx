@@ -11,6 +11,7 @@ import { controlledStations, ownedStations, populationOf } from '../../game/help
 import { deserialize, serialize } from '../../game/save';
 import { Emblem, EventScene } from '../components/art';
 import { SoundSettings } from '../components/SoundSettings';
+import { VideoSettings } from '../components/VideoSettings';
 import { Icon, Lines, Modal, Tip, fmt } from '../components/core';
 import { deleteSave, listSaves, loadGame, newSlotId, saveGame, type SaveMeta } from '../saves';
 import { go, store, ui, useGame } from '../store';
@@ -280,11 +281,43 @@ export function GameMenu() {
   );
 }
 
+type SettingsTab = 'partida' | 'video' | 'sonido';
+const SETTINGS_TABS: { id: SettingsTab; label: string; icon: string }[] = [
+  { id: 'partida', label: 'Partida', icon: 'Gamepad2' },
+  { id: 'video', label: 'Vídeo y rendimiento', icon: 'MonitorCog' },
+  { id: 'sonido', label: 'Sonido', icon: 'Volume2' },
+];
+let lastSettingsTab: SettingsTab = 'partida';
+
 export function SettingsForm() {
   useGame();
-  const s = store.settings;
+  const [tab, setTab] = useState<SettingsTab>(lastSettingsTab);
+  const pick = (t: SettingsTab) => {
+    lastSettingsTab = t;
+    setTab(t);
+  };
   return (
     <div className="settings">
+      <nav className="settings-tabs" role="tablist">
+        {SETTINGS_TABS.map((t) => (
+          <button key={t.id} role="tab" aria-selected={tab === t.id} className={`help-tab ${tab === t.id ? 'active' : ''}`} onClick={() => pick(t.id)}>
+            <Icon name={t.icon} size={15} /> {t.label}
+          </button>
+        ))}
+      </nav>
+      <div className="settings-body">
+        {tab === 'partida' && <GameSettings />}
+        {tab === 'video' && <VideoSettings />}
+        {tab === 'sonido' && <SoundSettings />}
+      </div>
+    </div>
+  );
+}
+
+function GameSettings() {
+  const s = store.settings;
+  return (
+    <div className="game-settings">
       <label className="toggle">
         <input type="checkbox" checked={s.pauseOnEvents} onChange={(e) => store.updateSettings({ pauseOnEvents: e.target.checked })} />
         Pausar cuando llega un evento
@@ -297,7 +330,6 @@ export function SettingsForm() {
         <input type="checkbox" checked={s.fog} onChange={(e) => store.updateSettings({ fog: e.target.checked })} />
         Niebla de guerra (solo ves las tropas cercanas)
       </label>
-      <SoundSettings />
     </div>
   );
 }

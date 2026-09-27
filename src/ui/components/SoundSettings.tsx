@@ -23,7 +23,7 @@ export function SoundSettings() {
   const s = store.settings;
   return (
     <div className="sound-settings">
-      <div className="tt-sub">Sonido</div>
+      <div className="tt-sub">Volumen</div>
       {CHANNELS.map((c) => (
         <label key={c.key} className="slider-row">
           <Icon name={c.icon} size={16} className="amber" />

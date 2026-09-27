@@ -4,11 +4,12 @@ import type { FactionId, GameState } from '../game/types';
 import { advanceHour } from '../game/engine';
 import { isNewMonth } from '../game/time';
 import { autosave } from './saves';
+import { applyVideoClasses, defaultVideoSettings, type VideoSettings } from './video';
 
 /** Horas de juego por segundo real en cada velocidad. */
 export const SPEEDS = [0, 4, 10, 24, 60, 160];
 
-export interface Settings {
+export interface Settings extends VideoSettings {
   pauseOnEvents: boolean;
   autosave: boolean;
   fog: boolean;
@@ -24,14 +25,28 @@ export interface Settings {
 const SETTINGS_KEY = 'hov-settings';
 
 function loadSettings(): Settings {
-  const defaults: Settings = { pauseOnEvents: true, autosave: true, fog: true, confirmWar: true, volMaster: 0.8, volMusic: 0.6, volAmbience: 0.55, volSfx: 0.8, muted: false };
+  const defaults: Settings = {
+    pauseOnEvents: true,
+    autosave: true,
+    fog: true,
+    confirmWar: true,
+    volMaster: 0.8,
+    volMusic: 0.6,
+    volAmbience: 0.55,
+    volSfx: 0.8,
+    muted: false,
+    // La primera vez, la calidad gráfica se elige según el equipo.
+    ...defaultVideoSettings(),
+  };
+  let settings = defaults;
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) return { ...defaults, ...JSON.parse(raw) };
+    if (raw) settings = { ...defaults, ...JSON.parse(raw) };
   } catch {
     /* almacenamiento no disponible */
   }
-  return defaults;
+  applyVideoClasses(settings);
+  return settings;
 }
 
 class GameStore {
@@ -90,6 +105,7 @@ class GameStore {
 
   updateSettings(patch: Partial<Settings>) {
     this.settings = { ...this.settings, ...patch };
+    applyVideoClasses(this.settings);
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
     } catch {
@@ -140,7 +156,8 @@ class GameStore {
           break;
         }
       }
-      if (stopped || t - this.lastEmit > 45) {
+      // La interfaz se refresca unas 22 veces por segundo (11 con el límite de 30 FPS).
+      if (stopped || t - this.lastEmit > (this.settings.fpsCap === 30 ? 90 : 45)) {
         this.lastEmit = t;
         this.emit();
       }

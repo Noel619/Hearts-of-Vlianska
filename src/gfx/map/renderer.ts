@@ -16,6 +16,7 @@ import { hash2 } from '../rng';
 import { buildCity, paintRiver, paintRock, paintRockGrain, WORLD, type CityPlan } from './background';
 import { AUX_TERRAIN, DANGER_TERRAIN, EDGE_GEO, RAIL_TERRAIN, STATION_GEO, distToPolyline, edgeBetween, insideStation, offsetLine, sampleAt, slice, type EdgeGeo, type Pt } from './geometry';
 import { Particles } from './particles';
+import { FULL_QUALITY, type MapQuality } from '../quality';
 import { barricadeSprite, labelSprite, lightSprite, starSprite, unitSprite, type UnitKind } from './props';
 import { paintHall, type HallSprite } from './stations';
 
@@ -38,6 +39,8 @@ export interface RenderInput {
   fog: boolean;
   time: number;
   dt: number;
+  /** Calidad del dibujo (por defecto, la máxima). */
+  quality?: MapQuality;
 }
 
 export interface CounterHit {
@@ -139,6 +142,7 @@ export class MapRenderer {
   /** Intensidad de combate visible (0..1), para el sonido. */
   battleLevel = 0;
   ready = false;
+  private q: MapQuality = FULL_QUALITY;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -371,8 +375,10 @@ export class MapRenderer {
     g.fillStyle = '#070807';
     g.fillRect(0, 0, this.canvas.width, this.canvas.height);
     if (!this.ready) return;
+    const q = (this.q = input.quality ?? FULL_QUALITY);
+    this.particles.density = q.particles;
     g.imageSmoothingEnabled = true;
-    g.imageSmoothingQuality = 'high';
+    g.imageSmoothingQuality = q.postfx ? 'high' : 'low';
 
     const vis = this.visibility(state, input.fog, input.mode);
     const supplied = this.supplied(state, input.mapMode);
@@ -389,7 +395,7 @@ export class MapRenderer {
     g.drawImage(this.rock!, WORLD.x, WORLD.y, WORLD.w, WORLD.h);
     // Grano de roca nítido
     if (!this.grain) this.grain = g.createPattern(this.grainCanvas!, 'repeat');
-    if (this.grain) {
+    if (q.postfx && this.grain) {
       this.grain.setTransform?.(new DOMMatrix().scale(0.55));
       g.save();
       g.globalCompositeOperation = 'overlay';
@@ -399,7 +405,7 @@ export class MapRenderer {
       g.restore();
     }
     // Ciudad fantasma en superficie
-    if (this.city) {
+    if (q.postfx && this.city) {
       const a = clamp(1.25 - zoom * 0.35, 0.25, 1);
       g.save();
       g.lineWidth = 3;
@@ -424,17 +430,19 @@ export class MapRenderer {
     g.globalAlpha = 1;
     g.lineCap = 'round';
     g.lineJoin = 'round';
-    g.setLineDash([18, 46]);
-    g.lineDashOffset = -t * 14;
-    g.strokeStyle = 'rgba(150,205,225,0.1)';
-    g.lineWidth = 2.2;
-    g.stroke(this.riverPath);
-    g.setLineDash([6, 70]);
-    g.lineDashOffset = -t * 22 + 30;
-    g.strokeStyle = 'rgba(190,230,245,0.12)';
-    g.lineWidth = 1.2;
-    g.stroke(this.riverPath);
-    g.setLineDash([]);
+    if (q.postfx) {
+      g.setLineDash([18, 46]);
+      g.lineDashOffset = -t * 14;
+      g.strokeStyle = 'rgba(150,205,225,0.1)';
+      g.lineWidth = 2.2;
+      g.stroke(this.riverPath);
+      g.setLineDash([6, 70]);
+      g.lineDashOffset = -t * 22 + 30;
+      g.strokeStyle = 'rgba(190,230,245,0.12)';
+      g.lineWidth = 1.2;
+      g.stroke(this.riverPath);
+      g.setLineDash([]);
+    }
     g.restore();
     this.worldText(g, 'RÍO VLIA · SUPERFICIE', 1562, 300, 72 * (Math.PI / 180), 'rgba(140,190,210,0.22)', 15);
     this.worldText(g, 'METRO DE VLIANSKA · ÓBLAST DE MÚRMANSK', 40, 1062, 0, 'rgba(180,160,120,0.16)', 16, 'left');
@@ -494,7 +502,7 @@ export class MapRenderer {
         g.strokeStyle = rgba(neutral ? '#4a4a44' : col, neutral ? 0.5 : stripeA);
         g.lineWidth = w;
         g.stroke();
-        if (trimA > 0 && !neutral) {
+        if (q.tunnelDetail && trimA > 0 && !neutral) {
           // Cable de luces del dueño a lo largo de las paredes
           for (const side of [-1, 1]) {
             const trim = offsetLine(slice(geo, s0, s1), side * (geo.width / 2 - 1));
@@ -508,7 +516,7 @@ export class MapRenderer {
       }
     }
     // d) detalles: paredes, raíles, traviesas, tuberías
-    if (zoom > 0.75) {
+    if (q.tunnelDetail && zoom > 0.75) {
       const detailA = clamp((zoom - 0.75) * 1.6);
       for (const geo of edges) {
         if (collapsedEdge(geo)) continue;
@@ -840,10 +848,11 @@ export class MapRenderer {
         g.drawImage(spr, sg.x - 70, sg.y - 70, 140, 140);
         continue;
       }
-      const flick = 0.92 + 0.08 * Math.sin(t * 1.3 + sg.y) * Math.sin(t * 0.7 + sg.x);
-      g.globalAlpha = 0.2 * flick * dim;
+      const flick = q.lights ? 0.92 + 0.08 * Math.sin(t * 1.3 + sg.y) * Math.sin(t * 0.7 + sg.x) : 1;
+      g.globalAlpha = (q.lights ? 0.2 : 0.26) * flick * dim;
       const big = lightSprite(warm, 128);
       g.drawImage(big, sg.x - 125, sg.y - 110, 250, 220);
+      if (!q.lights) continue;
       g.save();
       g.translate(sg.x, sg.y);
       g.rotate(sg.angle);
@@ -863,7 +872,7 @@ export class MapRenderer {
     }
     // Faroles de los tramos con el color del dueño
     for (const p of MAP.provinceList) {
-      if (p.kind !== 'tramo' || !inView(p.x, p.y)) continue;
+      if (!q.lights || p.kind !== 'tramo' || !inView(p.x, p.y)) continue;
       const ctrl = state.provinces[p.id].controller;
       if (!ctrl || state.provinces[p.id].collapsed) continue;
       const f = 0.8 + 0.2 * Math.sin(t * 3 + p.x * 0.7);
@@ -961,7 +970,8 @@ export class MapRenderer {
     if (input.mode === 'game') this.drawUnits(input, cam, vis);
     else this.counters = [];
 
-    // Viñeta y grano de película
+    // Viñeta
+    if (!q.postfx) return;
     const vg = g.createRadialGradient(this.cssW / 2, this.cssH / 2, Math.min(this.cssW, this.cssH) * 0.35, this.cssW / 2, this.cssH / 2, Math.hypot(this.cssW, this.cssH) * 0.62);
     vg.addColorStop(0, 'rgba(0,0,0,0)');
     vg.addColorStop(1, 'rgba(0,0,0,0.55)');
@@ -1090,7 +1100,7 @@ export class MapRenderer {
         g.strokeStyle = selected ? '#ffd27a' : 'rgba(235,228,210,0.9)';
         g.lineWidth = 2.5;
         g.shadowColor = selected ? 'rgba(255,200,100,0.8)' : 'transparent';
-        g.shadowBlur = selected ? 10 : 0;
+        g.shadowBlur = selected && this.q.postfx ? 10 : 0;
         g.beginPath();
         g.arc(sx, sy, (R + 3) * pulse, 0, Math.PI * 2);
         g.stroke();
@@ -1143,7 +1153,7 @@ export class MapRenderer {
       const pulse = 0.6 + 0.4 * Math.sin(input.time * 6);
       g.save();
       g.shadowColor = `rgba(224,97,74,${0.6 * pulse})`;
-      g.shadowBlur = 12;
+      g.shadowBlur = this.q.postfx ? 12 : 0;
       g.fillStyle = 'rgba(28,12,10,0.95)';
       g.beginPath();
       g.roundRect(x, y, w, h, 4);
@@ -1272,7 +1282,7 @@ export class MapRenderer {
     g.save();
     // Placa
     g.shadowColor = 'rgba(0,0,0,0.7)';
-    g.shadowBlur = 6;
+    g.shadowBlur = this.q.postfx ? 6 : 0;
     g.shadowOffsetY = 2;
     g.fillStyle = 'rgba(13,15,14,0.94)';
     g.beginPath();

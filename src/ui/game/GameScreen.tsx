@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FACTIONS } from '../../data';
 import type { LogEntry } from '../../game/types';
 import { formatShortDate } from '../../game/time';
-import { MapView } from '../map/MapView';
+import { MapView, mapActivity } from '../map/MapView';
 import { TERRAIN_COLOR } from '../map/mapUtil';
 import { Icon, Tip, TooltipLayer, hideTip } from '../components/core';
 import { store, ui, useGame, type MapMode, centerMapOn } from '../store';
@@ -59,6 +59,20 @@ function MapControls() {
           <div className="legend-row"><span className="legend-star">★</span> Capital</div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Contador de fotogramas (Ajustes → Vídeo y rendimiento). */
+function FpsMeter() {
+  const [stats, setStats] = useState({ fps: 0, ms: 0 });
+  useEffect(() => {
+    const id = window.setInterval(() => setStats({ fps: mapActivity.fps, ms: mapActivity.renderMs }), 500);
+    return () => window.clearInterval(id);
+  }, []);
+  return (
+    <div className="fps-meter num" aria-hidden>
+      {Math.round(stats.fps)} FPS · {stats.ms.toFixed(1)} ms
     </div>
   );
 }
@@ -165,6 +179,7 @@ export function GameScreen() {
           <Alerts />
           <FocusTicker />
           <MapControls />
+          {store.settings.showFps && <FpsMeter />}
           {store.speed === 0 && !s.menuOpen && <div className="paused-badge">EN PAUSA · <span className="kbd">Espacio</span></div>}
           {s.moveMode && <div className="move-hint">Elige el destino en el mapa · <span className="kbd">Esc</span> para cancelar</div>}
         </main>

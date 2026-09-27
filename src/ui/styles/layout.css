@@ -652,3 +652,17 @@
     bottom: 70px;
   }
 }
+
+.fps-meter {
+  position: absolute;
+  z-index: 12;
+  top: 10px;
+  left: 10px;
+  padding: 3px 8px;
+  background: rgba(8, 10, 9, 0.8);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 12px;
+  color: var(--text-dim);
+  pointer-events: none;
+}

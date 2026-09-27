@@ -21,6 +21,11 @@ const SECTIONS: { id: string; title: string; icon: string; body: ReactNode }[] =
           El tiempo avanza hora a hora. Pausa con <span className="kbd">Espacio</span> y cambia la velocidad con las teclas <span className="kbd">1</span>–
           <span className="kbd">5</span>.
         </p>
+        <p>
+          Si el juego va lento, en <strong>Ajustes → Vídeo y rendimiento</strong> puedes bajar la calidad gráfica: menos resolución en el mapa, un límite de 30 o 60
+          fotogramas por segundo, sin partículas ni luces animadas, y una interfaz sin sombras ni animaciones. Los preajustes Baja, Media y Alta lo cambian todo de
+          una vez; la primera vez se elige uno según tu equipo.
+        </p>
       </>
     ),
   },

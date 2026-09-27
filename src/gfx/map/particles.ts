@@ -23,8 +23,11 @@ const MAX = 900;
 
 export class Particles {
   list: Particle[] = [];
+  /** Fracción de partículas que realmente se crean (ajustes de rendimiento). */
+  density = 1;
 
   spawn(p: Omit<Particle, 'life'> & { life?: number }) {
+    if (this.density < 1 && Math.random() >= this.density) return;
     if (this.list.length >= MAX) this.list.shift();
     this.list.push({ ...p, life: p.life ?? p.max });
   }
