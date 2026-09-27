@@ -29,11 +29,37 @@ for (const file of walk('src/data')) {
   for (const m of src.matchAll(/(?:icon|picture):\s*'([A-Za-z0-9]+)'/g)) names.add(m[1]);
 }
 const sorted = [...names].sort();
-const body = `// Archivo generado por scripts/gen-icons.mjs. No editar a mano.
-import { ${sorted.join(', ')} } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 
-export const ICONS: Record<string, LucideIcon> = { ${sorted.join(', ')} };
+// Resuelve cada nombre exportado por lucide-react a su archivo y extrae los
+// trazos del icono. Así los iconos se pueden dibujar tanto en el DOM como en
+// canvas (medallas, escenas, mapa) sin depender de lucide en tiempo de ejecución.
+const LUCIDE = 'node_modules/lucide-react/dist/esm';
+const index = readFileSync(join(LUCIDE, 'lucide-react.mjs'), 'utf8');
+const fileOf = new Map();
+for (const m of index.matchAll(/export \{([^}]+)\} from '\.\/icons\/([a-z0-9-]+)\.mjs'/g)) {
+  for (const part of m[1].split(',')) {
+    const alias = part.trim().split(/\s+as\s+/)[1];
+    if (alias) fileOf.set(alias, m[2]);
+  }
+}
+const nodes = {};
+for (const name of sorted) {
+  const file = fileOf.get(name);
+  if (!file) throw new Error(`Icono desconocido en lucide-react: ${name}`);
+  const src = readFileSync(join(LUCIDE, 'icons', `${file}.mjs`), 'utf8');
+  const m = src.match(/const __iconData = (\{[\s\S]*?\n\});/);
+  if (!m) throw new Error(`No se pudo leer el icono ${name}`);
+  const { node } = new Function(`return ${m[1]}`)();
+  nodes[name] = node.map(([tag, attrs]) => {
+    const { key, ...rest } = attrs;
+    void key;
+    return [tag, rest];
+  });
+}
+const body = `// Archivo generado por scripts/gen-icons.mjs a partir de lucide (ISC). No editar a mano.
+export type IconNode = [string, Record<string, string>];
+
+export const ICON_NODES: Record<string, IconNode[]> = ${JSON.stringify(nodes)};
 `;
 writeFileSync('src/ui/iconMap.generated.ts', body);
 console.log(`iconMap.generated.ts: ${sorted.length} iconos`);

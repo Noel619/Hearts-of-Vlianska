@@ -263,88 +263,49 @@
 
 /* ------------------------------------------------------------------ Mapa */
 
-.map-svg {
+.map-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #070807;
+}
+.map-canvas {
   display: block;
   width: 100%;
   height: 100%;
   touch-action: none;
+  cursor: default;
 }
-.map-svg.interactive {
+.map-wrap.interactive .map-canvas {
   cursor: grab;
 }
-.map-svg.demo {
-  transform-origin: 55% 50%;
-  animation: mapDrift 60s ease-in-out infinite alternate;
-  will-change: transform;
-}
-@keyframes mapDrift {
-  0% {
-    transform: scale(1.02) translate(0, 0);
-  }
-  50% {
-    transform: scale(1.1) translate(-3%, 1.5%);
-  }
-  100% {
-    transform: scale(1.04) translate(2.5%, -1.5%);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .map-svg.demo {
-    animation: none;
-  }
-}
-.map-svg.interactive:active {
-  cursor: grabbing;
-}
-.map-svg.move-mode,
-.map-svg.move-mode .prov {
-  cursor: crosshair;
-}
-.map-svg .prov {
-  cursor: pointer;
-}
-.map-svg .unit-counter {
-  cursor: pointer;
-}
-.map-svg .battle-icon {
-  cursor: pointer;
-}
-.map-label {
-  font-family: var(--font-display);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  fill: #e6dcc4;
-  stroke: #060706;
-  stroke-width: 4px;
-  paint-order: stroke;
-  pointer-events: none;
-}
-.map-surface-label {
+.map-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
   font-family: var(--font-narrow);
-  font-size: 16px;
-  letter-spacing: 0.3em;
+  font-size: 15px;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  fill: #3f7a96;
-  fill-opacity: 0.55;
+  color: var(--brass);
+  background: radial-gradient(ellipse at 50% 50%, rgba(233, 165, 60, 0.08), transparent 60%), #070807;
   pointer-events: none;
 }
-.unit-count {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 700;
-  fill: #fff;
-  stroke: #000;
-  stroke-width: 2.5px;
-  paint-order: stroke;
-  pointer-events: none;
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--brass-dim);
+  border-top-color: var(--amber);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
-.march {
-  animation: march 1s linear infinite;
-}
-@keyframes march {
+@keyframes spin {
   to {
-    stroke-dashoffset: -17;
+    transform: rotate(360deg);
   }
 }
 

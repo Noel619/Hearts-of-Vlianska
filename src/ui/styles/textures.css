@@ -1,0 +1,130 @@
+/* Texturas procedurales (generadas en src/gfx/textures.ts) aplicadas sobre la interfaz.
+   Cada regla superpone un degradado semitransparente a la textura, así la interfaz
+   sigue siendo legible aunque la textura aún no se haya generado. */
+
+:root {
+  --rivet: radial-gradient(circle, #d9c592 0 1.2px, #7d6b45 1.8px, #1c170e 2.6px, transparent 3.2px);
+}
+
+.topbar {
+  background:
+    linear-gradient(180deg, rgba(46, 52, 45, 0.88), rgba(18, 21, 18, 0.95)),
+    var(--tex-steel, none) #1b1f1b;
+  background-size:
+    auto,
+    256px;
+}
+
+.rail {
+  background:
+    linear-gradient(90deg, rgba(14, 17, 15, 0.9), rgba(26, 30, 26, 0.88)),
+    var(--tex-steel, none) #151815;
+  background-size:
+    auto,
+    256px;
+}
+
+.panel {
+  background:
+    linear-gradient(180deg, rgba(24, 28, 24, 0.93), rgba(15, 18, 16, 0.96)),
+    var(--tex-steel, none) #161a17;
+  background-size:
+    auto,
+    256px;
+}
+
+.panel-head,
+.modal-head,
+.overlay-head,
+.setup-head {
+  background:
+    var(--rivet) 6px 6px / 8px 8px no-repeat,
+    var(--rivet) calc(100% - 6px) 6px / 8px 8px no-repeat,
+    linear-gradient(180deg, rgba(58, 64, 55, 0.85), rgba(28, 33, 29, 0.92)),
+    var(--tex-steel, none) #232823;
+  background-size:
+    8px 8px,
+    8px 8px,
+    auto,
+    256px;
+}
+
+.modal {
+  background:
+    linear-gradient(180deg, rgba(34, 39, 34, 0.92), rgba(18, 21, 19, 0.96)),
+    var(--tex-steel, none) #1a1e1b;
+  background-size:
+    auto,
+    256px;
+}
+
+.overlay {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(233, 165, 60, 0.09), transparent 55%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 40px),
+    linear-gradient(180deg, rgba(14, 17, 15, 0.86), rgba(10, 12, 11, 0.94)),
+    var(--tex-concrete, none) #0e110f;
+  background-size:
+    auto,
+    auto,
+    auto,
+    auto,
+    256px;
+}
+
+.setup-screen,
+.lore-screen {
+  background:
+    radial-gradient(ellipse at 50% -20%, rgba(233, 165, 60, 0.08), transparent 60%),
+    linear-gradient(180deg, rgba(14, 17, 15, 0.85), rgba(10, 12, 11, 0.92)),
+    var(--tex-concrete, none) #0e110f;
+  background-size:
+    auto,
+    auto,
+    256px;
+}
+
+.tooltip {
+  background:
+    linear-gradient(180deg, rgba(20, 24, 21, 0.95), rgba(12, 14, 13, 0.97)),
+    var(--tex-steel, none) #0e110f;
+  background-size:
+    auto,
+    256px;
+}
+
+/* Placas metálicas de las tarjetas */
+.stat-row > div,
+.setup-stats > div,
+.ticker-item {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.2)), var(--tex-steel, none);
+  background-size:
+    auto,
+    256px;
+}
+
+/* Retratos y emblemas */
+img.emblem {
+  display: inline-block;
+  flex: none;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
+}
+.portrait {
+  display: block;
+  flex: none;
+  object-fit: cover;
+  border: 1px solid #000;
+  box-shadow:
+    0 0 0 1px var(--brass-dim),
+    0 6px 16px rgba(0, 0, 0, 0.55);
+}
+.portrait-loading {
+  animation: portraitPulse 1.2s ease-in-out infinite alternate;
+}
+@keyframes portraitPulse {
+  to {
+    opacity: 0.6;
+  }
+}

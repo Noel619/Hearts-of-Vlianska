@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './ui/App';
-import { go, store } from './ui/store';
+import { go, store, ui as uiStore } from './ui/store';
 import { deserialize, serialize } from './game/save';
 import '@fontsource/big-shoulders-stencil-display/latin-700';
 import '@fontsource/big-shoulders-stencil-display/latin-800';
@@ -16,6 +16,9 @@ import './ui/styles/layout.css';
 import './ui/styles/panels.css';
 import './ui/styles/trees.css';
 import './ui/styles/screens.css';
+import './ui/styles/textures.css';
+import { installTextures } from './gfx/textures';
+import { mapActivity } from './ui/map/MapView';
 
 // Conserva la partida si la página se actualiza en caliente dentro de un Artifact.
 interface HotApi {
@@ -25,7 +28,11 @@ interface HotApi {
 }
 const hot = (window as unknown as { claude?: { hot?: HotApi } }).claude?.hot;
 
+// Métricas para depuración desde la consola del navegador
+(window as unknown as { __vlianska?: unknown }).__vlianska = { mapActivity, store, ui: uiStore };
+
 function start(data: unknown) {
+  installTextures();
   const saved = (data as { game?: string } | undefined)?.game;
   if (saved) {
     try {

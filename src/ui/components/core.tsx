@@ -1,6 +1,6 @@
 // Componentes básicos: iconos, tooltips, barras, paneles y modales.
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { ICONS } from '../iconMap.generated';
+import { ICON_NODES } from '../iconMap.generated';
 import { createUIStore, useVersion } from '../store';
 import type { Line } from '../../game/describe';
 import { describeMods } from '../../game/modifiers';
@@ -11,8 +11,27 @@ import type { Modifiers } from '../../game/types';
 // ---------------------------------------------------------------------------
 
 export function Icon({ name, size = 16, className, style, strokeWidth = 2 }: { name: string; size?: number; className?: string; style?: CSSProperties; strokeWidth?: number }) {
-  const C = ICONS[name] ?? ICONS.CircleHelp;
-  return <C size={size} className={className} style={style} strokeWidth={strokeWidth} aria-hidden />;
+  const nodes = ICON_NODES[name] ?? ICON_NODES.CircleHelp;
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className ? `icon ${className}` : 'icon'}
+      style={style}
+      aria-hidden
+    >
+      {nodes.map(([tag, attrs], i) => {
+        const Tag = tag as 'path';
+        return <Tag key={i} {...attrs} />;
+      })}
+    </svg>
+  );
 }
 
 // ---------------------------------------------------------------------------
