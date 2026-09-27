@@ -11,15 +11,20 @@ export const SPEEDS = [0, 4, 10, 24, 60, 160];
 export interface Settings {
   pauseOnEvents: boolean;
   autosave: boolean;
-  sound: boolean;
   fog: boolean;
   confirmWar: boolean;
+  /** Volúmenes (0..1) y silencio general. */
+  volMaster: number;
+  volMusic: number;
+  volAmbience: number;
+  volSfx: number;
+  muted: boolean;
 }
 
 const SETTINGS_KEY = 'hov-settings';
 
 function loadSettings(): Settings {
-  const defaults: Settings = { pauseOnEvents: true, autosave: true, sound: false, fog: true, confirmWar: true };
+  const defaults: Settings = { pauseOnEvents: true, autosave: true, fog: true, confirmWar: true, volMaster: 0.8, volMusic: 0.6, volAmbience: 0.55, volSfx: 0.8, muted: false };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) return { ...defaults, ...JSON.parse(raw) };

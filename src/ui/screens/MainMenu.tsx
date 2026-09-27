@@ -10,7 +10,8 @@ import { Emblem, Portrait } from '../components/art';
 import { Icon, Modal, TooltipLayer, fmt } from '../components/core';
 import { AUTOSAVE_SLOT, hasAutosave, loadGame } from '../saves';
 import { go, nav, store, ui } from '../store';
-import { ImportSave } from '../game/Modals';
+import { ImportSave, SettingsForm } from '../game/Modals';
+import { MuteButton, useAudioUnlocked } from '../components/SoundSettings';
 import { HelpModal } from './Help';
 import { MenuBackdrop } from './MenuBackdrop';
 import { deleteSave, listSaves } from '../saves';
@@ -74,6 +75,8 @@ function LoadModal({ onClose }: { onClose: () => void }) {
 
 export function MainMenu() {
   const n = nav.use();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const unlocked = useAudioUnlocked();
   const canContinue = hasAutosave();
   return (
     <div className="menu-screen">
@@ -116,6 +119,9 @@ export function MainMenu() {
           <button className="btn big" onClick={() => nav.set({ helpOpen: true })}>
             <Icon name="CircleHelp" size={18} /> Cómo jugar
           </button>
+          <button className="btn big" onClick={() => setSettingsOpen(true)}>
+            <Icon name="Settings" size={18} /> Ajustes
+          </button>
         </div>
         <footer className="menu-footer">
           <span>Universo, historia y mapa de Vlianska: Noel619.</span>
@@ -124,6 +130,27 @@ export function MainMenu() {
       </div>
       {n.loadOpen && <LoadModal onClose={() => nav.set({ loadOpen: false })} />}
       {n.helpOpen && <HelpModal onClose={() => nav.set({ helpOpen: false })} />}
+      {settingsOpen && (
+        <Modal onClose={() => setSettingsOpen(false)} className="menu-modal">
+          <header className="modal-head">
+            <Icon name="Settings" size={20} className="amber" />
+            <h2>Ajustes</h2>
+            <button className="btn icon ghost" onClick={() => setSettingsOpen(false)} aria-label="Cerrar">
+              <Icon name="X" size={18} />
+            </button>
+          </header>
+          <SettingsForm />
+        </Modal>
+      )}
+      <div className={`menu-sound ${unlocked ? 'on' : ''}`}>
+        {unlocked ? (
+          <MuteButton />
+        ) : (
+          <button className="btn ghost menu-sound-hint" onClick={() => undefined}>
+            <Icon name="Volume2" size={18} /> Haz clic para activar la música y el sonido
+          </button>
+        )}
+      </div>
       <TooltipLayer />
     </div>
   );

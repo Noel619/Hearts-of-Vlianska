@@ -10,6 +10,7 @@ import { formatDate, formatMonth } from '../../game/time';
 import { controlledStations, ownedStations, populationOf } from '../../game/helpers';
 import { deserialize, serialize } from '../../game/save';
 import { Emblem, EventScene } from '../components/art';
+import { SoundSettings } from '../components/SoundSettings';
 import { Icon, Lines, Modal, Tip, fmt } from '../components/core';
 import { deleteSave, listSaves, loadGame, newSlotId, saveGame, type SaveMeta } from '../saves';
 import { go, store, ui, useGame } from '../store';
@@ -296,6 +297,7 @@ export function SettingsForm() {
         <input type="checkbox" checked={s.fog} onChange={(e) => store.updateSettings({ fog: e.target.checked })} />
         Niebla de guerra (solo ves las tropas cercanas)
       </label>
+      <SoundSettings />
     </div>
   );
 }

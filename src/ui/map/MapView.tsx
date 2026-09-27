@@ -6,6 +6,7 @@ import type { FactionId, GameState } from '../../game/types';
 import { provinceName } from '../../game/helpers';
 import { orderMove, unitStats } from '../../game/military';
 import { DPR } from '../../gfx/canvas';
+import { audio } from '../../audio';
 import { mapLayersReady, MapRenderer, prepareMapLayers, type Camera, type CounterHit } from '../../gfx/map/renderer';
 import { Bar, fmt, hideTip, showHoverTip, showTip } from '../components/core';
 import { centerMapOn, store, ui, type MapMode } from '../store';
@@ -178,6 +179,7 @@ export function MapView({ mode, state, highlight, onPickFaction, mapMode: forced
     if (!ids.length) return;
     const n = store.act((x) => orderMove(x, ids, pid)) ?? 0;
     ui.set({ moveMode: false });
+    audio.play(n > 0 ? 'move' : 'error');
     if (n === 0) showTip(<div className="bad">No hay ruta posible hasta {provinceName(pid)}.</div>, window.innerWidth / 2, 120);
   };
 

@@ -19,6 +19,8 @@ import './ui/styles/screens.css';
 import './ui/styles/textures.css';
 import { installTextures } from './gfx/textures';
 import { mapActivity } from './ui/map/MapView';
+import { installAudio } from './audio/hooks';
+import { audio } from './audio';
 
 // Conserva la partida si la página se actualiza en caliente dentro de un Artifact.
 interface HotApi {
@@ -29,10 +31,11 @@ interface HotApi {
 const hot = (window as unknown as { claude?: { hot?: HotApi } }).claude?.hot;
 
 // Métricas para depuración desde la consola del navegador
-(window as unknown as { __vlianska?: unknown }).__vlianska = { mapActivity, store, ui: uiStore };
+(window as unknown as { __vlianska?: unknown }).__vlianska = { mapActivity, store, ui: uiStore, audio };
 
 function start(data: unknown) {
   installTextures();
+  installAudio();
   const saved = (data as { game?: string } | undefined)?.game;
   if (saved) {
     try {

@@ -9,6 +9,7 @@ import { formatDate } from '../../game/time';
 import { Emblem } from '../components/art';
 import { Icon, Tip, fmt, fmtSigned, pct } from '../components/core';
 import { store, ui, useGame } from '../store';
+import { MuteButton } from '../components/SoundSettings';
 
 export const RES_NAMES: Record<string, { name: string; icon: string }> = {
   chatarra: { name: 'Chatarra', icon: 'Anvil' },
@@ -233,6 +234,7 @@ export function TopBar() {
           </div>
         </Tip>
         <SpeedControls />
+        <MuteButton className="top-mute" />
         <button className="btn icon ghost" onClick={() => ui.set({ menuOpen: true })} aria-label="Menú">
           <Icon name="Menu" size={20} />
         </button>

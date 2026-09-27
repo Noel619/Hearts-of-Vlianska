@@ -335,3 +335,24 @@
     background: rgba(8, 10, 9, 0.8);
   }
 }
+
+/* Sonido en el menú */
+.menu-sound {
+  position: absolute;
+  z-index: 3;
+  right: 18px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+}
+.menu-sound-hint {
+  gap: 8px;
+  color: var(--brass-2);
+  background: rgba(10, 12, 11, 0.7);
+  border: 1px solid var(--brass-dim);
+  animation: soundHint 2.4s ease-in-out infinite;
+}
+@keyframes soundHint {
+  50% {
+    border-color: var(--amber);
+    box-shadow: 0 0 14px rgba(233, 165, 60, 0.35);
+  }
+}

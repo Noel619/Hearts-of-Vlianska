@@ -1365,3 +1365,25 @@
     height: 160px;
   }
 }
+
+/* Ajustes de sonido */
+.sound-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+.slider-row {
+  display: grid;
+  grid-template-columns: 18px 1fr minmax(120px, 1.3fr) 32px;
+  align-items: center;
+  gap: 10px;
+}
+.slider-row input[type='range'] {
+  width: 100%;
+  accent-color: var(--amber);
+}
+.slider-row .num {
+  text-align: right;
+}

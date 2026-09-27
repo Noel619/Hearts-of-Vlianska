@@ -789,42 +789,60 @@ export function figure(stage: Stage, x: number, y: number, H: number, o: FigureO
 // Fuego, humo y utilería
 // ---------------------------------------------------------------------------
 
-/** Llamas por capas (se puede animar con `t`). */
+/** Llamas por capas con mezcla aditiva (se puede animar con `t`). */
 export function fire(g: Ctx, x: number, y: number, s: number, t = 0, seed = 0) {
   glowAt(g, x, y - s * 0.6, s * 5, '#ff8a2a', 0.5);
   glowAt(g, x, y - s * 0.3, s * 2, '#ffd27a', 0.5);
-  const layers: [string, number][] = [
-    ['#b32a10', 1],
-    ['#f06a1a', 0.8],
-    ['#ffb640', 0.55],
-    ['#fff0b0', 0.3],
-  ];
-  for (const [col, k] of layers) {
-    g.fillStyle = col;
-    for (let i = 0; i < 5; i++) {
-      const ph = t * (5 + i) + seed * 3 + i * 1.7;
-      const fx = x + (i - 2) * s * 0.18 * k;
-      const fh = s * k * (1.2 + 0.35 * Math.sin(ph) + 0.25 * Math.sin(ph * 1.7 + 2));
-      const fw = s * 0.28 * k;
-      const lean = Math.sin(ph * 0.8) * s * 0.12;
-      g.beginPath();
-      g.moveTo(fx - fw, y);
-      g.quadraticCurveTo(fx - fw * 0.8, y - fh * 0.55, fx + lean, y - fh);
-      g.quadraticCurveTo(fx + fw * 0.8, y - fh * 0.55, fx + fw, y);
-      g.closePath();
-      g.fill();
-    }
-  }
-  // Leña
+  // Leña (debajo del fuego)
+  g.save();
   g.strokeStyle = '#1b120b';
-  g.lineWidth = s * 0.12;
+  g.lineWidth = s * 0.14;
   g.lineCap = 'round';
   g.beginPath();
-  g.moveTo(x - s * 0.6, y + s * 0.05);
-  g.lineTo(x + s * 0.5, y - s * 0.12);
-  g.moveTo(x + s * 0.6, y + s * 0.05);
-  g.lineTo(x - s * 0.45, y - s * 0.14);
+  g.moveTo(x - s * 0.7, y + s * 0.06);
+  g.lineTo(x + s * 0.55, y - s * 0.14);
+  g.moveTo(x + s * 0.7, y + s * 0.06);
+  g.lineTo(x - s * 0.5, y - s * 0.16);
   g.stroke();
+  // Brasas en la leña
+  g.strokeStyle = 'rgba(255,120,40,0.7)';
+  g.lineWidth = s * 0.04;
+  g.beginPath();
+  g.moveTo(x - s * 0.4, y - s * 0.05);
+  g.lineTo(x + s * 0.2, y - s * 0.12);
+  g.stroke();
+  g.globalCompositeOperation = 'lighter';
+  const tongues = 9;
+  for (let i = 0; i < tongues; i++) {
+    const k = i / (tongues - 1);
+    const ph = t * (4.5 + (i % 4) * 1.3) + seed * 3 + i * 1.9;
+    const fx = x + (k - 0.5) * s * 0.9;
+    const center = 1 - Math.abs(k - 0.5) * 1.3;
+    const fh = s * (0.7 + center * 1.1) * (1 + 0.28 * Math.sin(ph) + 0.18 * Math.sin(ph * 1.9 + 1.3));
+    const fw = s * (0.16 + center * 0.14);
+    const lean = Math.sin(ph * 0.7 + i) * s * 0.18;
+    const grad = g.createLinearGradient(fx, y, fx + lean, y - fh);
+    grad.addColorStop(0, 'rgba(255,245,200,0.9)');
+    grad.addColorStop(0.25, 'rgba(255,190,80,0.8)');
+    grad.addColorStop(0.6, 'rgba(235,90,25,0.5)');
+    grad.addColorStop(1, 'rgba(140,25,10,0)');
+    g.fillStyle = grad;
+    g.beginPath();
+    g.moveTo(fx - fw, y);
+    g.bezierCurveTo(fx - fw * 1.1, y - fh * 0.35, fx + lean - fw * 0.4, y - fh * 0.7, fx + lean, y - fh);
+    g.bezierCurveTo(fx + lean + fw * 0.4, y - fh * 0.7, fx + fw * 1.1, y - fh * 0.35, fx + fw, y);
+    g.closePath();
+    g.fill();
+  }
+  // Núcleo incandescente
+  const core = g.createRadialGradient(x, y - s * 0.15, 0, x, y - s * 0.15, s * 0.55);
+  core.addColorStop(0, 'rgba(255,250,220,0.9)');
+  core.addColorStop(1, 'rgba(255,200,100,0)');
+  g.fillStyle = core;
+  g.beginPath();
+  g.ellipse(x, y - s * 0.15, s * 0.55, s * 0.3, 0, 0, Math.PI * 2);
+  g.fill();
+  g.restore();
 }
 
 export function smoke(stage: Stage, x: number, y: number, s: number, n: number, color = '#8a8278', alpha = 0.18) {
