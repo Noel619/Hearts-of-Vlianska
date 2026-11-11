@@ -1,4 +1,8 @@
-// Punto de entrada. La aplicación se monta en #root.
-import { createRoot } from 'react-dom/client';
+// Punto de entrada.
+import { startViewer } from './dev/viewer';
 
-createRoot(document.getElementById('root')!).render(<div style={{ color: '#e8a33d', padding: 24, fontFamily: 'sans-serif' }}>Sombras de Vlianska: en construcción…</div>);
+const root = document.getElementById('root')!;
+startViewer(root).catch((e) => {
+  console.error(e);
+  root.textContent = String(e?.stack ?? e);
+});
