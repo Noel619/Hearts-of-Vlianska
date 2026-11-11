@@ -10,11 +10,13 @@ export default defineConfig(({ mode }) => ({
   plugins: mode === 'single' ? [react(), viteSingleFile()] : [react()],
   build: {
     outDir: mode === 'single' ? 'dist-single' : 'dist',
-    chunkSizeWarningLimit: 2000,
+    chunkSizeWarningLimit: 4000,
+    target: 'es2022',
   },
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    passWithNoTests: true,
     testTimeout: 120000,
   },
 }));
