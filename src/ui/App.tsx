@@ -1,0 +1,337 @@
+// Aplicación: carga del mundo, menú principal, comienzo de partida y juego.
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { SCENARIOS } from '../data/escenarios';
+import { LORE } from '../data/historia/cronica';
+import { Game, type Shared } from '../game/game';
+import type { Quality } from '../render/gfx';
+import { listSaves, loadGame, saveGame } from '../sim/save';
+import { GameCtx, hex } from './core';
+import { ContextMenuView, InspectPanel, LogView, Overlays, SelectionPanel, SquadBar, TopBar, type Screen } from './Hud';
+import { PanelView } from './Panels';
+import { BuildScreen, CodexScreen, FactionsScreen, GameOver, HelpBody, LogScreen, MapScreen, PauseScreen, ResearchScreen } from './Screens';
+import { Win } from './core';
+
+const COLORS = [0xd8c27a, 0xc86a4a, 0x7fb8c9, 0x9fc77a, 0xc9a0d8, 0xe0e0e0];
+const QUOTES = [
+  'Los más desafortunados tuvieron que esconderse en lo más profundo de los metros, con la esperanza de sobrevivir aunque fuera un día más.',
+  'Las estaciones, con líderes totalitarios y ávidos de poder, convirtieron el metro en una carnicería.',
+  'La carta nunca llegó a Volkov. Nadie sabe por qué.',
+  'Cinco túneles, cinco peajes.',
+  'Nadie sabe qué pasó en Tenevskaya; quienes se acercan hablan de voces en la oscuridad.',
+  '«Aquí Múrmansk. Seguimos vivos.»',
+];
+
+type Mode = 'cargando' | 'menu' | 'nueva' | 'juego';
+
+export function App() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [mode, setMode] = useState<Mode>('cargando');
+  const [progress, setProgress] = useState({ label: 'Preparando', frac: 0 });
+  const [game, setGame] = useState<Game | null>(null);
+  const [screen, setScreen] = useState<Screen>(null);
+  const [menuView, setMenuView] = useState<'main' | 'cronica' | 'ayuda' | 'cargar'>('main');
+  const [error, setError] = useState<string | null>(null);
+  const [quote] = useState(() => QUOTES[Math.floor(Math.random() * QUOTES.length)]);
+  const [, force] = useState(0);
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+
+  // Carga del mundo (una sola vez)
+  useEffect(() => {
+    let cancelled = false;
+    let g: Game | null = null;
+    (async () => {
+      const params = new URLSearchParams(location.search);
+      const quality = (params.get('q') as Quality) ?? (localStorage.getItem('sombras:calidad') as Quality) ?? 'media';
+      const shared: Shared = await Game.prepare((label, frac) => {
+        if (!cancelled) setProgress({ label, frac });
+      });
+      if (cancelled || !canvasRef.current) return;
+      g = Game.create(canvasRef.current, shared, quality);
+      // Escena de fondo del menú: una partida muda con la cámara dando vueltas
+      const direct = params.get('escenario');
+      g.startNew({ scenario: direct ?? 'nadie', seed: params.get('seed') ? Number(params.get('seed')) : undefined });
+      g.start();
+      setGame(g);
+      (window as unknown as Record<string, unknown>).__game = g;
+      setMode(direct ? 'juego' : 'menu');
+      (window as unknown as Record<string, unknown>).__ready = true;
+    })().catch((e) => {
+      console.error(e);
+      setError(String(e?.stack ?? e));
+    });
+    return () => {
+      cancelled = true;
+      g?.dispose();
+    };
+  }, []);
+
+  // En el menú la cámara orbita despacio y no hay selección
+  useEffect(() => {
+    if (!game) return;
+    if (mode !== 'menu' && mode !== 'nueva') return;
+    game.selected = [];
+    const f = game.shared.world.layout.stationById.STA;
+    game.rig.jump(f.x - 20, f.z, 30, 0.4, 0.62);
+    game.paused = false;
+    const id = setInterval(() => game.rig.rotate(0.0012, 0), 16);
+    return () => clearInterval(id);
+  }, [game, mode]);
+
+  // Atajos de las pantallas
+  useEffect(() => {
+    if (!game) return;
+    game.onHotkey = (code) => {
+      if (modeRef.current !== 'juego') return true;
+      const map: Record<string, Screen> = { KeyB: 'construir', KeyI: 'investigar', KeyM: 'mapa', KeyG: 'facciones', KeyK: 'cronica' };
+      if (map[code]) {
+        setScreen((s) => (s === map[code] ? null : map[code]));
+        return true;
+      }
+      if (code === 'Escape' && !game.buildDef && !game.menu && !game.panel) {
+        setScreen((s) => (s ? null : 'pausa'));
+        return true;
+      }
+      if (code === 'F5') {
+        saveGame('rapido', game.sim.state);
+        game.sim.log('Partida guardada.', 'info');
+        return true;
+      }
+      if (code === 'F9') {
+        const st = loadGame('rapido');
+        if (st) game.loadState(st);
+        return true;
+      }
+      return false;
+    };
+    return () => {
+      game.onHotkey = null;
+    };
+  }, [game]);
+
+  // Pausa mientras hay una pantalla abierta, autoguardado y fin de partida
+  useEffect(() => {
+    if (!game || mode !== 'juego') return;
+    if (screen) game.paused = true;
+    else if (!game.panel) game.paused = false;
+    game.bump();
+  }, [screen, game, mode]);
+  useEffect(() => {
+    if (!game || mode !== 'juego') return;
+    const id = setInterval(() => {
+      if (game.sim.players.length) saveGame('auto', game.sim.state);
+      force((n) => n + 1);
+    }, 60000);
+    const un = game.subscribe(() => {
+      if (game.sim.players.length === 0) force((n) => n + 1);
+    });
+    return () => {
+      clearInterval(id);
+      un();
+    };
+  }, [game, mode]);
+
+  const exit = useCallback(() => {
+    if (!game) return;
+    setScreen(null);
+    game.startNew({ scenario: 'nadie' });
+    setMode('menu');
+    setMenuView('main');
+  }, [game]);
+
+  const dead = mode === 'juego' && game && game.sim.players.length === 0 && game.sim.state.chars.every((c) => !c.player || c.st === 'muerto');
+
+  return (
+    <>
+      <canvas ref={canvasRef} className="game-canvas" tabIndex={0} />
+      {error && (
+        <div className="loading">
+          <div className="box">
+            <h2 className="stencil bad">Algo ha fallado</h2>
+            <pre style={{ textAlign: 'left', whiteSpace: 'pre-wrap', fontSize: 12 }}>{error}</pre>
+          </div>
+        </div>
+      )}
+      {mode === 'cargando' && !error && (
+        <div className="loading">
+          <div className="box">
+            <h1 className="title" style={{ fontSize: 52 }}>
+              <span>Sombras de</span>Vlianska
+            </h1>
+            <div className="track">
+              <i style={{ width: `${progress.frac * 100}%` }} />
+            </div>
+            <div className="dim">{progress.label}…</div>
+            <p className="quote" style={{ textAlign: 'left', marginTop: 26 }}>
+              {quote}
+            </p>
+          </div>
+        </div>
+      )}
+      {game && (
+        <GameCtx.Provider value={game}>
+          {mode === 'menu' && (
+            <div className="menu">
+              <div className="side">
+                <h1 className="title">
+                  <span>Sombras de</span>Vlianska
+                </h1>
+                <p className="tagline">
+                  Enero de 2033. Veinte años después de las bombas, ocho facciones se reparten las dieciséis estaciones del metro. Tú no eres ninguna de ellas. Todavía.
+                </p>
+                <button className="btn big" onClick={() => setMode('nueva')}>
+                  Nueva partida
+                </button>
+                <button className="btn big" disabled={!listSaves().length} onClick={() => setMenuView('cargar')}>
+                  Continuar
+                </button>
+                <button className="btn big" onClick={() => setMenuView('cronica')}>
+                  Crónica del metro
+                </button>
+                <button className="btn big" onClick={() => setMenuView('ayuda')}>
+                  Cómo se juega
+                </button>
+                <div className="sp" />
+                <div className="dim" style={{ fontSize: 12 }}>
+                  Universo, historia y mapa de Vlianska: Noel619.
+                </div>
+              </div>
+              {menuView === 'cronica' && (
+                <Win title="Crónica del metro" onClose={() => setMenuView('main')} width={780} cls="lore">
+                  {LORE.map((ch) => (
+                    <section key={ch.title}>
+                      <h3>{ch.title}</h3>
+                      {ch.paragraphs.map((p, i) => (
+                        <p key={i}>{p}</p>
+                      ))}
+                    </section>
+                  ))}
+                </Win>
+              )}
+              {menuView === 'ayuda' && (
+                <Win title="Cómo se juega" onClose={() => setMenuView('main')} width={700}>
+                  <HelpBody />
+                </Win>
+              )}
+              {menuView === 'cargar' && (
+                <Win title="Continuar" onClose={() => setMenuView('main')} width={520}>
+                  <div className="list" style={{ gap: 5 }}>
+                    {listSaves().map((m) => (
+                      <button
+                        key={m.slot}
+                        className="btn"
+                        style={{ textAlign: 'left' }}
+                        onClick={() => {
+                          const st = loadGame(m.slot);
+                          if (st) {
+                            game.loadState(st);
+                            setMode('juego');
+                          }
+                        }}
+                      >
+                        {m.name} · día {m.day} · {m.squad} en la escuadra · {m.slot === 'auto' ? 'autoguardado' : m.slot === 'rapido' ? 'guardado rápido' : m.slot} · {new Date(m.when).toLocaleString('es-ES')}
+                      </button>
+                    ))}
+                  </div>
+                </Win>
+              )}
+            </div>
+          )}
+          {mode === 'nueva' && (
+            <NewGame
+              back={() => setMode('menu')}
+              start={(scenario, name, color) => {
+                game.startNew({ scenario, name, color });
+                game.paused = true;
+                setScreen(null);
+                setMode('juego');
+              }}
+            />
+          )}
+          {mode === 'juego' && (
+            <div className="ui">
+              <TopBar open={setScreen} />
+              <SquadBar />
+              <SelectionPanel />
+              <InspectPanel />
+              <LogView />
+              <Overlays />
+              <ContextMenuView />
+              <PanelView />
+              {screen === 'construir' && <BuildScreen close={() => setScreen(null)} />}
+              {screen === 'investigar' && <ResearchScreen close={() => setScreen(null)} />}
+              {screen === 'mapa' && <MapScreen close={() => setScreen(null)} />}
+              {screen === 'facciones' && <FactionsScreen close={() => setScreen(null)} />}
+              {screen === 'cronica' && <CodexScreen close={() => setScreen(null)} />}
+              {screen === 'registro' && <LogScreen close={() => setScreen(null)} />}
+              {screen === 'pausa' && <PauseScreen close={() => setScreen(null)} exit={exit} open={setScreen} />}
+              {dead && <GameOver exit={exit} />}
+            </div>
+          )}
+        </GameCtx.Provider>
+      )}
+    </>
+  );
+}
+
+function NewGame({ back, start }: { back: () => void; start: (scenario: string, name: string, color: number) => void }) {
+  const [sel, setSel] = useState(SCENARIOS[0].id);
+  const [name, setName] = useState('Los Sin Nombre');
+  const [color, setColor] = useState(COLORS[0]);
+  const sc = SCENARIOS.find((s) => s.id === sel)!;
+  return (
+    <div className="shade">
+      <div className="panel win newgame">
+        <header>
+          <h2>Nueva partida</h2>
+          <button className="x" onClick={back}>
+            ✕
+          </button>
+        </header>
+        <div className="body">
+          <div className="cols">
+            <div className="col">
+              {SCENARIOS.map((s) => (
+                <button key={s.id} className={'card' + (s.id === sel ? ' sel' : '')} onClick={() => setSel(s.id)}>
+                  <h4>{s.name}</h4>
+                  <small>
+                    {s.members.length} {s.members.length === 1 ? 'persona' : 'personas'} · {s.difficulty}
+                  </small>
+                </button>
+              ))}
+            </div>
+            <div className="col lore" style={{ gap: 4 }}>
+              <h3 style={{ marginTop: 0 }}>{sc.name}</h3>
+              {sc.intro.map((p, i) => (
+                <p key={i}>{p}</p>
+              ))}
+              <p className="dim">
+                Dificultad: {sc.difficulty} · {sc.money} cartuchos · {sc.members.length} en la escuadra
+              </p>
+              <div className="sp" />
+              <label className="dim">Nombre de tu gente</label>
+              <input className="txt" value={name} maxLength={28} onChange={(e) => setName(e.target.value)} />
+              <label className="dim" style={{ marginTop: 6 }}>
+                Color del brazalete
+              </label>
+              <div className="swatches">
+                {COLORS.map((c) => (
+                  <div key={c} className={'swatch' + (c === color ? ' on' : '')} style={{ background: hex(c) }} onClick={() => setColor(c)} />
+                ))}
+              </div>
+              <div className="row" style={{ marginTop: 14 }}>
+                <button className="btn big" onClick={() => start(sel, name.trim() || 'Los Sin Nombre', color)}>
+                  Bajar al metro
+                </button>
+                <button className="btn" onClick={back}>
+                  Volver
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

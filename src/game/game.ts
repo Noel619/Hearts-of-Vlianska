@@ -49,6 +49,7 @@ export type Panel =
   | { t: 'comercio'; npc: number; actor: number }
   | { t: 'saqueo'; actor: number; target: Target }
   | { t: 'peaje'; npc: number }
+  | { t: 'taller'; id: number }
   | null;
 
 /** Recursos compartidos entre partidas: mundo, texturas y mallas estáticas. */
@@ -631,11 +632,20 @@ export class Game {
           actions.push({ label: 'Descansar aquí', run: one({ t: 'descansar', id: b.id }) });
           if (first.carry) actions.push({ label: 'Acostar al herido', run: one({ t: 'soltar', id: b.id }) });
         }
+        if (def.recipes) {
+          actions.push({
+            label: 'Elegir receta…',
+            run: () => {
+              this.panel = { t: 'taller', id: b.id };
+              this.bump();
+            },
+          });
+        }
         if (def.recipes || def.farm || def.research) {
           actions.push({ label: def.farm ? 'Atender el cultivo' : def.research ? 'Investigar' : 'Trabajar aquí', run: one({ t: 'operar', id: b.id }) });
           actions.push({ label: 'Asignar como trabajo fijo', hint: 'Lo hará siempre que no tenga órdenes', run: job(def.farm ? 'cultivar' : def.research ? 'investigar' : 'operar') });
         }
-        if (def.store) actions.push({ label: 'Abrir almacén', run: () => this.openBuilding(b.id) });
+        if (def.store || def.recipes || def.farm || def.passive) actions.push({ label: def.store && !def.recipes ? 'Abrir almacén' : 'Ver contenido', run: () => this.openBuilding(b.id) });
       }
       actions.push({ label: 'Derribar', run: one({ t: 'derribar', id: b.id }), danger: true });
     } else if (t.kind === 'cont') {
@@ -901,14 +911,12 @@ export class Game {
       case 'KeyF':
         if (this.selected[0]) this.focusOn(this.selected[0]);
         break;
-      case 'KeyL':
-        for (const c of sq) c.lamp = !sq[0].lamp || c !== sq[0] ? !sq[0].lamp : !c.lamp;
-        if (sq[0]) {
-          const v = !sq[0].lamp;
-          for (const c of sq) c.lamp = v;
-        }
+      case 'KeyL': {
+        const v = !sq[0]?.lamp;
+        for (const c of sq) c.lamp = v && (!!c.eq.luz || c.inv.some((q) => ITEMS[q.id]?.light));
         this.bump();
         break;
+      }
       case 'KeyC': {
         const v = !sq[0]?.sneak;
         for (const c of sq) c.sneak = v;
