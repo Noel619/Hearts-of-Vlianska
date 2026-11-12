@@ -595,13 +595,16 @@ const SPECIALS: Record<string, (st: St) => void> = {
     const mid = (P.u0 + P.u1) / 2;
     const half = (P.u1 - P.u0) / 2;
     for (const s of [-1, 1]) {
-      const u = mid + s * half * 0.44;
       const v = s * 5.3;
-      if (st.put('pozoAire', u, v, 0, -s)) {
+      // Prueba varios sitios: los pasillos de las escaleras mandan
+      for (const k of [0.44, 0.5, 0.38, 0.56, 0.32]) {
+        const u = mid + s * half * k;
+        if (!st.free(u, v, 3.5, 3.5) || !st.put('pozoAire', u, v, 0, -s)) continue;
         st.block(u - 4.4, u + 4.4, Math.min(v - 4, v + 4), Math.max(v - 4, v + 4));
-        st.put('bidonFuego', u + 4.9, s * 2.2, 0, -s);
+        st.put('bidonFuego', u + 4.9, s * 2.2, 0, -s, { aisle: true });
         st.spot('ocio', u + 4.9, s * 3.4, 0, -s, 'fuego');
         st.spot('ocio', u + 6.0, s * 2.3, -1, 0, 'fuego');
+        break;
       }
     }
   },

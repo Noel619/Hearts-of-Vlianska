@@ -110,7 +110,8 @@ export function stepMove(sim: Sim, c: Char, dt: number): boolean {
     }
     if (!ok) {
       c.repath = 0.8 + sim.rng.next() * 0.6;
-      c.stuck += 1;
+      // Los del jugador se rinden antes: alguien espera una respuesta
+      c.stuck += c.player ? 2.5 : 1;
       if (c.stuck > 6) {
         clearDest(c);
         return true;

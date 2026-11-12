@@ -11,14 +11,16 @@ import { Gfx, type Quality } from '../render/gfx';
 import { initMaterialGlobals, globals } from '../render/materials';
 import { buildPropsView } from '../render/propsView';
 import { buildTextures, type TextureSet } from '../render/textures';
+import { buildWaterMesh } from '../render/waterMesh';
 import { buildWorldMesh } from '../render/worldMesh';
-import { building, buildingLight, canPlace, placeBuilding } from '../sim/build';
+import { building, buildingLight, canPlace, placeBuilding, restoreBuildings } from '../sim/build';
+import { applyNodes } from '../sim/events';
 import { totalHpFrac } from '../sim/chars';
 import { hostile, needsCare } from '../sim/combat';
 import { newGame, type NewGameOptions } from '../sim/newGame';
 import { Sim } from '../sim/sim';
 import type { Char, JobType, Order, SimState } from '../sim/types';
-import { buildWorld, placeName, type World } from '../sim/world';
+import { buildWorld, placeName, resetWorld, type World } from '../sim/world';
 import { Fx, type DynLight, type SpotReq } from './fx';
 import { CharViews, ThingViews } from './views';
 
@@ -133,6 +135,7 @@ export class Game {
     await progress('Amueblando estaciones', 0.94);
     await tick();
     const props = buildPropsView(world.decor.props, world.field);
+    mesh.group.add(buildWaterMesh(world.nav, world.field, tex));
     await progress('Listo', 1);
     return { world, tex, worldGroup: mesh.group, propsGroup: props.group };
   }
@@ -151,22 +154,12 @@ export class Game {
   }
 
   loadState(state: SimState) {
-    this.resetWorld();
+    resetWorld(this.shared.world);
     const sim = new Sim(this.shared.world, state);
     this.attach(sim, true);
     const p = this.sim.players[0];
     if (p) this.rig.jump(p.x, p.z, 26, 0.6, 0.95);
     this.selected = [];
-  }
-
-  /** Devuelve el mundo compartido a su estado inicial (obstáculos dinámicos fuera). */
-  private resetWorld() {
-    // Las partidas modifican la rejilla (obras, derrumbes): se limpia al cambiar de partida
-    const nav = this.shared.world.nav;
-    const DYN = 16 | 32;
-    for (let i = 0; i < nav.flags.length; i++) if (nav.flags[i] & DYN) nav.flags[i] &= ~(DYN | 64);
-    for (const l of [...this.shared.world.field.lights]) if (l.owner) this.shared.world.field.remove(l);
-    this.shared.world.graph.blockedLinks.clear();
   }
 
   private attach(sim: Sim, loaded = false) {
@@ -176,8 +169,8 @@ export class Game {
     this.sim = sim;
     if (loaded) {
       // Recoloca derrumbes y obras de la partida guardada
-      void import('../sim/events').then((m) => m.applyNodes(sim));
-      void import('../sim/build').then((m) => m.restoreBuildings(sim));
+      applyNodes(sim);
+      restoreBuildings(sim);
     }
     this.views = new CharViews(sim);
     this.things = new ThingViews(sim);

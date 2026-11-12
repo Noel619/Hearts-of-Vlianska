@@ -8,7 +8,7 @@ import { addItem, makeHuman } from './chars';
 import { seedWorld } from './events';
 import { placePos, seedPacks } from './population';
 import { Sim, blankState } from './sim';
-import type { World } from './world';
+import { resetWorld, type World } from './world';
 
 export interface NewGameOptions {
   scenario: string;
@@ -25,6 +25,7 @@ export function newGame(world: World, opts: NewGameOptions): Sim {
   state.money = sc.money;
   if (opts.name) state.playerName = opts.name;
   if (opts.color !== undefined) state.playerColor = opts.color;
+  resetWorld(world);
   const sim = new Sim(world, state);
   seedWorld(sim);
   seedPacks(sim);

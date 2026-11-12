@@ -13,6 +13,8 @@ export interface World {
   nav: NavGrid;
   graph: RouteGraph;
   field: LightField;
+  /** Rejilla recién construida: a ella se vuelve al empezar o cargar una partida. */
+  baseFlags: Uint8Array;
 }
 
 export function buildWorld(): World {
@@ -20,7 +22,15 @@ export function buildWorld(): World {
   const decor = decorate(layout);
   const field = new LightField(layout.nav, decor.lights);
   const graph = new RouteGraph(layout, layout.nav);
-  return { layout, decor, nav: layout.nav, graph, field };
+  return { layout, decor, nav: layout.nav, graph, field, baseFlags: layout.nav.flags.slice() };
+}
+
+/** Devuelve el mundo compartido a su estado inicial: sin obras, derrumbes ni luces de partida. */
+export function resetWorld(world: World) {
+  world.nav.flags.set(world.baseFlags);
+  world.nav.version++;
+  for (const l of [...world.field.lights]) if (l.owner) world.field.remove(l);
+  world.graph.blockedLinks.clear();
 }
 
 /** Estación que contiene un punto (con margen), o null. */

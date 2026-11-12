@@ -36,6 +36,8 @@ export interface Order {
   /** Entidad objetivo: personaje, edificio, contenedor, objeto del suelo o nodo. */
   id?: number;
   data?: string;
+  /** Veces que el camino hasta el objetivo ha resultado imposible. */
+  fail?: number;
 }
 
 export type JobType = 'operar' | 'construir' | 'acarrear' | 'cultivar' | 'chatarrear' | 'medico' | 'guardia' | 'cocinar' | 'investigar';

@@ -43,6 +43,33 @@ function sampleHeight(type: string): number {
   return d?.tall ? 1.6 : 0.7;
 }
 
+const acc = new Float32Array(6);
+
+/** Luz que recibe una pieza. Las altas se muestrean a su alrededor: su propia huella las taparía. */
+function sampleProp(field: LightField, p: PropInst, type: string, out: Float32Array) {
+  const d = PROPS[type];
+  const y = p.y + sampleHeight(type);
+  if (d?.tall && d.foot && p.wnx === undefined) {
+    const s = p.scale ?? 1;
+    const hx = ('r' in d.foot ? d.foot.r : d.foot.hx) * s + 0.5;
+    const hz = ('r' in d.foot ? d.foot.r : d.foot.hz) * s + 0.5;
+    const c = Math.cos(p.rot);
+    const sn = Math.sin(p.rot);
+    acc.fill(0);
+    for (let k = 0; k < 4; k++) {
+      const lx = k === 0 ? hx : k === 1 ? -hx : 0;
+      const lz = k === 2 ? hz : k === 3 ? -hz : 0;
+      field.sample(p.x + lx * c + lz * sn, y, p.z - lx * sn + lz * c, 0, 1, 0, false, out);
+      for (let q = 0; q < 6; q++) acc[q] += out[q] * 0.25;
+    }
+    out.set(acc);
+    return;
+  }
+  // Las piezas de pared se muestrean un poco separadas del muro
+  const off = p.wnx !== undefined ? 0.5 : 0;
+  field.sample(p.x - (p.wnx ?? 0) * off, y, p.z - (p.wnz ?? 0) * off, 0, 1, 0, false, out);
+}
+
 export function buildPropsView(props: PropInst[], field: LightField, shared?: { material?: THREE.MeshStandardMaterial; solid?: THREE.MeshStandardMaterial }): PropsView {
   const group = new THREE.Group();
   group.name = 'atrezo';
@@ -82,9 +109,7 @@ export function buildPropsView(props: PropInst[], field: LightField, shared?: { 
       tmpQ.setFromAxisAngle(UP, p.rot);
       tmpM.compose(tmpP.set(p.x, p.y, p.z), tmpQ, tmpS.set(s, s, s));
       mesh.setMatrixAt(i, tmpM);
-      // Las piezas de pared se muestrean un poco separadas del muro
-      const off = p.wnx !== undefined ? 0.5 : 0;
-      field.sample(p.x - (p.wnx ?? 0) * off, p.y + sampleHeight(type), p.z - (p.wnz ?? 0) * off, 0, 1, 0, false, out);
+      sampleProp(field, p, type, out);
       soften(out);
       bakeCol[i * 3] = out[0];
       bakeCol[i * 3 + 1] = out[1];

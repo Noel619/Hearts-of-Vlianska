@@ -154,11 +154,23 @@ function think(sim: Sim, c: Char): void {
 // ---------------------------------------------------------------------------
 
 /** Se acerca a un punto; devuelve true cuando está a `range` o menos. */
-function approach(c: Char, x: number, z: number, range: number, run = true): boolean {
+function approach(sim: Sim, c: Char, x: number, z: number, range: number, run = true): boolean {
   const d = Math.hypot(x - c.x, z - c.z);
   if (d <= range) {
     if (c.hasDest) clearDest(c);
     return true;
+  }
+  const o = c.order;
+  if (!c.hasDest && o) {
+    // Sin destino en marcha: o es el primer intento o el anterior no encontró camino
+    o.fail = (o.fail ?? 0) + 1;
+    if (o.fail > 2) {
+      // Tan cerca como se puede: vale si el objetivo está a la vista
+      if (d <= range + 2.6 && sim.world.nav.sightLine(c.x, c.z, x, z) >= 0.99) return true;
+      if (c.player) sim.emit({ t: 'flota', x: c.x, z: c.z, text: 'No puedo llegar', color: '#d8a060' });
+      done(c);
+      return false;
+    }
   }
   setDest(c, x, z, range * 0.8, run);
   return false;
@@ -187,7 +199,7 @@ function runOrder(sim: Sim, c: Char, o: Order, dt: number): void {
       } else {
         if (t.st === 'ko' && o.data === 'rematar') {
           // Rematar a un caído
-          if (approach(c, t.x, t.z, 1.4)) c.target = t.id;
+          if (approach(sim, c, t.x, t.z, 1.4)) c.target = t.id;
         } else c.target = t.id;
       }
       break;
@@ -208,7 +220,7 @@ function runOrder(sim: Sim, c: Char, o: Order, dt: number): void {
         done(c);
         break;
       }
-      if (approach(c, dr.x, dr.z, 1.2)) {
+      if (approach(sim, c, dr.x, dr.z, 1.2)) {
         const cap = maxCarry(c) * 1.6;
         for (let i = dr.items.length - 1; i >= 0; i--) {
           const s = dr.items[i];
@@ -236,7 +248,7 @@ function runOrder(sim: Sim, c: Char, o: Order, dt: number): void {
         done(c);
         break;
       }
-      if (approach(c, tx, tz, 1.5)) {
+      if (approach(sim, c, tx, tz, 1.5)) {
         c.pose = 'arrodillado';
         c.work = 'rebuscar';
         faceTo(c, tx, tz, dt);
@@ -265,7 +277,7 @@ function runOrder(sim: Sim, c: Char, o: Order, dt: number): void {
         done(c);
         break;
       }
-      if (approach(c, t.x, t.z, 2.2, false)) {
+      if (approach(sim, c, t.x, t.z, 3.1, false)) {
         faceTo(c, t.x, t.z, dt);
         sim.emit({ t: 'mundo', k: 'hablar', id: t.id, a: c.id });
         done(c);
@@ -284,7 +296,7 @@ function runOrder(sim: Sim, c: Char, o: Order, dt: number): void {
         if (!treat(sim, c, c, dt)) done(c);
         break;
       }
-      if (approach(c, t.x, t.z, 1.3)) {
+      if (approach(sim, c, t.x, t.z, 1.3)) {
         c.pose = 'arrodillado';
         c.work = 'vendar';
         faceTo(c, t.x, t.z, dt);
@@ -298,7 +310,7 @@ function runOrder(sim: Sim, c: Char, o: Order, dt: number): void {
         done(c);
         break;
       }
-      if (approach(c, t.x, t.z, 1.2)) {
+      if (approach(sim, c, t.x, t.z, 1.2)) {
         if (t.st === 'ok' && t.side !== c.side) {
           done(c);
           break;

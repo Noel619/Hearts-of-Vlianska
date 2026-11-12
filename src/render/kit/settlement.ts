@@ -50,12 +50,46 @@ function ridgeTent(b: MeshBuilder, w: number, d: number, h: number, wall: number
       tri(0, hd);
     }
   }
-  // Palos y vientos
+  // Costuras, cumbrera y remiendos
+  const slope = Math.atan2(h - wall, hd);
+  b.color(c, 0.7);
+  const seams = Math.max(2, Math.round(w / 0.9));
+  for (const s of [-1, 1]) {
+    for (let i = 1; i < seams; i++) {
+      const x = -hw + (w * i) / seams;
+      b.beam(x, wall + 0.012, s * hd, x, h - 0.045, 0, 0.03, 0.012);
+    }
+    b.beam(-hw, wall + 0.01, s * (hd + 0.006), hw, wall + 0.01, s * (hd + 0.006), 0.012, 0.05);
+  }
+  b.color(c, 0.6).beam(-hw - 0.03, h + 0.004, 0, hw + 0.03, h + 0.004, 0, 0.1, 0.02);
+  const patches = 2 + Math.floor(rng.next() * 3);
+  for (let i = 0; i < patches; i++) {
+    const s = rng.chance(0.5) ? 1 : -1;
+    const k = rng.range(0.2, 0.8);
+    b.push().translate(rng.range(-hw + 0.4, hw - 0.4), wall + (h - wall) * k + 0.01, s * hd * (1 - k)).rotateX(s * slope).rotateY(rng.range(-0.3, 0.3));
+    b.color(vary(rng.pick([C.canvasDark, C.burlap, C.cloth, C.canvasGrey]), rng, 0.2));
+    b.cube(0, 0, 0, rng.range(0.25, 0.5), 0.012, rng.range(0.22, 0.4));
+    b.pop();
+  }
+  if (open) {
+    // Faldón recogido y farol en la puerta
+    const x = hw;
+    b.color(c, 1.08);
+    b.triangle(x + 0.02, 0, 0.5, x + 0.28, 0, 0.98, x + 0.02, h - 0.4, 0.07);
+    b.triangle(x + 0.28, 0, 0.98, x + 0.02, 0, 0.5, x + 0.02, h - 0.4, 0.07);
+    b.color(C.iron).cube(x + 0.13, h - 0.42, 0, 0.07, 0.03, 0.07);
+    bulb(b, x + 0.13, h - 0.5, 0, 0.04, C.bulb, 3.5);
+  }
+  // Palos, vientos y piquetas
   b.color(C.woodDark);
   b.cyl(hw - 0.02, 0, 0, 0.03, 0.03, h + 0.12, 5);
   b.cyl(-hw + 0.02, 0, 0, 0.03, 0.03, h + 0.12, 5);
-  b.color(C.burlap, 0.7);
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.tube([sx * hw, wall, sz * hd, sx * (hw + 0.35), 0.02, sz * (hd + 0.4)], 0.008, 3);
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      b.color(C.burlap, 0.7).tube([sx * hw, wall, sz * hd, sx * (hw + 0.35), 0.02, sz * (hd + 0.4)], 0.008, 3);
+      b.color(C.woodDark).cyl(sx * (hw + 0.35), 0, sz * (hd + 0.4), 0.02, 0.012, 0.14, 4);
+    }
+  }
 }
 
 defProp('tienda', (b, v, rng) => {
@@ -128,10 +162,22 @@ defProp('barracon', (b, v, rng) => {
   // Tejado inclinado de chapa con piedras
   b.push().translate(0, h + 0.05, 0).rotateX(0.09);
   for (let i = 0; i < 4; i++) {
-    b.color(vary(i % 2 ? C.rustDark : sheet, rng, 0.15));
-    b.cube(-w / 2 + 0.47 + i * 0.94, 0, 0, 1.0, 0.035, d + 0.5);
+    const rc = vary(i % 2 ? C.rustDark : sheet, rng, 0.15);
+    const cx = -w / 2 + 0.47 + i * 0.94;
+    b.color(rc).cube(cx, i % 2 ? 0.012 : 0, 0, 1.0, 0.035, d + 0.5 - (i % 2) * 0.12);
+    // Ondas de la chapa
+    b.color(rc, 0.72);
+    for (let k = 0; k < 5; k++) b.cube(cx - 0.4 + k * 0.2, 0.035 + (i % 2) * 0.012, 0, 0.035, 0.018, d + 0.44 - (i % 2) * 0.12);
   }
+  // Un neumático y un remiendo de lona para las goteras
+  b.color(C.rubber, 1.4).lathe(-0.9, 0.05, 0.5, [0.14, 0.02, 0.28, 0, 0.33, 0.07, 0.28, 0.14, 0.14, 0.12], 10);
+  b.color(vary(C.tarp, rng, 0.15)).cube(0.9, 0.056, -0.5, 1.1, 0.012, 0.8);
   b.pop();
+  // Ventanuco iluminado en un lateral
+  b.color([1, 0.7, 0.36]).glow(1.5);
+  b.quad(w / 2 + 0.006, 1.25, 0.35, w / 2 + 0.006, 1.25, -0.35, w / 2 + 0.006, 1.7, -0.35, w / 2 + 0.006, 1.7, 0.35);
+  b.glow(0).color(C.woodDark);
+  b.cube(w / 2 + 0.01, 1.2, 0, 0.03, 0.05, 0.8).cube(w / 2 + 0.01, 1.7, 0, 0.03, 0.05, 0.8).cube(w / 2 + 0.012, 1.25, 0, 0.02, 0.45, 0.04);
   b.color(C.stone);
   for (let i = 0; i < 4; i++) b.sphere(rng.range(-1.4, 1.4), h + 0.16, rng.range(-1, 1), 0.14, 0.09, 0.12, 5, 3);
   // Chimenea de tubo

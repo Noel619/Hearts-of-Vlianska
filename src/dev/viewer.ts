@@ -7,14 +7,17 @@ import { Gfx, type Quality } from '../render/gfx';
 import { initMaterialGlobals } from '../render/materials';
 import { buildPropsView } from '../render/propsView';
 import { buildTextures } from '../render/textures';
+import { buildWaterMesh } from '../render/waterMesh';
 import { buildWorldMesh } from '../render/worldMesh';
 import { decorate } from '../world/decor';
 import { buildLayout } from '../world/layout';
 import { LightField } from '../world/lights';
 import { addCharTest } from './charTest';
+import { startKit } from './kitView';
 
 export async function startViewer(root: HTMLElement) {
   const params = new URLSearchParams(location.search);
+  if (params.has('kit')) return startKit(root, params);
   const canvas = document.createElement('canvas');
   canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block';
   root.appendChild(canvas);
@@ -41,6 +44,7 @@ export async function startViewer(root: HTMLElement) {
     await new Promise((r) => setTimeout(r, 0));
   });
   gfx.scene.add(world.group);
+  gfx.scene.add(buildWaterMesh(layout.nav, field, tex));
   const t4 = performance.now();
   const props = buildPropsView(decor.props, field);
   gfx.scene.add(props.group);

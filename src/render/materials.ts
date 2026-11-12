@@ -346,6 +346,16 @@ export function solidMaterial(opts: { wall?: boolean; roughness?: number; metaln
   );
 }
 
+/** Agua estancada: oscura, lisa y translúcida; la opacidad va en el alfa del color de vértice. */
+export function waterMaterial(normalMap: THREE.Texture): THREE.MeshStandardMaterial {
+  const m = make(
+    { color: 0x2c4640, emissive: 0x040c0a, normalMap, vertexColors: true, roughness: 0.1, metalness: 0, transparent: true, opacity: 0.62, depthWrite: false },
+    { VL_BAKE_VERTEX: '' },
+  );
+  m.normalScale.setScalar(0.3);
+  return m;
+}
+
 /** Personajes y objetos móviles: luz por sonda (uniformes propios de cada material). */
 export function probeMaterial(opts: { roughness?: number; metalness?: number; grunge?: boolean; side?: THREE.Side } = {}): THREE.MeshStandardMaterial {
   const uniforms = {

@@ -280,7 +280,7 @@ function kiosk(b: MeshBuilder, w: number, d: number, h: number, body: RGB, roof:
   b.box(win.x, 0, z, win.w, win.y, 0.08);
   b.box(win.x, win.y + win.h, z, win.w, h - win.y - win.h, 0.08);
   // Interior iluminado
-  b.color([1, 0.78, 0.45]).glow(win.lit);
+  b.color([1, 0.78, 0.45]).glow(win.lit * 0.55);
   b.quad(wx0, win.y, z - 0.05, wx1, win.y, z - 0.05, wx1, win.y + win.h, z - 0.05, wx0, win.y + win.h, z - 0.05);
   b.glow(0);
   // Repisa
@@ -513,7 +513,7 @@ defProp('escaleraMecanica', (b, _v, rng) => {
   // Arco de salida con la compuerta hermética a medio cerrar
   for (const s of [-1, 1]) b.color(MARBLE, 0.85).box(4.7, H, s * 2.3, 0.7, 3.2, 0.8);
   b.color(MARBLE, 0.8).box(4.7, H + 3.2, 0, 0.7, 0.7, 5.4, 0b111111);
-  b.color([0.72, 0.86, 1]).glow(2.6);
+  b.color([0.45, 0.6, 0.8]).glow(0.6);
   b.quad(5.2, H, 1.9, 5.2, H, -1.9, 5.2, H + 3.2, -1.9, 5.2, H + 3.2, 1.9);
   b.glow(0);
   b.color(vary([0.26, 0.3, 0.3], rng, 0.05)).cube(5.0, H + 0.03, -0.9, 0.2, 3.1, 2.1);
@@ -568,7 +568,7 @@ defProp('pozoAire', (b, _v, rng) => {
     b.pop();
   }
   // Boca: rejilla, aspas y el resplandor azul del día polar
-  b.color([0.55, 0.75, 1]).glow(1.6).disc(0, 6.75, 0, R - 0.1, 22, 1);
+  b.color([0.2, 0.32, 0.5]).glow(0.5).disc(0, 6.75, 0, R - 0.1, 22, 1);
   b.glow(0).color(C.steelDark);
   b.cyl(0, 6.8, 0, 0.4, 0.4, 0.3, 10, 3);
   for (let i = 0; i < 6; i++) {
@@ -766,8 +766,8 @@ defProp('manantial', (b, _v, rng) => {
     b.pop();
   }
   // Agua
-  b.color([0.1, 0.9, 0.6]).glow(1.5).disc(0, 0.26, 0, 1.7, 20, 1);
-  b.color([0.6, 1, 0.85]).glow(2.4).disc(0.2, 0.265, -0.5, 0.5, 12, 1);
+  b.color([0.06, 0.55, 0.36]).glow(0.55).disc(0, 0.26, 0, 1.7, 20, 1);
+  b.color([0.3, 0.9, 0.65]).glow(0.9).disc(0.2, 0.265, -0.5, 0.5, 12, 1);
   b.glow(0);
   // La roca de la que mana y el caño
   for (let i = 0; i < 5; i++) {
@@ -777,7 +777,7 @@ defProp('manantial', (b, _v, rng) => {
     b.jitter(v0, 0.1, i + 9);
   }
   b.color(C.copper).tube([0.2, 1.25, -0.9, 0.2, 1.3, -0.6, 0.2, 1.2, -0.45], 0.05, 6);
-  b.color([0.5, 1, 0.8]).glow(2.2).tube([0.2, 1.2, -0.45, 0.2, 0.9, -0.4, 0.2, 0.27, -0.42], 0.03, 5);
+  b.color([0.4, 0.95, 0.75]).glow(1.1).tube([0.2, 1.2, -0.45, 0.2, 0.9, -0.4, 0.2, 0.27, -0.42], 0.03, 5);
   b.glow(0);
   // Musgo, ofrendas y cántaros
   b.color([0.12, 0.34, 0.14]);
