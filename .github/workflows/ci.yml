@@ -28,7 +28,7 @@ jobs:
       - run: npm run build:single
       - uses: actions/upload-artifact@v4
         with:
-          name: hearts-of-vlianska-single-file
+          name: sombras-de-vlianska-archivo-unico
           path: dist-single/index.html
       - if: github.event_name == 'workflow_dispatch' && inputs.deploy
         uses: actions/upload-pages-artifact@v3

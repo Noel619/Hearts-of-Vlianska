@@ -12,7 +12,7 @@ import { healCost, holderItems, owned, payHeal, recipeAvailable, setRecipe, tran
 import { building } from '../sim/build';
 import { addItem, countItem, invWeight, maxCarry } from '../sim/chars';
 import { relation } from '../sim/combat';
-import { buyItem, buyPrice, deliverLetter, deliverPrisoner, hire, sellItem, sellPrice, shopOf } from '../sim/events';
+import { buyItem, buyPrice, deliverLetter, deliverPrisoner, hire, payStaToll, sellItem, sellPrice, shopOf, staTollFee, staTollState } from '../sim/events';
 import type { Char } from '../sim/types';
 import { ItemIcon, Win, charTitle, itemTip, sideColor, sideName, useGame, useTick, useTooltip } from './core';
 
@@ -66,6 +66,8 @@ function DialogWin({ p }: { p: Extract<Panel, { t: 'hablar' }> }) {
   const isDoc = npc.role === 'medico' || npc.vendor === 'medico';
   const cost = isDoc ? healCost(sim, actor) : 0;
   const say = (s: string | null) => s && setText(s);
+  // En Staraya, quien no ha pagado el peaje no comercia
+  const moroso = npc.side === 'STA' && npc.ai.place === 'STA' && staTollState(sim) === 'moroso';
   return (
     <Win title={npc.name} onClose={close} cls="dialog">
       <div className="row" style={{ marginBottom: 8 }}>
@@ -76,7 +78,7 @@ function DialogWin({ p }: { p: Extract<Panel, { t: 'hablar' }> }) {
       {npc.bio && <p className="dim">{npc.bio}</p>}
       <p className="quote">{text ?? (rel < -20 ? 'No tengo nada que hablar contigo.' : `«${greet[(npc.id + n) % greet.length]}»`)}</p>
       <div className="opts">
-        {npc.vendor && rel > -40 && (
+        {npc.vendor && rel > -40 && !moroso && (
           <button
             className="btn"
             onClick={() => {
@@ -85,6 +87,11 @@ function DialogWin({ p }: { p: Extract<Panel, { t: 'hablar' }> }) {
             }}
           >
             Comerciar
+          </button>
+        )}
+        {moroso && (
+          <button className="btn" disabled={sim.state.money < staTollFee(sim)} onClick={() => say(payStaToll(sim) ?? '«Así sí. Bienvenidos a la Encrucijada.»')}>
+            Pagar el peaje de Staraya ({staTollFee(sim)} cartuchos)
           </button>
         )}
         {isDoc && rel > -30 && (
@@ -345,6 +352,53 @@ function TollWin({ p }: { p: Extract<Panel, { t: 'peaje' }> }) {
   const sim = g.sim;
   const npc = sim.char(p.npc);
   if (!npc) return null;
+  if (npc.side === 'STA') {
+    // Cinco túneles, cinco peajes
+    const fee = staTollFee(sim);
+    const union = sim.state.rep.UNI >= 40;
+    return (
+      <Win title="Peaje de Staraya" cls="dialog">
+        <p className="quote">
+          «Alto. Estáis en la Encrucijada: cinco túneles, cinco peajes. Son {fee} cartuchos por vuestra gente y lo que lleváis encima. Quien paga, comercia; quien no, media vuelta.»
+        </p>
+        <p className="dim">{npc.name}, del Consejo Mercantil, apunta algo en una libreta sin levantar la vista. Detrás, los mercenarios miran vuestras mochilas.</p>
+        <div className="opts">
+          <button
+            className="btn"
+            disabled={sim.state.money < fee}
+            onClick={() => {
+              payStaToll(sim);
+              g.closePanel();
+            }}
+          >
+            Pagar {fee} cartuchos
+          </button>
+          {union && (
+            <button
+              className="btn"
+              onClick={() => {
+                sim.state.flags.peajePagado = sim.day + 1;
+                sim.log('Enseñas el salvoconducto de la Unión: por el Acuerdo de Libre Paso, sus caravanas no pagan en Staraya.', 'bueno');
+                g.closePanel();
+              }}
+            >
+              «Venimos con la Unión: libre paso.»
+            </button>
+          )}
+          <button
+            className="btn danger"
+            onClick={() => {
+              sim.rep('STA', -4, 'negarte a pagar el peaje');
+              sim.log('No pagas el peaje. En Staraya nadie te venderá nada hasta que lo hagas.', 'malo');
+              g.closePanel();
+            }}
+          >
+            «Solo estamos de paso.»
+          </button>
+        </div>
+      </Win>
+    );
+  }
   const toll = Math.max(20, Math.min(160, Math.round(sim.state.money * 0.25)));
   const sq = npc.squad ? sim.squad(npc.squad) : null;
   return (

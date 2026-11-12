@@ -7,7 +7,7 @@ import { FACTION_LORE } from '../data/historia/facciones';
 import { ITEMS, type ItemDef, type Stack } from '../data/items';
 import type { FactionId, SideId } from '../data/tipos';
 import { F_DYN, F_TALL } from '../world/grid';
-import { linkPointAt } from '../world/layout';
+import { insideStation, linkPointAt } from '../world/layout';
 import { COLLAPSE_NODES } from '../world/plans';
 import { addItem, countItem, gainXp, invWeight, maxCarry, takeItem } from './chars';
 import { hasTech } from './build';
@@ -510,11 +510,57 @@ export function stepWorldEvents(sim: Sim, dt: number) {
       if (lead) sim.emit({ t: 'mundo', k: 'peaje', id: lead.id });
     }
   }
+  // El peaje de Staraya: se cobra al entrar, una vez por jornada
+  if (st.stations.STA?.owner === 'STA' && staTollState(sim) === 'libre' && st.rep.STA < 15 && st.rep.STA > -40) {
+    const f = sim.world.layout.stationById.STA;
+    const inside = sim.players.find((c) => c.st === 'ok' && insideStation(f, c.x, c.z, -7));
+    if (inside) {
+      let best: Char | null = null;
+      let bd = 45;
+      for (const c of st.chars) {
+        if (c.side !== 'STA' || c.st !== 'ok' || c.squad) continue;
+        const d = Math.hypot(c.x - inside.x, c.z - inside.z) - (c.bio?.startsWith('Cobrador') ? 12 : 0);
+        if ((c.ai.mode === 'guardia' || c.bio?.startsWith('Cobrador')) && d < bd) {
+          bd = d;
+          best = c;
+        }
+      }
+      if (best) {
+        st.flags.peajeSTA = sim.day + 1;
+        sim.emit({ t: 'mundo', k: 'peaje', id: best.id });
+      }
+    }
+  }
   // La radio: el final abierto de la historia
   if (!st.flags.senal) {
     const radio = st.buildings.find((b) => b.prog >= 1 && BUILDS[b.def].radio && b.user);
     void radio;
   }
+}
+
+/** Peaje de Staraya: tanto por cabeza y una parte de lo que se lleva en la bolsa. */
+export function staTollFee(sim: Sim): number {
+  const heads = sim.players.filter((c) => c.st !== 'muerto').length;
+  return Math.max(8, heads * 5 + Math.round(sim.state.money * 0.04));
+}
+
+/** ¿Cómo está hoy la escuadra con los cobradores de Staraya? */
+export function staTollState(sim: Sim): 'libre' | 'pagado' | 'moroso' {
+  const today = sim.day + 1;
+  if (sim.state.flags.peajePagado === today) return 'pagado';
+  if (sim.state.flags.peajeSTA === today) return 'moroso';
+  return 'libre';
+}
+
+export function payStaToll(sim: Sim): string | null {
+  const fee = staTollFee(sim);
+  if (sim.state.money < fee) return 'No tienes cartuchos suficientes';
+  sim.state.money -= fee;
+  sim.state.flags.peajePagado = sim.day + 1;
+  sim.rep('STA', 1);
+  sim.log(`Pagas ${fee} cartuchos de peaje al Consejo Mercantil de Staraya.`, 'info');
+  sim.emit({ t: 'sonido', k: 'moneda', x: NaN, z: NaN });
+  return null;
 }
 
 function raid(sim: Sim, base: { x: number; z: number; n: number }) {

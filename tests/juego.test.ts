@@ -5,7 +5,7 @@ import { ITEMS } from '../src/data/items';
 import { setRecipe, startResearch } from '../src/sim/actions';
 import { canPlace, placeBuilding, restoreBuildings } from '../src/sim/build';
 import { addItem, countItem } from '../src/sim/chars';
-import { applyNodes, buyItem, hire, sellItem, shopOf } from '../src/sim/events';
+import { applyNodes, buyItem, hire, payStaToll, sellItem, shopOf, staTollFee, staTollState } from '../src/sim/events';
 import { newGame } from '../src/sim/newGame';
 import { deserialize, serialize } from '../src/sim/save';
 import { Sim } from '../src/sim/sim';
@@ -173,6 +173,31 @@ describe('partida', () => {
     expect(hire(sim, recruit)).toBeNull();
     sim.reindex();
     expect(sim.players.length).toBe(n + 1);
+  });
+
+  it('cobra el peaje de Staraya a quien entra en la Encrucijada', () => {
+    const sim = newGame(world, { scenario: 'nadie', seed: 14 });
+    const f = world.layout.stationById.STA;
+    // La escuadra aparece en mitad del andén de Staraya
+    sim.players.forEach((c, i) => {
+      const p = world.nav.nearestPassable(f.x + i * 0.8, f.z, 8)!;
+      c.x = p.x;
+      c.z = p.z;
+    });
+    expect(staTollState(sim)).toBe('libre');
+    let asked = false;
+    for (let i = 0; i < 30 * 20 && !asked; i++) {
+      sim.step(1 / 30);
+      asked = sim.events.some((e) => e.t === 'mundo' && e.k === 'peaje');
+      sim.events.length = 0;
+    }
+    expect(asked).toBe(true);
+    expect(staTollState(sim)).toBe('moroso');
+    const money = sim.state.money;
+    const fee = staTollFee(sim);
+    expect(payStaToll(sim)).toBeNull();
+    expect(sim.state.money).toBe(money - fee);
+    expect(staTollState(sim)).toBe('pagado');
   });
 
   it('aguanta diez minutos de metro en cada comienzo', () => {
