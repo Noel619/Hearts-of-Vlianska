@@ -298,7 +298,10 @@ export class Game {
         }
         case 'ataque': {
           const c = sim.char(e.id);
-          if (c) this.onSound?.('silbido', c.x, c.z, 0.5);
+          if (!c) break;
+          // Las fieras se anuncian; la gente solo corta el aire
+          if (c.kind === 'humano') this.onSound?.('silbido', c.x, c.z, 0.5);
+          else if (Math.random() < 0.6) this.onSound?.(c.kind === 'rata' ? 'chillido' : c.kind === 'glubinnik' || c.kind === 'sheptun' ? 'rugido' : 'grunido', c.x, c.z);
           break;
         }
         case 'ko':
@@ -307,6 +310,7 @@ export class Game {
           if (c) {
             this.fx.dust(c.x, nav.heightAt(c.x, c.z) + 0.2, c.z, 6);
             this.onSound?.('caida', c.x, c.z);
+            if (e.t === 'muerte' && c.player) this.onSound?.('muerte', NaN, NaN);
           }
           break;
         }
@@ -319,10 +323,12 @@ export class Game {
         case 'nivel': {
           const c = sim.char(e.id);
           if (c) this.fx.text(c.x, nav.heightAt(c.x, c.z) + 2.2, c.z, `${SKILLS[e.skill].name} ${e.lvl}`, '#9fe0a0');
+          if (c?.player && e.lvl % 5 === 0) this.onSound?.('nivel', NaN, NaN);
           break;
         }
         case 'obra':
           this.lightSig = '';
+          if (e.k === 'lista') this.onSound?.('hecho', NaN, NaN);
           break;
         case 'mundo': {
           if (e.k === 'hablar' && e.id && e.a) {

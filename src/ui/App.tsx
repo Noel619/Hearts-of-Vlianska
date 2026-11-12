@@ -1,6 +1,8 @@
 // Aplicación: carga del mundo, menú principal, comienzo de partida y juego.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { audio } from '../audio';
+import { attachAudio } from '../audio/director';
 import { SCENARIOS } from '../data/escenarios';
 import { LORE } from '../data/historia/cronica';
 import { Game, type Shared } from '../game/game';
@@ -9,7 +11,7 @@ import { listSaves, loadGame, saveGame } from '../sim/save';
 import { GameCtx, hex } from './core';
 import { ContextMenuView, InspectPanel, LogView, Overlays, SelectionPanel, SquadBar, TopBar, type Screen } from './Hud';
 import { PanelView } from './Panels';
-import { BuildScreen, CodexScreen, FactionsScreen, GameOver, HelpBody, LogScreen, MapScreen, PauseScreen, ResearchScreen } from './Screens';
+import { BuildScreen, CodexScreen, FactionsScreen, GameOver, HelpBody, LogScreen, MapScreen, PauseScreen, ResearchScreen, SettingsBody } from './Screens';
 import { Win } from './core';
 
 const COLORS = [0xd8c27a, 0xc86a4a, 0x7fb8c9, 0x9fc77a, 0xc9a0d8, 0xe0e0e0];
@@ -30,7 +32,7 @@ export function App() {
   const [progress, setProgress] = useState({ label: 'Preparando', frac: 0 });
   const [game, setGame] = useState<Game | null>(null);
   const [screen, setScreen] = useState<Screen>(null);
-  const [menuView, setMenuView] = useState<'main' | 'cronica' | 'ayuda' | 'cargar'>('main');
+  const [menuView, setMenuView] = useState<'main' | 'cronica' | 'ayuda' | 'cargar' | 'ajustes'>('main');
   const [error, setError] = useState<string | null>(null);
   const [quote] = useState(() => QUOTES[Math.floor(Math.random() * QUOTES.length)]);
   const [, force] = useState(0);
@@ -55,6 +57,7 @@ export function App() {
       g.start();
       setGame(g);
       (window as unknown as Record<string, unknown>).__game = g;
+      (window as unknown as Record<string, unknown>).__audio = audio;
       setMode(direct ? 'juego' : 'menu');
       (window as unknown as Record<string, unknown>).__ready = true;
     })().catch((e) => {
@@ -67,17 +70,45 @@ export function App() {
     };
   }, []);
 
-  // En el menú la cámara orbita despacio y no hay selección
+  // En el menú la cámara orbita despacio sobre el andén donde espera la escuadra de fondo
   useEffect(() => {
     if (!game) return;
     if (mode !== 'menu' && mode !== 'nueva') return;
     game.selected = [];
-    const f = game.shared.world.layout.stationById.STA;
-    game.rig.jump(f.x - 20, f.z, 30, 0.4, 0.62);
+    const p = game.sim.players[0];
+    const f = game.shared.world.layout.stationById.TSE;
+    game.rig.jump(p ? p.x - f.ax * 9 : f.x, p ? p.z - f.az * 9 : f.z, 27, 0.4, 0.6);
     game.paused = false;
     const id = setInterval(() => game.rig.rotate(0.0012, 0), 16);
     return () => clearInterval(id);
   }, [game, mode]);
+
+  // Sonido: se desbloquea con el primer gesto; el menú tiene su canción y la partida su director
+  useEffect(() => {
+    const unlock = () => audio.unlock();
+    const click = (e: MouseEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el?.closest('button, .card, .swatch')) audio.play('click');
+    };
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
+    document.addEventListener('click', click, true);
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+      document.removeEventListener('click', click, true);
+    };
+  }, []);
+  useEffect(() => {
+    if (!game) return;
+    if (mode === 'juego') return attachAudio(game);
+    audio.setMood('menu');
+    audio.setAmbience('menu');
+    return undefined;
+  }, [game, mode]);
+  useEffect(() => {
+    if (mode === 'juego') audio.play(screen ? 'abrir' : 'cerrar');
+  }, [screen, mode]);
 
   // Atajos de las pantallas
   useEffect(() => {
@@ -192,6 +223,9 @@ export function App() {
                 <button className="btn big" onClick={() => setMenuView('ayuda')}>
                   Cómo se juega
                 </button>
+                <button className="btn big" onClick={() => setMenuView('ajustes')}>
+                  Ajustes
+                </button>
                 <div className="sp" />
                 <div className="dim" style={{ fontSize: 12 }}>
                   Universo, historia y mapa de Vlianska: Noel619.
@@ -212,6 +246,11 @@ export function App() {
               {menuView === 'ayuda' && (
                 <Win title="Cómo se juega" onClose={() => setMenuView('main')} width={700}>
                   <HelpBody />
+                </Win>
+              )}
+              {menuView === 'ajustes' && (
+                <Win title="Ajustes" onClose={() => setMenuView('main')} width={460}>
+                  <SettingsBody />
                 </Win>
               )}
               {menuView === 'cargar' && (

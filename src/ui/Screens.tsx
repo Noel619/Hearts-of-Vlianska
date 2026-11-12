@@ -2,6 +2,7 @@
 // facciones, crónica, menú de pausa y fin de partida.
 
 import { useEffect, useRef, useState } from 'react';
+import { audio, type Volumes } from '../audio';
 import { BUILD_CATS, BUILD_LIST, TECHS, TECH_LIST, type BuildCat } from '../data/edificios';
 import { LORE } from '../data/historia/cronica';
 import { FACTION_IDS, FACTION_LORE } from '../data/historia/facciones';
@@ -407,7 +408,7 @@ export function HelpBody() {
 
 export function PauseScreen({ close, exit, open }: { close: () => void; exit: () => void; open: (s: Screen) => void }) {
   const g = useGame();
-  const [view, setView] = useState<'menu' | 'guardar' | 'cargar' | 'ayuda'>('menu');
+  const [view, setView] = useState<'menu' | 'guardar' | 'cargar' | 'ayuda' | 'ajustes'>('menu');
   const [msg, setMsg] = useState('');
   const saves = listSaves();
   const slots = ['partida1', 'partida2', 'partida3'];
@@ -415,6 +416,12 @@ export function PauseScreen({ close, exit, open }: { close: () => void; exit: ()
     return (
       <Win title="Cómo se juega" onClose={() => setView('menu')} width={700}>
         <HelpBody />
+      </Win>
+    );
+  if (view === 'ajustes')
+    return (
+      <Win title="Ajustes" onClose={() => setView('menu')} width={460}>
+        <SettingsBody />
       </Win>
     );
   if (view === 'guardar' || view === 'cargar')
@@ -470,6 +477,9 @@ export function PauseScreen({ close, exit, open }: { close: () => void; exit: ()
         <button className="btn big" onClick={() => open('registro')}>
           Diario
         </button>
+        <button className="btn big" onClick={() => setView('ajustes')}>
+          Ajustes
+        </button>
         <button className="btn big" onClick={() => setView('ayuda')}>
           Cómo se juega
         </button>
@@ -478,6 +488,61 @@ export function PauseScreen({ close, exit, open }: { close: () => void; exit: ()
         </button>
       </div>
     </Win>
+  );
+}
+
+/** Volúmenes y calidad gráfica. */
+export function SettingsBody() {
+  const [v, setV] = useState<Volumes>(audio.volumes);
+  const [q, setQ] = useState<string>(() => localStorage.getItem('sombras:calidad') ?? 'media');
+  const [changed, setChanged] = useState(false);
+  const set = (patch: Partial<Volumes>) => {
+    const n = { ...v, ...patch };
+    setV(n);
+    audio.setVolumes(n);
+  };
+  const slider = (label: string, key: 'master' | 'music' | 'ambience' | 'sfx') => (
+    <label className="slider">
+      <span>{label}</span>
+      <input type="range" min={0} max={100} value={Math.round(v[key] * 100)} onChange={(e) => set({ [key]: Number(e.target.value) / 100 })} />
+      <b>{Math.round(v[key] * 100)}</b>
+    </label>
+  );
+  return (
+    <div className="col settings">
+      <h4>Sonido</h4>
+      {slider('General', 'master')}
+      {slider('Música', 'music')}
+      {slider('Ambiente', 'ambience')}
+      {slider('Efectos', 'sfx')}
+      <button className={'btn' + (v.muted ? ' on' : '')} onClick={() => set({ muted: !v.muted })}>
+        {v.muted ? 'Sonido apagado' : 'Silenciar todo'}
+      </button>
+      <h4 style={{ marginTop: 14 }}>Gráficos</h4>
+      <div className="row">
+        {(['baja', 'media', 'alta'] as const).map((k) => (
+          <button
+            key={k}
+            className={'btn grow' + (q === k ? ' on' : '')}
+            onClick={() => {
+              localStorage.setItem('sombras:calidad', k);
+              setQ(k);
+              setChanged(true);
+            }}
+          >
+            {k === 'baja' ? 'Baja' : k === 'media' ? 'Media' : 'Alta'}
+          </button>
+        ))}
+      </div>
+      <p className="dim" style={{ fontSize: 12, margin: 0 }}>
+        Baja: sin sombras ni resplandor. Alta: sombras nítidas y más resolución. La calidad se aplica al recargar la página; guarda antes la partida.
+      </p>
+      {changed && (
+        <button className="btn" onClick={() => location.reload()}>
+          Recargar ahora
+        </button>
+      )}
+    </div>
   );
 }
 

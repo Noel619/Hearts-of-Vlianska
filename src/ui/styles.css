@@ -957,3 +957,49 @@ kbd {
   gap: 6px 14px;
   align-items: center;
 }
+
+/* --- Ajustes ------------------------------------------------------------- */
+.settings h4 {
+  margin: 0 0 2px;
+  font-family: var(--stencil, inherit);
+  letter-spacing: 0.08em;
+  color: var(--amber2);
+  text-transform: uppercase;
+  font-size: 14px;
+}
+.slider {
+  display: grid;
+  grid-template-columns: 90px 1fr 34px;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+.slider b {
+  text-align: right;
+  color: var(--amber2);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.slider input[type='range'] {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 4px;
+  background: var(--line2);
+  outline: none;
+}
+.slider input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 18px;
+  background: var(--amber);
+  border: 1px solid #000;
+  cursor: pointer;
+}
+.slider input[type='range']::-moz-range-thumb {
+  width: 12px;
+  height: 18px;
+  background: var(--amber);
+  border: 1px solid #000;
+  border-radius: 0;
+  cursor: pointer;
+}
