@@ -226,7 +226,7 @@ export function MapScreen({ close }: { close: () => void }) {
         ref={ref}
         width={W}
         height={H}
-        style={{ display: 'block', maxWidth: '100%', cursor: 'crosshair', border: '1px solid var(--line)' }}
+        style={{ display: 'block', maxWidth: '100%', maxHeight: 'calc(100vh - 200px)', width: 'auto', height: 'auto', margin: '0 auto', cursor: 'crosshair', border: '1px solid var(--line)' }}
         onClick={(e) => {
           const r = e.currentTarget.getBoundingClientRect();
           const x = b.minX + ((e.clientX - r.left) / r.width) * (b.maxX - b.minX);
