@@ -57,7 +57,7 @@ const SODIUM = 0xffa246;
 export const PROPS: Record<string, PropDef> = {
   // --- Arquitectura
   pilar: { foot: { r: 0.55 }, tall: true, variants: 3 },
-  portal: { wall: false },
+  portal: { variants: 3 },
   tope: { foot: { hx: 0.35, hz: 1.1 } },
   // --- Luz
   lamparaPared: { wall: true, light: { color: BULB, intensity: 1.0, radius: 15, y: 0, oz: 0.75 } },
@@ -90,8 +90,8 @@ export const PROPS: Record<string, PropDef> = {
   alfombra: { variants: 3 },
   estanteria: { foot: { hx: 0.9, hz: 0.25 }, tall: true, variants: 2 },
   barra: { foot: { hx: 1.6, hz: 0.4 } },
-  estandarte: { wall: true },
-  bandera: { foot: { r: 0.12 } },
+  estandarte: { wall: true, variants: 8 },
+  bandera: { foot: { r: 0.12 }, variants: 8 },
   cartel: { wall: true, variants: 6 },
   rotulo: { wall: true },
   tablon: { foot: { hx: 0.8, hz: 0.12 } },
@@ -146,7 +146,7 @@ export const PROPS: Record<string, PropDef> = {
   // --- Hitos
   escaleraMecanica: { foot: { hx: 5.5, hz: 5 }, tall: true, unique: true, light: { color: 0xbcd8ff, intensity: 1.5, radius: 24, y: 4, ox: 3 } },
   pozoAire: { foot: { r: 3.4 }, tall: true, unique: true, light: { color: 0xa9c8ff, intensity: 0.7, radius: 16, y: 3.5 } },
-  edificioQuemado: { foot: { hx: 6, hz: 4 }, tall: true, unique: true },
+  edificioQuemado: { foot: { hx: 6, hz: 4 }, tall: true, unique: true, light: { color: 0xff8a4a, intensity: 0.45, radius: 11, y: 1.4, oz: 5.4, flicker: 1, kind: 'fire' } },
   correos: { foot: { hx: 2.0, hz: 1.4 }, tall: true, unique: true, light: { color: BULB, intensity: 0.7, radius: 9, y: 2.2, oz: 1.6 } },
   comisaria: { foot: { hx: 2.4, hz: 1.6 }, tall: true, unique: true, light: { color: 0x5fa0ff, intensity: 0.6, radius: 10, y: 2.8, oz: 1.8 } },
   mesaConferencia: { foot: { r: 2.3 }, unique: true },
@@ -162,6 +162,9 @@ export const PROPS: Record<string, PropDef> = {
   arsenal: { foot: { hx: 1.4, hz: 0.4 }, tall: true, variants: 2 },
   muroHormigon: { foot: { hx: 2.0, hz: 0.4 }, tall: true, variants: 2 },
   portonEstacion: { unique: true },
+  // --- Obra del jugador
+  muroChapa: { foot: { hx: 1.5, hz: 0.25 }, tall: true },
+  portonChapa: { foot: { hx: 1.5, hz: 0.3 }, tall: true },
   radio: { foot: { hx: 0.7, hz: 0.4 }, light: { color: 0xffd060, intensity: 0.1, radius: 4, y: 1.1, kind: 'glow' } },
 };
 

@@ -21,19 +21,39 @@ const OFF = 115;
 interface Runtime {
   spotUser: Map<number, number>;
   spotsByPlace: Map<string, number[]>;
+  /** Centro y radio de cada lugar con residentes. */
+  places: Map<string, { x: number; z: number; rad: number }>;
   active: Set<string>;
 }
+
+/** Puntos que ocupa gente (el resto son objetos del mundo). */
+const PEOPLE_SPOTS = new Set(['guardia', 'vendedor', 'bar', 'medico', 'recluta', 'lider', 'figura', 'peaje']);
 const RT = new WeakMap<Sim, Runtime>();
 
 function rt(sim: Sim): Runtime {
   let r = RT.get(sim);
   if (!r) {
-    r = { spotUser: new Map(), spotsByPlace: new Map(), active: new Set() };
+    r = { spotUser: new Map(), spotsByPlace: new Map(), places: new Map(), active: new Set() };
+    const box = new Map<string, [number, number, number, number]>();
     sim.world.decor.spots.forEach((s, i) => {
       let a = r!.spotsByPlace.get(s.place);
       if (!a) r!.spotsByPlace.set(s.place, (a = []));
       a.push(i);
+      if (!PEOPLE_SPOTS.has(s.kind)) return;
+      const b = box.get(s.place);
+      if (!b) box.set(s.place, [s.x, s.z, s.x, s.z]);
+      else {
+        b[0] = Math.min(b[0], s.x);
+        b[1] = Math.min(b[1], s.z);
+        b[2] = Math.max(b[2], s.x);
+        b[3] = Math.max(b[3], s.z);
+      }
     });
+    for (const [place, b] of box) {
+      const f = sim.world.layout.stationById[place];
+      if (f) r.places.set(place, { x: f.x, z: f.z, rad: Math.max(f.hl, f.hw) });
+      else r.places.set(place, { x: (b[0] + b[2]) / 2, z: (b[1] + b[3]) / 2, rad: Math.hypot(b[2] - b[0], b[3] - b[1]) / 2 + 6 });
+    }
     // Los residentes ya presentes (partida cargada) siguen activos
     for (const c of sim.state.chars) if (c.slot) r.active.add(c.slot.split(':')[0]);
     RT.set(sim, r);
@@ -166,24 +186,36 @@ function spawnPlace(sim: Sim, place: string) {
     c.face = sp.rot;
     sim.addChar(c);
   };
+  const ROLES = ROLE_NAMES as Record<string, string>;
   for (const i of list) {
     const sp = spots[i];
     const slot = `${place}:${i}`;
     if (sim.state.chars.some((c) => c.slot === slot)) continue;
     if (sp.kind === 'lider' || sp.kind === 'figura') {
-      if (sp.data) spawnFigure(sim, sp.data, sp.x, sp.z, sp.rot, place);
+      if (sp.data) {
+        const fig = spawnFigure(sim, sp.data, sp.x, sp.z, sp.rot, place);
+        if (fig && sp.shop && !fig.vendor) fig.vendor = sp.shop;
+      }
       continue;
     }
-    if (!owner && sp.kind !== 'nido') continue;
+    if (!PEOPLE_SPOTS.has(sp.kind)) continue;
+    const side = (sp.side ?? owner) as SideId | null;
+    if (!side) continue;
     if (!alive(slot)) continue;
     const seed = seedFrom(slot, sim.state.seed + (st?.dead[slot] ?? 0));
-    if (sp.kind === 'guardia') {
-      const role: Role = sp.data === 'elite' ? 'elite' : sp.data === 'oficial' ? 'oficial' : (seed & 3) === 0 ? 'soldado' : 'guardia';
-      const c = makeHuman(sim, owner!, owner === 'VHL' ? 'bandido' : owner === 'STA' && (seed & 1) === 0 ? 'mercenario' : role, sp.x, sp.z, seed);
+    if (sp.kind === 'guardia' || sp.kind === 'peaje') {
+      let role: Role;
+      if (sp.data && ROLES[sp.data]) role = sp.data as Role;
+      else if (side === 'VHL') role = 'bandido';
+      else if (side === 'LIB') role = 'mercenario';
+      else if (side === 'STA' && (seed & 1) === 0) role = 'mercenario';
+      else role = (seed & 3) === 0 ? 'soldado' : 'guardia';
+      const c = makeHuman(sim, side, role, sp.x, sp.z, seed);
+      if (sp.kind === 'peaje') c.bio = 'Cobrador del Consejo Mercantil. Cinco túneles, cinco peajes.';
       base(c, slot, sp, 'guardia');
       n++;
     } else if (sp.kind === 'vendedor' || sp.kind === 'bar' || sp.kind === 'medico') {
-      const c = makeHuman(sim, owner!, sp.kind === 'medico' ? 'medico' : 'comerciante', sp.x, sp.z, seed);
+      const c = makeHuman(sim, side, sp.kind === 'medico' ? 'medico' : 'comerciante', sp.x, sp.z, seed);
       c.vendor = sp.data ?? 'bazar';
       base(c, slot, sp, 'vendedor');
       n++;
@@ -542,19 +574,13 @@ let roamT = 0;
 
 export function updatePopulation(sim: Sim, dt: number) {
   const r = rt(sim);
-  // Estaciones y cruces con residentes
-  for (const [place] of r.spotsByPlace) {
-    const p = placePos(sim, place);
-    if (!p) continue;
-    const f = sim.world.layout.stationById[place];
-    const rad = f ? Math.max(f.hl, f.hw) : 12;
+  // Estaciones, cruces y altos del camino con residentes
+  for (const [place, p] of r.places) {
     const d = sim.playerDist(p.x, p.z);
-    if (!r.active.has(place) && d < rad + ON) {
+    if (!r.active.has(place) && d < p.rad + ON) {
       r.active.add(place);
       spawnPlace(sim, place);
-      const st = sim.state.stations[place];
-      if (st && !st.visited && d < rad + 20) st.visited = true;
-    } else if (r.active.has(place) && d > rad + OFF) {
+    } else if (r.active.has(place) && d > p.rad + OFF) {
       r.active.delete(place);
       despawnPlace(sim, place);
     }

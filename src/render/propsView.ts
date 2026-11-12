@@ -9,6 +9,8 @@ import { MeshBuilder, lin } from './geo';
 import { drawProp, propGeometry } from './kit/core';
 import { propMaterial, solidMaterial } from './materials';
 import './kit/basics';
+import './kit/settlement';
+import './kit/landmarks';
 
 const TILE = 96;
 
@@ -23,6 +25,16 @@ const tmpQ = new THREE.Quaternion();
 const tmpS = new THREE.Vector3();
 const tmpP = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
+
+/** Comprime la luz horneada muy intensa (piezas pegadas a una lámpara) para que no se queme. */
+function soften(out: Float32Array | number[], limit = 1.0, extra = 0.5) {
+  const mx = Math.max(out[0], out[1], out[2]);
+  if (mx <= limit) return;
+  const k = (limit + extra * (1 - Math.exp(-(mx - limit) / extra))) / mx;
+  out[0] *= k;
+  out[1] *= k;
+  out[2] *= k;
+}
 
 /** Altura a la que se muestrea la luz de cada pieza. */
 function sampleHeight(type: string): number {
@@ -73,11 +85,10 @@ export function buildPropsView(props: PropInst[], field: LightField, shared?: { 
       // Las piezas de pared se muestrean un poco separadas del muro
       const off = p.wnx !== undefined ? 0.5 : 0;
       field.sample(p.x - (p.wnx ?? 0) * off, p.y + sampleHeight(type), p.z - (p.wnz ?? 0) * off, 0, 1, 0, false, out);
-      const mx = Math.max(out[0], out[1], out[2], 1e-6);
-      const k = mx > 2.6 ? 2.6 / mx : 1;
-      bakeCol[i * 3] = out[0] * k;
-      bakeCol[i * 3 + 1] = out[1] * k;
-      bakeCol[i * 3 + 2] = out[2] * k;
+      soften(out);
+      bakeCol[i * 3] = out[0];
+      bakeCol[i * 3 + 1] = out[1];
+      bakeCol[i * 3 + 2] = out[2];
       bakeDir[i * 3] = out[3];
       bakeDir[i * 3 + 1] = out[4];
       bakeDir[i * 3 + 2] = out[5];
@@ -142,6 +153,7 @@ export function buildPropsView(props: PropInst[], field: LightField, shared?: { 
     for (let i = 0; i < n; i++) {
       const q = i * 3;
       field.sample(b.pos[q], b.pos[q + 1], b.pos[q + 2], b.nor[q], b.nor[q + 1], b.nor[q + 2], true, out, false);
+      soften(out, 1.0, 0.6);
       bakeCol[q] = out[0];
       bakeCol[q + 1] = out[1];
       bakeCol[q + 2] = out[2];
