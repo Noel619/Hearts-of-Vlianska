@@ -355,7 +355,7 @@ export function buildHumanoid(look: Look): THREE.BufferGeometry {
   const rubber: RGB = look.mask === 'antigas' ? [0.1, 0.105, 0.1] : lin(look.hatColor);
   const faceC = masked ? rubber : skin;
   const stub = !masked && look.facial === 'barba3' ? mixc(skin, hair, 0.32) : faceC;
-  const hs = fem ? 0.95 : 1;
+  const hs = fem ? 1.02 : 1.07;
   column(
     sb,
     [
@@ -391,7 +391,7 @@ export function buildHumanoid(look: Look): THREE.BufferGeometry {
     const hc = look.hair === 'rapado' ? mixc(skin, hair, 0.55) : hair;
     sb.color(hc);
     const thick = look.hair === 'rapado' ? 0.003 : 0.012;
-    if (!hatCovers || look.hair === 'rapado') sb.blob(0, 1.715, -0.012, (0.084 + thick) * hs, 0.082 + thick, (0.098 + thick) * hs, 12, 5, HW, 0.5, 1);
+    if (!hatCovers || look.hair === 'rapado') sb.blob(0, 1.715, -0.012, (0.086 + thick) * hs, 0.098 + thick, (0.1 + thick) * hs, 12, 5, HW, 0.5, 1);
     // Parte trasera y laterales
     sb.blob(0, 1.69, -0.028, (0.083 + thick) * hs, 0.075, (0.085 + thick) * hs, 12, 4, HW, 0.25, 0.75);
     if (look.hair === 'largo') {
@@ -426,52 +426,52 @@ export function buildHumanoid(look: Look): THREE.BufferGeometry {
   const hatC = lin(look.hatColor);
   switch (look.hat) {
     case 'gorra':
-      sb.color(hatC).blob(0, 1.735, -0.006, 0.094, 0.062, 0.106, 12, 4, HW, 0.42, 1);
-      sb.color(scalec(hatC, 0.7)).box(0, 1.742, 0.118, 0.12, 0.012, 0.075, HW);
+      sb.color(hatC).blob(0, 1.738, -0.006, 0.1, 0.086, 0.114, 12, 4, HW, 0.42, 1);
+      sb.color(scalec(hatC, 0.7)).box(0, 1.742, 0.128, 0.12, 0.012, 0.075, HW);
       break;
     case 'plato': {
       column(
         sb,
         [
-          { y: 1.74, rx: 0.09, rz: 0.102, w: HW, c: scalec(hatC, 0.55) },
-          { y: 1.78, rx: 0.092, rz: 0.104, w: HW, c: hatC },
-          { y: 1.815, rx: 0.125, rz: 0.135, w: HW, c: hatC, cz: 0.006 },
-          { y: 1.83, rx: 0.12, rz: 0.13, w: HW, c: scalec(hatC, 1.1), cz: 0.006 },
+          { y: 1.745, rx: 0.096, rz: 0.11, w: HW, c: scalec(hatC, 0.55) },
+          { y: 1.79, rx: 0.098, rz: 0.112, w: HW, c: hatC },
+          { y: 1.825, rx: 0.13, rz: 0.142, w: HW, c: hatC, cz: 0.006 },
+          { y: 1.84, rx: 0.125, rz: 0.136, w: HW, c: scalec(hatC, 1.1), cz: 0.006 },
         ],
         12,
         true,
       );
-      sb.color([0.03, 0.03, 0.03]).box(0, 1.742, 0.125, 0.13, 0.01, 0.07, HW);
-      sb.color([0.62, 0.5, 0.18]).box(0, 1.775, 0.106, 0.03, 0.03, 0.008, HW);
+      sb.color([0.03, 0.03, 0.03]).box(0, 1.748, 0.135, 0.13, 0.01, 0.07, HW);
+      sb.color([0.62, 0.5, 0.18]).box(0, 1.782, 0.115, 0.03, 0.03, 0.008, HW);
       break;
     }
     case 'ushanka':
-      sb.color(hatC).blob(0, 1.73, -0.004, 0.1, 0.075, 0.11, 12, 4, HW, 0.4, 1);
+      sb.color(hatC).blob(0, 1.73, -0.004, 0.106, 0.096, 0.118, 12, 4, HW, 0.4, 1);
       sb.color(scalec(hatC, 0.82));
-      for (const s of [1, -1]) sb.blob(s * 0.092, 1.665, -0.004, 0.022, 0.075, 0.055, 6, 4, HW);
-      sb.blob(0, 1.752, 0.092, 0.07, 0.036, 0.022, 8, 3, HW);
-      sb.blob(0, 1.68, -0.092, 0.075, 0.06, 0.024, 8, 4, HW);
+      for (const s of [1, -1]) sb.blob(s * 0.099, 1.665, -0.004, 0.022, 0.075, 0.055, 6, 4, HW);
+      sb.blob(0, 1.76, 0.1, 0.07, 0.036, 0.022, 8, 3, HW);
+      sb.blob(0, 1.68, -0.1, 0.075, 0.06, 0.024, 8, 4, HW);
       break;
     case 'boina':
-      sb.color(hatC).blob(0.022, 1.775, -0.006, 0.112, 0.036, 0.115, 12, 4, HW);
-      sb.color(scalec(hatC, 0.6)).blob(0, 1.752, -0.004, 0.088, 0.02, 0.1, 12, 2, HW, 0.3, 0.7);
+      sb.color(hatC).blob(0.022, 1.79, -0.006, 0.118, 0.042, 0.122, 12, 4, HW);
+      sb.color(scalec(hatC, 0.6)).blob(0, 1.762, -0.004, 0.094, 0.022, 0.108, 12, 2, HW, 0.3, 0.7);
       break;
     case 'casco':
-      sb.color(hatC).blob(0, 1.72, -0.006, 0.108, 0.098, 0.122, 12, 5, HW, 0.47, 1);
-      sb.color(scalec(hatC, 0.7)).blob(0, 1.723, -0.006, 0.116, 0.012, 0.13, 12, 2, HW, 0.3, 0.7);
+      sb.color(hatC).blob(0, 1.722, -0.006, 0.114, 0.108, 0.13, 12, 5, HW, 0.47, 1);
+      sb.color(scalec(hatC, 0.7)).blob(0, 1.725, -0.006, 0.122, 0.012, 0.138, 12, 2, HW, 0.3, 0.7);
       sb.color([0.07, 0.05, 0.03]).box(0.078, 1.63, 0.03, 0.006, 0.16, 0.014, HW).box(-0.078, 1.63, 0.03, 0.006, 0.16, 0.014, HW);
       break;
     case 'panuelo':
-      sb.color(hatC).blob(0, 1.725, -0.008, 0.09, 0.075, 0.103, 12, 4, HW, 0.45, 1);
-      sb.blob(0, 1.705, -0.108, 0.026, 0.026, 0.022, 6, 3, HW);
-      sb.box(0.02, 1.66, -0.112, 0.022, 0.07, 0.008, HW, 0.2);
+      sb.color(hatC).blob(0, 1.725, -0.008, 0.096, 0.096, 0.11, 12, 4, HW, 0.45, 1);
+      sb.blob(0, 1.705, -0.116, 0.026, 0.026, 0.022, 6, 3, HW);
+      sb.box(0.02, 1.66, -0.12, 0.022, 0.07, 0.008, HW, 0.2);
       break;
     case 'kufi':
       column(
         sb,
         [
-          { y: 1.745, rx: 0.086, rz: 0.098, w: HW, c: scalec(hatC, 0.85), cz: -0.004 },
-          { y: 1.8, rx: 0.08, rz: 0.09, w: HW, c: hatC, cz: -0.006 },
+          { y: 1.75, rx: 0.092, rz: 0.106, w: HW, c: scalec(hatC, 0.85), cz: -0.004 },
+          { y: 1.815, rx: 0.086, rz: 0.098, w: HW, c: hatC, cz: -0.006 },
         ],
         12,
         true,

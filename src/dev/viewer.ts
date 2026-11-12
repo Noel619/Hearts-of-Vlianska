@@ -11,6 +11,7 @@ import { buildWorldMesh } from '../render/worldMesh';
 import { decorate } from '../world/decor';
 import { buildLayout } from '../world/layout';
 import { LightField } from '../world/lights';
+import { addCharTest } from './charTest';
 
 export async function startViewer(root: HTMLElement) {
   const params = new URLSearchParams(location.search);
@@ -54,6 +55,8 @@ export async function startViewer(root: HTMLElement) {
     const c = layout.stationById[at ?? 'STA'] ?? layout.nodeById[at ?? ''] ?? layout.stationById.STA;
     rig.jump(c.x, c.z, Number(params.get('d') ?? 46), Number(params.get('yaw') ?? 0.6), Number(params.get('pitch') ?? 0.95));
   }
+  let charTick: ((dt: number) => void) | null = null;
+  if (params.has('chars')) charTick = addCharTest(gfx.scene, field, rig.tx, rig.tz, layout.nav.heightAt(rig.tx, rig.tz), rig.yaw);
   const keys = new Set<string>();
   window.addEventListener('keydown', (e) => keys.add(e.code));
   window.addEventListener('keyup', (e) => keys.delete(e.code));
@@ -87,6 +90,7 @@ export async function startViewer(root: HTMLElement) {
     if (keys.has('KeyQ')) rig.rotate(dt * 1.5, 0);
     if (keys.has('KeyE')) rig.rotate(-dt * 1.5, 0);
     rig.update(dt);
+    charTick?.(dt);
     gfx.render(dt);
     frames++;
     fpsT += dt;

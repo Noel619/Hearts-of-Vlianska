@@ -181,13 +181,13 @@ function concrete(seed: number, formwork: boolean): SurfaceTex {
     c -= stain * 0.1;
     // Fisuras: curvas de nivel estrechas de un ruido suave
     const crackN = pfbm(u, v, 4, 4, seed + 21);
-    const crack = 1 - smoothstep(0.0, 0.012, Math.abs(crackN - 0.5));
-    const crackMask = smoothstep(0.5, 0.62, pfbm(u, v, 2, 2, seed + 30));
+    const crack = 1 - smoothstep(0.0, 0.0035, Math.abs(crackN - 0.5));
+    const crackMask = smoothstep(0.56, 0.7, pfbm(u, v, 2, 2, seed + 30));
     const ck = crack * crackMask;
     // Poros
     pcell(u, v, 40, seed + 40, cellOut);
     const pore = (1 - smoothstep(0.04, 0.1, cellOut[0])) * (cellOut[2] > 0.72 ? 1 : 0);
-    let h = big * 0.4 + fine * 0.22 - ck * 0.6 - pore * 0.35;
+    let h = big * 0.4 + fine * 0.22 - ck * 0.3 - pore * 0.3;
     if (formwork) {
       // Juntas de encofrado cada 1 m y chorretones verticales
       const jv = Math.abs(((v * 4) % 1) - 0.5);
@@ -197,7 +197,7 @@ function concrete(seed: number, formwork: boolean): SurfaceTex {
       const drip = smoothstep(0.62, 0.9, pn(u * 40, v * 3, 40, 3, seed + 60)) * smoothstep(0.3, 0.8, pfbm(u, v, 3, 2, seed + 61));
       c -= drip * 0.08;
     }
-    c -= ck * 0.2 + pore * 0.1;
+    c -= ck * 0.1 + pore * 0.08;
     t.r = c * 1.0;
     t.g = c * 0.99;
     t.b = c * 0.965;
