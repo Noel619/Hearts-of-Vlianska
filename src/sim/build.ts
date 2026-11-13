@@ -7,6 +7,7 @@ import { ITEMS, type Stack } from '../data/items';
 import { F_DYN, F_GATE, F_SLOW, F_TALL } from '../world/grid';
 import { makeLight, type LightDef } from '../world/lights';
 import { addItem, countItem, gainXp, invWeight, maxCarry, takeItem } from './chars';
+import { breathable } from './gas';
 import { clearDest, faceTo, setDest } from './move';
 import type { Sim } from './sim';
 import type { Building, Char, Order } from './types';
@@ -581,13 +582,26 @@ export function stepJobs(sim: Sim, c: Char, dt: number): boolean {
   if (!c.jobs.length || c.order) return false;
   if ((sim.tick + c.id * 7) % 15 !== 0) return false;
   void dt;
+  // Nadie va a trabajar a una bolsa de gas sin una máscara que le proteja
+  let gassed = false;
+  const safe = (x: number, z: number) => {
+    if (breathable(sim, c, x, z)) return true;
+    gassed = true;
+    return false;
+  };
+  const busy = pickJob(sim, c, safe);
+  if (!busy && gassed && (sim.tick + c.id) % 900 < 15) sim.emit({ t: 'flota', x: c.x, z: c.z, text: 'Ahí hay gas: me hace falta una máscara', color: '#d8a060' });
+  return busy;
+}
+
+function pickJob(sim: Sim, c: Char, safe: (x: number, z: number) => boolean): boolean {
   // Si va cargado de materiales de un trabajo anterior, los deja en el almacén
   for (const j of c.jobs) {
     if (j.t === 'construir') {
       let best: Building | null = null;
       let bd = 120;
       for (const b of sim.state.buildings) {
-        if (b.prog >= 1) continue;
+        if (b.prog >= 1 || !safe(b.x, b.z)) continue;
         const d = Math.hypot(b.x - c.x, b.z - c.z);
         if (d < bd) {
           bd = d;
@@ -600,6 +614,7 @@ export function stepJobs(sim: Sim, c: Char, dt: number): boolean {
       }
     } else if (j.t === 'operar' || j.t === 'cultivar' || j.t === 'cocinar' || j.t === 'investigar') {
       const b = j.id ? building(sim, j.id) : null;
+      if (b && !safe(b.x, b.z)) continue;
       if (b && hasWork(sim, b)) {
         c.order = { t: 'operar', id: b.id, data: 'job' };
         return true;
@@ -613,7 +628,7 @@ export function stepJobs(sim: Sim, c: Char, dt: number): boolean {
       if (unload(sim, c)) return true;
     } else if (j.t === 'chatarrear') {
       const n = j.id ? sim.node(j.id) : null;
-      if (n && n.amount > 0) {
+      if (n && n.amount > 0 && safe(n.x, n.z)) {
         if (invWeight(c) > maxCarry(c) * 0.95) {
           if (unload(sim, c)) return true;
         } else {

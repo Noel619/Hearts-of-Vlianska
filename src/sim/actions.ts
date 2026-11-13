@@ -2,10 +2,12 @@
 // inventarios, usar y equipar, recetas, investigación, robos y servicios.
 
 import { BUILDS, RECIPES, TECHS } from '../data/edificios';
-import { ITEMS, type EquipSlot, type Stack } from '../data/items';
+import { FILTER_LIFE } from '../data/gases';
+import { ITEMS, stackState, type EquipSlot, type Stack } from '../data/items';
 import type { FactionId } from '../data/tipos';
 import { hasTech, stored, storeWeight } from './build';
-import { addItem, countItem, equip, invWeight, maxCarry, takeItem, unequip } from './chars';
+import { filterMask, fitFilter } from './gas';
+import { addItem, countItem, equip, invWeight, maxCarry, sneakMult, takeItem, unequip } from './chars';
 import type { Sim } from './sim';
 import type { Building, Char, Container } from './types';
 
@@ -55,7 +57,7 @@ export function transfer(sim: Sim, from: Holder, to: Holder, index: number, n: n
       sim.forNear(actor.x, actor.z, 14, (o) => {
         if (seen || o.player || o.st !== 'ok' || o.side !== victimSide) return;
         const dark = actor.lit < 0.25 ? 0.5 : 1;
-        const sneak = actor.sneak ? 0.55 - actor.sk.sigilo * 0.004 : 1;
+        const sneak = actor.sneak ? sneakMult(actor, 0.55) : 1;
         if (Math.hypot(o.x - actor.x, o.z - actor.z) < 14 * dark * sneak && sim.world.nav.sightLine(o.x, o.z, actor.x, actor.z) > 0.97) seen = true;
       });
       if (seen) {
@@ -73,7 +75,7 @@ export function transfer(sim: Sim, from: Holder, to: Holder, index: number, n: n
   }
   s.n -= n;
   if (s.n <= 0) src.splice(index, 1);
-  addItem({ inv: holderItems(to) }, s.id, n, { mag: s.mag, hot });
+  addItem({ inv: holderItems(to) }, s.id, n, { ...stackState(s), hot });
   sim.emit({ t: 'sonido', k: 'coger', x: actor.x, z: actor.z });
   return null;
 }
@@ -92,6 +94,14 @@ export function useItem(sim: Sim, c: Char, index: number): string | null {
   }
   if (def.med) {
     c.order = { t: 'curar', id: c.id };
+    return null;
+  }
+  if (s.id === 'filtros') {
+    // Cambia el filtro de la máscara puesta por uno nuevo
+    const mask = filterMask(c);
+    if (!mask) return 'Hace falta llevar puesta una máscara';
+    if ((mask.fil ?? 0) >= FILTER_LIFE * 0.98) return 'El filtro puesto está nuevo';
+    fitFilter(sim, c, mask);
     return null;
   }
   if (def.weapon || def.armor || def.light) {
@@ -126,7 +136,7 @@ export function dropItem(sim: Sim, c: Char, index: number, n: number) {
     d = { id: sim.state.nextId++, x: c.x + Math.cos(c.face) * 0.6, z: c.z + Math.sin(c.face) * 0.6, items: [], t: 3600 };
     sim.state.drops.push(d);
   }
-  addItem({ inv: d.items }, s.id, n, { mag: s.mag, hot: s.hot });
+  addItem({ inv: d.items }, s.id, n, stackState(s));
   d.t = 3600;
   sim.emit({ t: 'sonido', k: 'soltar', x: c.x, z: c.z });
 }

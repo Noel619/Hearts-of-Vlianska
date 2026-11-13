@@ -1,6 +1,7 @@
 // Objetos del juego: recursos, comida, medicina, munición, armas, armaduras y
 // objetos de la historia. Los precios base están en cartuchos de grado militar.
 
+import { GAS_DENSE } from './gases';
 import type { Hat, Look, Mask } from './looks';
 
 export type ItemKind = 'recurso' | 'comida' | 'medicina' | 'municion' | 'arma' | 'armadura' | 'herramienta' | 'varios' | 'clave';
@@ -47,8 +48,12 @@ export interface ArmorDef {
   pierce: number;
   /** Cambios de aspecto al llevarla. */
   look?: Partial<Look>;
-  /** Protege de los gases. */
-  filter?: boolean;
+  /**
+   * Máscara con filtro: densidad de gas (0..1) que deja fuera por completo
+   * mientras el filtro puesto aguante. La antigás, todo; el respirador, el
+   * gas ligero (del denso deja pasar lo que sobra).
+   */
+  filter?: number;
   /** Capacidad de carga adicional (kg). */
   carry?: number;
   /** Penalización al sigilo y a la esquiva (0..1). */
@@ -171,8 +176,8 @@ const armor = (id: string, name: string, desc: string, a: ArmorDef, w: number, p
 armor('ushanka', 'Ushanka', 'Gorro de piel con orejeras. Abriga más que protege.', { slot: 'cabeza', cover: [0], cut: 0.1, blunt: 0.12, pierce: 0.02, look: { hat: 'ushanka' as Hat, hatColor: 0x4a4436 } }, 0.4, 20, 0x4a4436);
 armor('casco', 'Casco de acero', 'Un casco del ejército soviético. Pesa, pero para la metralla.', { slot: 'cabeza', cover: [0], cut: 0.5, blunt: 0.4, pierce: 0.35, look: { hat: 'casco' as Hat, hatColor: 0x4a5236 }, bulk: 0.03 }, 1.3, 110, 0x4a5236);
 armor('pasamontanas', 'Pasamontañas', 'Nadie te ve la cara. Eso a veces conviene.', { slot: 'cabeza', cover: [0], cut: 0.08, blunt: 0.05, pierce: 0, look: { hat: 'pasamontanas' as Hat, hatColor: 0x1e1e1e } }, 0.1, 15, 0x1e1e1e);
-armor('mascaraGas', 'Máscara antigás', 'Goma, cristales y un filtro. En los túneles con gas es vida o muerte.', { slot: 'cara', cover: [0], cut: 0.06, blunt: 0.06, pierce: 0, look: { mask: 'antigas' as Mask }, filter: true }, 0.8, 130, 0x2a2c2a);
-armor('respirador', 'Respirador', 'Media máscara con dos filtros. Aguanta el polvo y algo de gas.', { slot: 'cara', cover: [0], cut: 0.02, blunt: 0.02, pierce: 0, look: { mask: 'respirador' as Mask }, filter: true }, 0.4, 70, 0x3a3a3a);
+armor('mascaraGas', 'Máscara antigás', 'Goma, cristales y un filtro. En los túneles con gas es vida o muerte.', { slot: 'cara', cover: [0], cut: 0.06, blunt: 0.06, pierce: 0, look: { mask: 'antigas' as Mask }, filter: 1 }, 0.8, 130, 0x2a2c2a);
+armor('respirador', 'Respirador', 'Media máscara con dos filtros. Aguanta el polvo y algo de gas.', { slot: 'cara', cover: [0], cut: 0.02, blunt: 0.02, pierce: 0, look: { mask: 'respirador' as Mask }, filter: GAS_DENSE }, 0.4, 70, 0x3a3a3a);
 armor('chaleco', 'Chaleco de carga', 'Lona gruesa con bolsillos. Para una paliza, no una bala.', { slot: 'torso', cover: [1, 2], cut: 0.25, blunt: 0.15, pierce: 0.08, look: { vest: 0x3a3c30, pouches: true } }, 1.5, 80, 0x3a3c30);
 armor('chalecoPlacas', 'Chaleco de placas', 'Planchas de vagón cosidas a un chaleco. Para balas… a veces.', { slot: 'torso', cover: [1, 2], cut: 0.6, blunt: 0.4, pierce: 0.5, look: { vest: 0x2e3326, vestPlates: true, pouches: true }, bulk: 0.12 }, 7.5, 420, 0x2e3326);
 armor('petoCuero', 'Peto de cuero', 'Cuero de cerdo endurecido con hombreras de neumático.', { slot: 'torso', cover: [1, 2, 3, 4], cut: 0.38, blunt: 0.25, pierce: 0.12, look: { vest: 0x3a2a1e, shoulderPads: 0x1e1e1e }, bulk: 0.04 }, 3.0, 150, 0x3a2a1e);
@@ -197,6 +202,17 @@ export interface Stack {
   mag?: number;
   /** Robado: no se puede vender donde se robó. */
   hot?: string;
+  /** Máscaras: lo que le queda al filtro puesto (segundos de gas denso). */
+  fil?: number;
+}
+
+/** Estado propio de un objeto suelto (cargador, filtro, procedencia) para que viaje con él. */
+export function stackState(s: Stack): Partial<Stack> {
+  const o: Partial<Stack> = {};
+  if (s.mag !== undefined) o.mag = s.mag;
+  if (s.hot !== undefined) o.hot = s.hot;
+  if (s.fil !== undefined) o.fil = s.fil;
+  return o;
 }
 
 export function stackWeight(s: Stack): number {

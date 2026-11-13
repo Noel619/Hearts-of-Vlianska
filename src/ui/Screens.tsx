@@ -4,6 +4,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { audio, type Volumes } from '../audio';
 import { BUILD_CATS, BUILD_LIST, TECHS, TECH_LIST, type BuildCat } from '../data/edificios';
+import { GAS_DENSE } from '../data/gases';
+import type { GasField } from '../world/gas';
 import { LORE } from '../data/historia/cronica';
 import { FACTION_IDS, FACTION_LORE } from '../data/historia/facciones';
 import { FIGURE_BY_ID } from '../data/historia/figuras';
@@ -191,6 +193,33 @@ const TERRAIN_COLOR: Record<string, string> = {
 };
 const LINE_COLOR: Record<string, string> = { verde: '#3f8f3a', roja: '#b3202c', azul: '#2f62d8' };
 
+const gasLayers = new WeakMap<GasField, HTMLCanvasElement>();
+
+/** Capa del mapa con las bolsas de gas, pintada una sola vez por mundo. */
+function gasLayer(gas: GasField, W: number, H: number, sx: (x: number) => number, sz: (z: number) => number): HTMLCanvasElement {
+  let cv = gasLayers.get(gas);
+  if (cv && cv.width === W && cv.height === H) return cv;
+  cv = document.createElement('canvas');
+  cv.width = W;
+  cv.height = H;
+  const ctx = cv.getContext('2d')!;
+  const r = Math.max(1.5, sx(2) - sx(0));
+  for (const gp of gas.pockets) {
+    for (let j = 0; j < gp.rows; j += 2) {
+      for (let i = 0; i < gp.cols; i += 2) {
+        const d = gp.dens[j * gp.cols + i];
+        if (d < 0.05) continue;
+        ctx.fillStyle = `rgba(190, 205, 80, ${(0.12 + d * 0.38).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(sx(gp.x0 + i + 1), sz(gp.z0 + j + 1), r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+  gasLayers.set(gas, cv);
+  return cv;
+}
+
 export function MapScreen({ close }: { close: () => void }) {
   const g = useGame();
   useTick();
@@ -260,6 +289,8 @@ export function MapScreen({ close }: { close: () => void }) {
       }
     }
     ctx.setLineDash([]);
+    // Bolsas de gas: una mancha amarillenta tan densa como el gas (se pinta una vez)
+    ctx.drawImage(gasLayer(sim.world.gas, W, H, sx, sz), 0, 0);
     // Obras de la base
     ctx.fillStyle = hex(sim.state.playerColor);
     for (const bd of sim.state.buildings) ctx.fillRect(sx(bd.x) - 2, sz(bd.z) - 2, 4, 4);
@@ -300,6 +331,11 @@ export function MapScreen({ close }: { close: () => void }) {
             </span>
           );
         })}
+        {sim.world.gas.pockets.map((gp) => (
+          <span key={gp.def.id} className="mk gas" style={{ left: px(gp.x), top: pz(gp.z) }} title={`${gp.def.name} · ${gp.def.peak > GAS_DENSE ? 'gas denso: hace falta máscara antigás' : 'gas ligero: basta un respirador'}\n${gp.def.desc}`}>
+            <Icon id="gas" size={11} />
+          </span>
+        ))}
         <span className="mk cam" style={{ left: px(f.x), top: pz(f.z) }} />
         {squad.length > 0 && (
           <span className="mk squad" style={{ left: px(cxm), top: pz(czm) }} title={sim.state.playerName}>
@@ -328,6 +364,12 @@ export function MapScreen({ close }: { close: () => void }) {
             <Icon id="cerrar" size={9} />
           </span>{' '}
           Derrumbe o tabique
+        </span>
+        <span>
+          <span className="mk gas inl">
+            <Icon id="gas" size={9} />
+          </span>{' '}
+          Bolsa de gas
         </span>
         <span>
           <span className="mk squad inl">
@@ -637,6 +679,9 @@ export function HelpBody() {
       </div>
       <p className="dim" style={{ lineHeight: 1.5 }}>
         Nadie te espera ni te debe nada. Las habilidades suben con el uso; los golpes van a partes concretas del cuerpo; las heridas abiertas sangran hasta que alguien las venda. Quien cae inconsciente puede levantarse… o desangrarse. Comercia, rebusca chatarra, caza skrebuns, contrata gente en los bares y levanta tu propia estación donde nadie mande.
+      </p>
+      <p className="dim" style={{ lineHeight: 1.5 }}>
+        En algunos túneles se estanca el gas (el mapa marca dónde). Sin máscara le quema el pecho a quien lo respira, le hace toser y le delata; quien cae inconsciente dentro se asfixia si nadie lo saca. La máscara antigás lo deja fuera mientras aguante el filtro, que se cambia solo si llevas de repuesto; el respirador solo basta con el gas ligero. El equipo pesado, como el chaleco de placas, estorba al moverse en sigilo y al esquivar.
       </p>
     </>
   );

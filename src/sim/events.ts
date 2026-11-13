@@ -325,7 +325,7 @@ export function buyItem(sim: Sim, buyer: Char, vendor: Char, index: number, n: n
   if (price > sim.state.money) return 'No tienes cartuchos suficientes';
   sim.state.money -= price;
   shop.money += price;
-  addItem(buyer, s.id, n, { mag: s.mag });
+  addItem(buyer, s.id, n, { mag: s.mag, fil: s.fil });
   s.n -= n;
   if (s.n <= 0) shop.stock.splice(index, 1);
   sim.emit({ t: 'sonido', k: 'moneda', x: buyer.x, z: buyer.z });
@@ -352,7 +352,7 @@ export function sellItem(sim: Sim, seller: Char, vendor: Char, index: number, n:
   sim.state.money += price;
   sim.state.stats.earned += price;
   sim.state.flags.tComercio = 1;
-  addItem({ inv: shop.stock }, s.id, n, { mag: s.mag });
+  addItem({ inv: shop.stock }, s.id, n, { mag: s.mag, fil: s.fil });
   s.n -= n;
   if (s.n <= 0) seller.inv.splice(index, 1);
   // Vender comida en la estación sitiada es romper el embargo

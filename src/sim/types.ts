@@ -152,6 +152,8 @@ export interface Char {
   slot?: string;
   /** Nivel de luz en su posición (0..1+), actualizado periódicamente. */
   lit: number;
+  /** Gas que respira ahora mismo (0..1), ya descontado lo que filtra su máscara. */
+  gas: number;
   /** Visto por el jugador hace poco. */
   seenT: number;
   /** Segundos hasta que el cadáver desaparece. */

@@ -11,6 +11,7 @@ import { Gfx, type Quality } from '../render/gfx';
 import { initMaterialGlobals, globals } from '../render/materials';
 import { buildPropsView } from '../render/propsView';
 import { buildTextures, type TextureSet } from '../render/textures';
+import { buildGasMesh } from '../render/gasMesh';
 import { buildWaterMesh } from '../render/waterMesh';
 import { buildWorldMesh } from '../render/worldMesh';
 import { building, buildingLight, canPlace, placeBuilding, restoreBuildings } from '../sim/build';
@@ -21,6 +22,7 @@ import { newGame, type NewGameOptions } from '../sim/newGame';
 import { Sim } from '../sim/sim';
 import type { Char, JobType, Order, SimState } from '../sim/types';
 import { buildWorld, placeName, resetWorld, type World } from '../sim/world';
+import type { GasPocket } from '../world/gas';
 import { Fx, type DynLight, type SpotReq } from './fx';
 import { CharViews, ThingViews } from './views';
 
@@ -88,6 +90,8 @@ export class Game {
   paused = false;
   version = 0;
   placeLabel = '';
+  /** Bolsa de gas bajo la cámara (o null). */
+  gasHere: GasPocket | null = null;
   fps = 0;
   running = false;
   /** Rectángulo de selección en curso (píxeles de pantalla). */
@@ -138,6 +142,7 @@ export class Game {
     await tick();
     const props = buildPropsView(world.decor.props, world.field);
     mesh.group.add(buildWaterMesh(world.nav, world.field, tex));
+    mesh.group.add(buildGasMesh(world.gas, world.nav, world.field, tex));
     await progress('Listo', 1);
     return { world, tex, worldGroup: mesh.group, propsGroup: props.group };
   }
@@ -240,6 +245,7 @@ export class Game {
     if (this.uiAcc >= 0.16) {
       this.uiAcc = 0;
       this.placeLabel = placeName(this.shared.world, f.x, f.z);
+      this.gasHere = this.shared.world.gas.pocketAt(f.x, f.z, 0.08);
       this.selected = this.selected.filter((id) => {
         const c = this.sim.char(id);
         return c && c.player && c.st !== 'muerto';

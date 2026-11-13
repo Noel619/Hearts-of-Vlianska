@@ -1,6 +1,7 @@
 // Creación de una partida nueva a partir de un comienzo.
 
 import { SCENARIO_BY_ID } from '../data/escenarios';
+import { FILTER_LIFE } from '../data/gases';
 import { ITEMS } from '../data/items';
 import type { FactionId } from '../data/tipos';
 import { SKILL_IDS } from '../data/skills';
@@ -54,7 +55,7 @@ export function newGame(world: World, opts: NewGameOptions): Sim {
     }
     for (const a2 of m.armor ?? []) {
       const def = ITEMS[a2];
-      if (def?.armor) c.eq[def.armor.slot] = { id: a2, n: 1 };
+      if (def?.armor) c.eq[def.armor.slot] = def.armor.filter ? { id: a2, n: 1, fil: FILTER_LIFE } : { id: a2, n: 1 };
     }
     for (const [id, n] of m.items ?? []) addItem(c, id, n);
     if (c.inv.some((s) => s.id === 'linterna')) c.lamp = true;

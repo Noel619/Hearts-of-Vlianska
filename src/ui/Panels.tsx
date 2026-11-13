@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { BUILDS, RECIPES } from '../data/edificios';
 import { FACTION_LORE } from '../data/historia/facciones';
 import { STATION_BY_ID } from '../data/historia/mapa';
-import { ITEMS, type EquipSlot, type Stack } from '../data/items';
+import { ITEMS, stackState, type EquipSlot, type Stack } from '../data/items';
 import type { FactionId } from '../data/tipos';
 import type { Panel, Target } from '../game/game';
 import { healCost, holderItems, owned, payHeal, recipeAvailable, setRecipe, transfer, type Holder } from '../sim/actions';
@@ -285,7 +285,7 @@ function LootWin({ p }: { p: Extract<Panel, { t: 'saqueo' }> }) {
     const s = eq.eq[slot];
     if (!s) return;
     delete eq.eq[slot];
-    addItem(eq, s.id, 1, { mag: s.mag });
+    addItem(eq, s.id, 1, stackState(s));
     setMsg(transfer(sim, tgt.h, me, eq.inv.length - 1, 1, actor) ?? '');
     g.bump();
   };

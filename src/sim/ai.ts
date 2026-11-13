@@ -2,11 +2,12 @@
 // conductas de fondo: residentes, guardias, vendedores, escuadras y fieras.
 
 import { CREATURES } from '../data/criaturas';
-import { ITEMS } from '../data/items';
+import { ITEMS, stackState } from '../data/items';
 import { addItem, countItem, crawling, gainXp, healthFrac, invWeight, limpSide, maxCarry } from './chars';
 import { findEnemy, hostile, needsCare, stepFight, topUpMagazine, treat } from './combat';
 import { clearDest, faceTo, setDest, stepMove } from './move';
 import { stepJobs, workOnBuilding } from './build';
+import { cleanAirNear } from './gas';
 import { freeSpot, occupySpot, pickSpot } from './population';
 import { isCivilDefense, workNode } from './events';
 import type { Sim } from './sim';
@@ -228,7 +229,7 @@ function runOrder(sim: Sim, c: Char, o: Order, dt: number): void {
           const can = w > 0 ? Math.floor((cap - invWeight(c)) / w) : s.n;
           const n = Math.min(s.n, Math.max(0, can));
           if (n > 0) {
-            addItem(c, s.id, n, { mag: s.mag, hot: s.hot });
+            addItem(c, s.id, n, stackState(s));
             s.n -= n;
             if (s.n <= 0) dr.items.splice(i, 1);
           }
@@ -398,6 +399,17 @@ function idle(sim: Sim, c: Char, dt: number, prevPose: string): void {
           c.order = { t: 'curar', id: (patient as Char).id };
           return;
         }
+      }
+      // Sin órdenes, nadie se queda a respirar gas (salvo que se le mande quedarse quieto)
+      if (c.gas > 0 && !c.hold) {
+        if (!c.hasDest && (sim.tick + c.id) % 15 === 0) {
+          const p = cleanAirNear(sim, c);
+          if (p) {
+            setDest(c, p.x, p.z, 0.8, true);
+            sim.emit({ t: 'flota', x: c.x, z: c.z, text: 'Me aparto del gas', color: '#b9d77a' });
+          }
+        }
+        return;
       }
       if (!c.hold && stepJobs(sim, c, dt)) return;
       break;

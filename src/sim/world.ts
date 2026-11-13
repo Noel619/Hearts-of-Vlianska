@@ -1,7 +1,8 @@
 // Mundo estático compartido por la simulación y el render: trazado, decoración,
-// rejilla de navegación, grafo de rutas y campo de luz.
+// rejilla de navegación, grafo de rutas, campo de luz y bolsas de gas.
 
 import { decorate, type Decor } from '../world/decor';
+import { buildGas, type GasField } from '../world/gas';
 import { RouteGraph } from '../world/graph';
 import type { NavGrid } from '../world/grid';
 import { buildLayout, type Layout, type StationFrame, insideStation } from '../world/layout';
@@ -13,6 +14,8 @@ export interface World {
   nav: NavGrid;
   graph: RouteGraph;
   field: LightField;
+  /** Bolsas de gas de los túneles. */
+  gas: GasField;
   /** Rejilla recién construida: a ella se vuelve al empezar o cargar una partida. */
   baseFlags: Uint8Array;
 }
@@ -22,7 +25,8 @@ export function buildWorld(): World {
   const decor = decorate(layout);
   const field = new LightField(layout.nav, decor.lights);
   const graph = new RouteGraph(layout, layout.nav);
-  return { layout, decor, nav: layout.nav, graph, field, baseFlags: layout.nav.flags.slice() };
+  const gas = buildGas(layout);
+  return { layout, decor, nav: layout.nav, graph, field, gas, baseFlags: layout.nav.flags.slice() };
 }
 
 /** Devuelve el mundo compartido a su estado inicial: sin obras, derrumbes ni luces de partida. */

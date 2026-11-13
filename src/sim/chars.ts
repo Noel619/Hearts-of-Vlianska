@@ -1,8 +1,9 @@
 // Personajes: creación, estadísticas derivadas, inventario, equipo y experiencia.
 
 import { CREATURES } from '../data/criaturas';
+import { FILTER_LIFE } from '../data/gases';
 import { makeLoadout, makeLook, type Role } from '../data/gente';
-import { ITEMS, type ArmorSlot, type EquipSlot, type ItemDef, type Stack, type WeaponDef } from '../data/items';
+import { ITEMS, stackState, type ArmorSlot, type EquipSlot, type ItemDef, type Stack, type WeaponDef } from '../data/items';
 import type { Look } from '../data/looks';
 import { randomName } from '../data/nombres';
 import { PART_MAX, SKILL_IDS, xpForLevel, type SkillId } from '../data/skills';
@@ -82,6 +83,7 @@ export function newChar(sim: Sim, x: number, z: number, side: SideId, kind = 'hu
     work: 'nada',
     persist: false,
     lit: 0.5,
+    gas: 0,
     seenT: 0,
     rot: 0,
   };
@@ -120,7 +122,8 @@ export function makeHuman(sim: Sim, side: SideId, role: Role, x: number, z: numb
   if (lo.sidearm) addItem(c, lo.sidearm, 1);
   for (const a of lo.armor) {
     const def = ITEMS[a];
-    if (def?.armor) c.eq[def.armor.slot] = { id: a, n: 1 };
+    // Las máscaras de quien vive en los túneles llevan su filtro puesto
+    if (def?.armor) c.eq[def.armor.slot] = def.armor.filter ? { id: a, n: 1, fil: FILTER_LIFE } : { id: a, n: 1 };
   }
   if (lo.weapon) {
     const st: Stack = { id: lo.weapon, n: 1 };
@@ -243,7 +246,7 @@ export function equip(c: Char, index: number, slot?: EquipSlot): boolean {
   if (s.n <= 0) c.inv.splice(index, 1);
   const old = c.eq[target];
   c.eq[target] = one;
-  if (old) addItem(c, old.id, 1, { mag: old.mag, hot: old.hot });
+  if (old) addItem(c, old.id, 1, stackState(old));
   return true;
 }
 
@@ -251,7 +254,7 @@ export function unequip(c: Char, slot: EquipSlot): void {
   const old = c.eq[slot];
   if (!old) return;
   delete c.eq[slot];
-  addItem(c, old.id, 1, { mag: old.mag, hot: old.hot });
+  addItem(c, old.id, 1, stackState(old));
 }
 
 /** Resistencia de la armadura en una parte del cuerpo frente a un tipo de daño. */
@@ -270,6 +273,27 @@ export function armorAt(c: Char, part: number, kind: 'cut' | 'blunt' | 'pierce')
 export function hasFilter(c: Char): boolean {
   const s = c.eq.cara;
   return !!(s && ITEMS[s.id]?.armor?.filter);
+}
+
+/** Estorbo del equipo puesto (0 = nada, tope 0,5): resta sigilo y esquiva. */
+export function armorBulk(c: Char): number {
+  let b = 0;
+  for (const slot of ['cabeza', 'cara', 'torso', 'mochila'] as ArmorSlot[]) {
+    const s = c.eq[slot];
+    if (s) b += ITEMS[s.id]?.armor?.bulk ?? 0;
+  }
+  return Math.min(0.5, b);
+}
+
+/** Cuánto pesa el estorbo: el sigilo y la esquiva pierden el doble del estorbo. */
+export const BULK_WEIGHT = 2;
+
+/**
+ * Factor por el que se multiplica la distancia a la que ven a alguien que
+ * avanza en sigilo: `base` es el de una persona sin pericia ni estorbo.
+ */
+export function sneakMult(c: Char, base: number): number {
+  return Math.max(0.15, (base - c.sk.sigilo * 0.004) * (1 + armorBulk(c) * BULK_WEIGHT));
 }
 
 /** Aspecto efectivo: el de base más lo que cambia el equipo puesto. */
@@ -294,6 +318,18 @@ export function gainXp(sim: Sim, c: Char, skill: SkillId, amount: number): void 
   const nv = Math.min(100, v + amount / xpForLevel(lvl));
   c.sk[skill] = nv;
   if (c.player && Math.floor(nv) > lvl) sim.emit({ t: 'nivel', id: c.id, skill, lvl: Math.floor(nv) });
+}
+
+/**
+ * Lo que se aprende andando: correr entrena el atletismo, y correr o andar
+ * con mucho peso encima (o con alguien a hombros) entrena la fuerza.
+ * Solo la escuadra del jugador: la gente del metro ya es como es.
+ */
+export function trainMove(sim: Sim, c: Char, meters: number): void {
+  if (!c.player || c.kind !== 'humano' || meters <= 0) return;
+  const load = invWeight(c) / maxCarry(c) + (c.carry ? 0.8 : 0);
+  if (c.run && !c.sneak && c.speed > 2.2) gainXp(sim, c, 'atletismo', meters * 0.05 * (0.7 + Math.min(1.6, load)));
+  if (load > 0.55) gainXp(sim, c, 'fuerza', meters * 0.02 * Math.min(1.5, load - 0.55));
 }
 
 // --- Estado físico -----------------------------------------------------------------
@@ -328,7 +364,7 @@ export function moveSpeed(c: Char, run: boolean): number {
   }
   if (crawling(c)) return 0.55;
   let v = run ? 3.5 + c.sk.atletismo * 0.032 : 1.45;
-  if (c.sneak) v = Math.min(v, 1.5 + c.sk.sigilo * 0.012);
+  if (c.sneak) v = Math.min(v, (1.5 + c.sk.sigilo * 0.012) * (1 - armorBulk(c)));
   v *= 0.35 + 0.65 * legPower(c);
   v /= 1 + encumbrance(c) * 1.6;
   if (c.carry) v *= 0.72;

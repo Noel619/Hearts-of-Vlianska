@@ -11,6 +11,7 @@ import { separate } from './move';
 import { updatePopulation } from './population';
 import { stepWorldEvents } from './events';
 import { stepBuildings } from './build';
+import { stepGas } from './gas';
 import type { Char, Container, LogEntry, ResNode, SimEvent, SimState, Squad } from './types';
 import { SAVE_VERSION } from './types';
 import type { World } from './world';
@@ -234,6 +235,7 @@ export class Sim {
       for (let i = st.chars.length - 1; i >= 0; i--) {
         const c = st.chars[i];
         stepNeeds(this, c, sdt);
+        stepGas(this, c, sdt);
         if ((this.tick + c.id) % 3 === 0) c.lit = this.world.field.level(c.x, c.z);
         if (c.st === 'muerto' && c.rot <= 0 && !c.carriedBy) this.removeChar(c);
       }

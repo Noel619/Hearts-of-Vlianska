@@ -73,6 +73,7 @@ export function attachAudio(game: Game): () => void {
         const theme = reg.kind === 'node' ? nodeById[reg.ref]?.room.theme : '';
         if (reg.terrain === 'peligroso' || reg.terrain === 'auxiliarPeligroso' || reg.terrain === 'derrumbe' || theme === 'cueva' || theme === 'nido' || theme === 'inundado' || theme === 'anden') amb = 'peligro';
       }
+      if (world.gas.at(cx, cz) > 0.05) amb = 'peligro';
     }
     const want: Mood = fight > 0 ? 'combate' : threat > 0 ? 'tension' : base;
     const now = performance.now() / 1000;

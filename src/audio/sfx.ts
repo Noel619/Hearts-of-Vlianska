@@ -44,7 +44,10 @@ export type Sfx =
   | 'venda'
   | 'cerradura'
   | 'hecho'
-  | 'alarma';
+  | 'alarma'
+  // Gas
+  | 'tos'
+  | 'filtro';
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 
@@ -87,6 +90,8 @@ export const SFX_LEVEL: Record<Sfx, number> = {
   cerradura: 3.46,
   hecho: 2.62,
   alarma: 2.3,
+  tos: 2.5,
+  filtro: 2.0,
 };
 
 const UI = new Set<Sfx>(['click', 'abrir', 'cerrar', 'error', 'orden', 'colocar', 'aviso', 'avisoMalo', 'avisoHistoria', 'moneda', 'pausa', 'nivel']);
@@ -345,5 +350,26 @@ export function playSfx(e: AudioEngine, name: Sfx, pos?: SfxPos) {
       o.stop(t + 4.4);
       break;
     }
+    // --- Gas --------------------------------------------------------------------
+    case 'tos': {
+      // Una, dos o tres toses roncas: soplo de garganta con un poco de voz
+      const n = 1 + Math.floor(rnd(0, 2.6));
+      let at = t;
+      for (let i = 0; i < n; i++) {
+        const k = 1 - i * 0.22;
+        noiseHit(e, out, at, { type: 'bandpass', freq: rnd(700, 950), sweepTo: rnd(420, 520), q: 1.6, dur: rnd(0.1, 0.15), gain: 0.32 * k, kind: 'pink' });
+        noiseHit(e, out, at, { type: 'lowpass', freq: 380, dur: 0.07, gain: 0.18 * k, kind: 'brown' });
+        tone(e, out, at + 0.005, 'triangle', rnd(150, 190), rnd(105, 125), 0.09, 0.035 * k, 0.006);
+        at += rnd(0.2, 0.3);
+      }
+      break;
+    }
+    case 'filtro':
+      // Se desenrosca el filtro gastado y se enrosca el nuevo: chasquidos y un soplo
+      metal(e, out, t, { freq: 1900, gain: 0.025, decay: 0.05 });
+      noiseHit(e, out, t + 0.06, { type: 'highpass', freq: 2800, dur: 0.22, gain: 0.05 });
+      metal(e, out, t + 0.3, { freq: 1500, gain: 0.03, decay: 0.07 });
+      noiseHit(e, out, t + 0.3, { type: 'bandpass', freq: 1300, q: 2, dur: 0.03, gain: 0.1 });
+      break;
   }
 }

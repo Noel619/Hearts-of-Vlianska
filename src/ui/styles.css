@@ -473,6 +473,18 @@ button {
   color: #8fa8c8;
   line-height: 1;
 }
+.plaque small.gaswarn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #cfdc6e;
+  animation: gaswarn 1.6s ease-in-out infinite alternate;
+}
+@keyframes gaswarn {
+  to {
+    color: #e9b04a;
+  }
+}
 .plaque b {
   display: block;
   font-family: var(--stencil);
@@ -897,6 +909,9 @@ button {
     0 0 2px #000,
     0 0 2px #000,
     0 1px 2px #000;
+}
+.slot .n.bad {
+  color: var(--bad);
 }
 .slot .tag {
   position: absolute;
@@ -1908,6 +1923,18 @@ kbd {
   color: #fff;
   background: #b3261e;
   box-shadow: 0 0 0 1.5px #050505;
+}
+.mk.gas {
+  width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #1a1c08;
+  background: #c2cf5a;
+  box-shadow: 0 0 0 1.5px #050505;
+  pointer-events: auto;
+  cursor: help;
 }
 .mk.squad {
   width: 24px;

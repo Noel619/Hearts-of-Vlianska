@@ -4,16 +4,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { BUILDS, RECIPES } from '../data/edificios';
 import { propThumb } from '../render/thumbs';
+import { FILTER_LIFE, GAS_DENSE } from '../data/gases';
 import { ITEMS, type EquipSlot } from '../data/items';
 import { BODY_PARTS, SKILLS, SKILL_IDS, skillWord, type SkillId } from '../data/skills';
 import type { FactionId } from '../data/tipos';
 import { dropItem, hasLamp, unequipSlot, useItem } from '../sim/actions';
-import { invWeight, maxCarry, totalHpFrac, weaponDef } from '../sim/chars';
+import { armorBulk, BULK_WEIGHT, invWeight, maxCarry, totalHpFrac, weaponDef } from '../sim/chars';
 import { hostile, relation } from '../sim/combat';
 import { squadCap } from '../sim/events';
+import { filterMask, spareFilters } from '../sim/gas';
 import { firstSteps } from '../sim/hilos';
 import type { Char, Stance } from '../sim/types';
-import { Bar, BodyDoll, Face, ItemIcon, Money, charTitle, hex, itemTip, sideName, statusIcon, statusText, useGame, useTick, useTooltip } from './core';
+import { Bar, BodyDoll, Face, ItemIcon, Money, charTitle, hex, itemTip, sideName, statusBad, statusIcon, statusText, useGame, useTick, useTooltip } from './core';
 import { Emblem } from './sprites/Emblem';
 import { Icon, ItemSprite } from './sprites/Sprite';
 
@@ -41,10 +43,16 @@ export function TopBar({ open }: { open: (s: Screen) => void }) {
   const sim = g.sim;
   return (
     <div className="topbar">
-      <div className="plaque" title="Dónde está la cámara">
+      <div className="plaque" title={g.gasHere ? `${g.gasHere.def.name}: ${g.gasHere.def.desc}` : 'Dónde está la cámara'}>
         <Emblem side="JUG" size={34} playerColor={hex(sim.state.playerColor)} />
         <div>
-          <small>Metro de Vlianska</small>
+          {g.gasHere ? (
+            <small className="gaswarn">
+              <Icon id="gas" size={11} /> {g.gasHere.def.peak > GAS_DENSE ? 'Gas denso' : 'Gas ligero'}
+            </small>
+          ) : (
+            <small>Metro de Vlianska</small>
+          )}
           <b>{g.placeLabel || 'Túneles'}</b>
         </div>
       </div>
@@ -116,7 +124,7 @@ export function SquadBar() {
                 <Bar v={c.blood / 100} cls="thin blood" style={{ flex: 1 }} />
                 <Bar v={c.hunger / 100} cls="thin amber" style={{ flex: 1 }} />
               </div>
-              <div className={'st' + (c.st !== 'ok' || c.bleed > 0.05 ? ' bad' : '')}>
+              <div className={'st' + (statusBad(c) ? ' bad' : '')}>
                 <Icon id={statusIcon(c)} size={11} />
                 {statusText(g, c)}
               </div>
@@ -160,6 +168,11 @@ export function SelectionPanel() {
   const weight = invWeight(c);
   const cap = maxCarry(c);
   const w = weaponDef(c);
+  const bulk = armorBulk(c);
+  const bulkPct = Math.round(bulk * BULK_WEIGHT * 100);
+  const mask = filterMask(c);
+  const filFrac = mask ? (mask.fil ?? 0) / FILTER_LIFE : 0;
+  const spares = mask ? spareFilters(sim, c) : 0;
   return (
     <div className="panel selpanel">
       <div className="selhead">
@@ -171,7 +184,7 @@ export function SelectionPanel() {
             {w ? ` · ${c.eq.arma ? ITEMS[c.eq.arma.id].name : ''}` : ''}
           </div>
         </div>
-        <span className={'chipst' + (c.st !== 'ok' || c.bleed > 0.05 ? ' bad' : '')}>
+        <span className={'chipst' + (statusBad(c) ? ' bad' : '')}>
           <Icon id={statusIcon(c)} size={13} />
           {statusText(g, c)}
         </span>
@@ -207,9 +220,20 @@ export function SelectionPanel() {
               <Icon id="carga" size={13} className={weight > cap ? 'bad' : ''} />
               <Bar v={weight / cap} color={weight > cap ? '#e0624f' : '#9a968a'} />
             </div>
+            {mask && (
+              <div className="meter" title={`Filtro de la máscara: ${Math.ceil(filFrac * 100)} % · ${spares === 1 ? 'un filtro' : `${spares} filtros`} de repuesto${spares ? '' : ': cuando se gaste, el gas pasará'}`}>
+                <Icon id="gas" size={13} className={c.gas > 0.05 ? 'bad' : ''} />
+                <Bar v={filFrac} color={filFrac > 0.25 ? '#9fbf5a' : '#e0624f'} />
+              </div>
+            )}
             <div className="kg">
               {weight.toFixed(0)}/{cap.toFixed(0)} kg
             </div>
+            {bulk > 0 && (
+              <div className="kg" title={`El equipo puesto estorba: en sigilo te ven desde un ${bulkPct} % más lejos y avanzas más despacio, y sin arma esquivas un ${bulkPct} % peor`}>
+                estorbo −{bulkPct} %
+              </div>
+            )}
           </div>
         </div>
         <div className="grow col" style={{ gap: 0, minHeight: 0 }}>
@@ -235,6 +259,7 @@ export function SelectionPanel() {
                         <ItemSprite id={st ? st.id : ghost} size={40} className={st ? '' : 'ghost'} />
                         <span className="lbl">{label}</span>
                         {st?.mag !== undefined && <span className="n">{st.mag}</span>}
+                        {st && ITEMS[st.id]?.armor?.filter && <span className={'n' + ((st.fil ?? 0) > 0 ? '' : ' bad')}>{(st.fil ?? 0) > 0 ? `${Math.ceil(((st.fil ?? 0) / FILTER_LIFE) * 100)}%` : '0%'}</span>}
                       </div>
                     );
                   })}
@@ -247,7 +272,10 @@ export function SelectionPanel() {
                       {...tip.bind(itemTip(st) + '\nClic: usar o equipar · Mayús+clic: soltar', st.id)}
                       onClick={(e) => {
                         if (e.shiftKey) dropItem(sim, c, i, e.ctrlKey ? st.n : 1);
-                        else useItem(sim, c, i);
+                        else {
+                          const why = useItem(sim, c, i);
+                          if (why) sim.emit({ t: 'flota', x: c.x, z: c.z, text: why, color: '#d8a060' });
+                        }
                         tip.clear();
                         g.bump();
                       }}

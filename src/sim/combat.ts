@@ -6,7 +6,7 @@ import { ITEMS } from '../data/items';
 import { PART_HIT, type SkillId } from '../data/skills';
 import type { FactionId, SideId } from '../data/tipos';
 import { clamp, clamp01 } from '../core/math';
-import { armorAt, countItem, crawling, gainXp, takeItem, weaponDef } from './chars';
+import { armorAt, armorBulk, BULK_WEIGHT, countItem, crawling, gainXp, sneakMult, takeItem, weaponDef } from './chars';
 import { clearDest, faceTo, setDest } from './move';
 import type { Sim } from './sim';
 import type { Char } from './types';
@@ -61,7 +61,8 @@ export function pickPart(sim: Sim): number {
   return 1;
 }
 
-export function knockOut(sim: Sim, c: Char, seconds: number): void {
+/** Deja inconsciente a alguien; `where` completa el aviso (p. ej. «en el gas: …»). */
+export function knockOut(sim: Sim, c: Char, seconds: number, where?: string): void {
   if (c.st !== 'ok') {
     c.koT = Math.max(c.koT, seconds);
     return;
@@ -77,10 +78,11 @@ export function knockOut(sim: Sim, c: Char, seconds: number): void {
   clearDest(c);
   dropCarried(sim, c);
   sim.emit({ t: 'ko', id: c.id });
-  if (c.player) sim.log(`${c.name} ha caído inconsciente.`, 'malo');
+  if (c.player) sim.log(`${c.name} ha caído inconsciente${where ? ' ' + where : ''}.`, 'malo');
 }
 
-export function kill(sim: Sim, c: Char, by?: Char): void {
+/** Muerte de un personaje; `cause` completa el aviso (p. ej. «desangrado»). */
+export function kill(sim: Sim, c: Char, by?: Char, cause?: string): void {
   if (c.st === 'muerto') return;
   c.st = 'muerto';
   c.pose = 'muerto';
@@ -94,7 +96,7 @@ export function kill(sim: Sim, c: Char, by?: Char): void {
   clearDest(c);
   dropCarried(sim, c);
   sim.emit({ t: 'muerte', id: c.id });
-  if (c.player) sim.log(`${c.name} ha muerto.`, 'malo');
+  if (c.player) sim.log(`${c.name} ha muerto${cause ? ' ' + cause : ''}.`, 'malo');
   else if (by?.player) {
     sim.state.stats.kills++;
     if (c.unique) sim.onUniqueDeath(c, by);
@@ -212,7 +214,7 @@ export function stepNeeds(sim: Sim, c: Char, dt: number): void {
   if (c.bleed > 0) {
     c.blood -= c.bleed * dt;
     if (c.blood <= 0) {
-      kill(sim, c);
+      kill(sim, c, undefined, 'desangrado');
       return;
     }
     if (c.blood < 42 && c.st === 'ok') knockOut(sim, c, 40);
@@ -243,7 +245,7 @@ export function stepNeeds(sim: Sim, c: Char, dt: number): void {
       c.hunger = 0;
       c.hp[2] -= dt * 0.05;
       if (c.hp[2] <= 0 && c.st === 'ok') knockOut(sim, c, 60);
-      if (c.hp[2] <= -c.hpMax[2]) kill(sim, c);
+      if (c.hp[2] <= -c.hpMax[2]) kill(sim, c, undefined, 'de hambre');
     }
   }
 }
@@ -344,7 +346,8 @@ export function sightRange(sim: Sim, c: Char, t: Char): number {
   const dark = c.kind !== 'humano' && !CREATURES[c.kind].lightFear ? 1 : 0;
   let f = dark ? 1 : 0.38 + 0.62 * Math.min(1, t.lit * 1.6);
   if (t.lamp && t.st === 'ok') f = Math.max(f, 1.1);
-  if (t.sneak) f *= 0.72 - t.sk.sigilo * 0.004;
+  // Quien tose por el gas no pasa desapercibido
+  if (t.sneak && t.gas < 0.15) f *= sneakMult(t, 0.72);
   if (t.st !== 'ok') f *= 0.6;
   if (c.target === t.id) base *= 1.5;
   return base * f;
@@ -500,7 +503,8 @@ function resolveMelee(sim: Sim, c: Char, t: Char, dist: number): void {
   const tw = weaponDef(t);
   let def = 0;
   if (t.st === 'ok') {
-    def = tw ? t.sk.defensa * 0.75 + tw.parry * 2 + t.sk[weaponSkill(t)] * 0.15 : t.sk.esquiva * 0.6 + t.sk.defensa * 0.25;
+    // Sin arma con la que parar, se esquiva: el equipo pesado estorba
+    def = tw ? t.sk.defensa * 0.75 + tw.parry * 2 + t.sk[weaponSkill(t)] * 0.15 : t.sk.esquiva * 0.6 * Math.max(0, 1 - armorBulk(t) * BULK_WEIGHT) + t.sk.defensa * 0.25;
     if (t.atkT >= 0 && t.atkT < 0.6) def *= 0.55;
     if (t.target !== c.id) def *= 0.5;
     if (t.hp[3] <= 0 || t.hp[4] <= 0) def *= 0.6;

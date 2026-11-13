@@ -29,10 +29,16 @@ export function deserialize(text: string): SimState | null {
   try {
     const s = JSON.parse(text) as SimState;
     if (!s || s.version !== SAVE_VERSION || !Array.isArray(s.chars)) return null;
-    return s;
+    return migrate(s);
   } catch {
     return null;
   }
+}
+
+/** Completa las partidas guardadas con versiones anteriores del juego (campos nuevos con su valor por defecto). */
+function migrate(s: SimState): SimState {
+  for (const c of s.chars) c.gas ??= 0;
+  return s;
 }
 
 export function saveGame(slot: string, state: SimState): boolean {

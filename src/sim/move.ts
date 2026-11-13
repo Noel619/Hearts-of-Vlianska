@@ -3,7 +3,7 @@
 
 import { angleDiff } from '../core/math';
 import { F_SLOW, F_WATER } from '../world/grid';
-import { moveSpeed } from './chars';
+import { moveSpeed, trainMove } from './chars';
 import type { Sim } from './sim';
 import type { Char } from './types';
 
@@ -167,8 +167,11 @@ export function stepMove(sim: Sim, c: Char, dt: number): boolean {
   const k = Math.abs(dAng) < 0.5 ? 1 : 0;
   const nx = c.x + (k ? ux * stepLen : mx);
   const nz = c.z + (k ? uz * stepLen : mz);
+  const ox = c.x;
+  const oz = c.z;
   if (tryMove(sim, c, nx, nz, gates)) {
     c.stuck = Math.max(0, c.stuck - dt * 2);
+    trainMove(sim, c, Math.hypot(c.x - ox, c.z - oz));
   } else {
     c.stuck += dt * 4;
     if (c.stuck > 2.5) {

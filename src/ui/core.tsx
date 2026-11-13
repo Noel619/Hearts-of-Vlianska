@@ -6,10 +6,11 @@ import { createPortal } from 'react-dom';
 import { CREATURES } from '../data/criaturas';
 import { ROLE_NAMES } from '../data/gente';
 import { FACTION_LORE } from '../data/historia/facciones';
+import { FILTER_LIFE } from '../data/gases';
 import { ITEMS, type ItemDef, type Stack } from '../data/items';
 import type { SideId } from '../data/tipos';
 import type { Game } from '../game/game';
-import { effectiveLook } from '../sim/chars';
+import { BULK_WEIGHT, effectiveLook } from '../sim/chars';
 import type { Char } from '../sim/types';
 import { Emblem } from './sprites/Emblem';
 import { Portrait } from './sprites/Portrait';
@@ -172,7 +173,12 @@ export function itemTip(s: Stack): string {
   const a = def.armor;
   if (a && a.cover.length) lines.push(`Protección: corte ${Math.round(a.cut * 100)} % · golpes ${Math.round(a.blunt * 100)} % · balas ${Math.round(a.pierce * 100)} %`);
   if (a?.carry) lines.push(`+${a.carry} kg de carga`);
-  if (a?.filter) lines.push('Filtra el aire viciado');
+  if (a?.bulk) lines.push(`Estorbo: −${Math.round(a.bulk * BULK_WEIGHT * 100)} % al sigilo y a la esquiva`);
+  if (a?.filter) {
+    lines.push(a.filter >= 1 ? 'Deja fuera todo el gas mientras el filtro aguante' : 'Filtra el gas ligero; del denso deja pasar una parte');
+    lines.push((s.fil ?? 0) > 0 ? `Filtro puesto: ${Math.ceil(((s.fil ?? 0) / FILTER_LIFE) * 100)} %` : 'Sin filtro: en el gas se pone uno de los que lleves');
+  }
+  if (s.id === 'filtros') lines.push(`Aguanta unas ${Math.round(FILTER_LIFE / 60)} horas de gas denso. Cuando se gasta, se cambia solo`);
   if (def.food) lines.push(`Alimento: ${def.food}`);
   if (def.med) lines.push(`Cura ${def.med.heal}${def.med.bleed ? ' y corta la hemorragia' : ''}`);
   lines.push(`${def.w} kg · ${def.price} cartuchos`);
@@ -206,10 +212,16 @@ export function useTooltip() {
   return { bind, node, clear: () => setTip(null) };
 }
 
+/** ¿Está en apuros? (el estado se pinta en rojo) */
+export function statusBad(c: Char): boolean {
+  return c.st !== 'ok' || c.bleed > 0.05 || c.gas > 0.05;
+}
+
 /** Icono que resume el estado de un personaje. */
 export function statusIcon(c: Char): string {
   if (c.st === 'muerto') return 'calavera';
-  if (c.st === 'ko') return 'ko';
+  if (c.st === 'ko') return c.gas > 0.05 ? 'gas' : 'ko';
+  if (c.gas > 0.05) return 'gas';
   if (c.target) return 'agresivo';
   if (c.bleed > 0.05) return 'sangre';
   const o = c.order;
@@ -252,8 +264,9 @@ export function statusIcon(c: Char): string {
 /** Qué está haciendo un personaje, en pocas palabras. */
 export function statusText(g: Game, c: Char): string {
   if (c.st === 'muerto') return 'Muerto';
-  if (c.st === 'ko') return c.bleed > 0.05 ? 'Inconsciente y sangrando' : 'Inconsciente';
+  if (c.st === 'ko') return c.gas > 0.05 ? 'Inconsciente en el gas' : c.bleed > 0.05 ? 'Inconsciente y sangrando' : 'Inconsciente';
   if (c.carriedBy) return 'A hombros';
+  if (c.gas > 0.05) return c.target ? 'Lucha en el gas' : 'Respira gas';
   if (c.target && (c.atkT >= 0 || c.aim > 0)) return 'Luchando';
   if (c.target) return 'En combate';
   const o = c.order;

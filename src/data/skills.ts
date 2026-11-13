@@ -1,7 +1,7 @@
 // Atributos y habilidades. Todas suben con el uso (0-100).
 
 export const SKILLS = {
-  fuerza: { name: 'Fuerza', group: 'Atributos', desc: 'Daño contundente y peso que puedes cargar. Sube cargando peso y golpeando.' },
+  fuerza: { name: 'Fuerza', group: 'Atributos', desc: 'Daño contundente y peso que puedes cargar. Sube golpeando y moviéndote con mucho peso encima.' },
   destreza: { name: 'Destreza', group: 'Atributos', desc: 'Velocidad de ataque y daño cortante. Sube peleando con armas ligeras.' },
   aguante: { name: 'Aguante', group: 'Atributos', desc: 'Cuánto castigo soportas antes de caer y lo rápido que te levantas. Sube recibiendo golpes.' },
   percepcion: { name: 'Percepción', group: 'Atributos', desc: 'Distancia a la que detectas a otros y puntería a larga distancia.' },
@@ -12,9 +12,9 @@ export const SKILLS = {
   asta: { name: 'Armas de asta', group: 'Combate', desc: 'Lanzas y bayonetas.' },
   pelea: { name: 'Pelea', group: 'Combate', desc: 'Puños y patadas.' },
   punteria: { name: 'Puntería', group: 'Combate', desc: 'Precisión con armas de fuego.' },
-  esquiva: { name: 'Esquiva', group: 'Combate', desc: 'Evitar golpes sin arma con la que parar.' },
-  atletismo: { name: 'Atletismo', group: 'Supervivencia', desc: 'Velocidad de carrera. Sube corriendo.' },
-  sigilo: { name: 'Sigilo', group: 'Supervivencia', desc: 'Moverte sin que te vean ni te oigan.' },
+  esquiva: { name: 'Esquiva', group: 'Combate', desc: 'Evitar golpes sin arma con la que parar. El equipo pesado estorba.' },
+  atletismo: { name: 'Atletismo', group: 'Supervivencia', desc: 'Velocidad de carrera. Sube corriendo, y más deprisa si vas cargado.' },
+  sigilo: { name: 'Sigilo', group: 'Supervivencia', desc: 'Moverte sin que te vean ni te oigan. El equipo pesado estorba.' },
   medicina: { name: 'Medicina', group: 'Oficios', desc: 'Rapidez y calidad de las curas.' },
   ingenieria: { name: 'Ingeniería', group: 'Oficios', desc: 'Construir, reparar y excavar.' },
   chatarreria: { name: 'Chatarrería', group: 'Oficios', desc: 'Desguazar y rebuscar entre los restos.' },
