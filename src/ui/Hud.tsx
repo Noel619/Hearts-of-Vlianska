@@ -11,57 +11,74 @@ import { invWeight, maxCarry, totalHpFrac, weaponDef } from '../sim/chars';
 import { hostile, relation } from '../sim/combat';
 import { squadCap } from '../sim/events';
 import type { Char, Stance } from '../sim/types';
-import { Bar, ItemIcon, charTitle, hex, itemTip, sideColor, sideName, statusText, useGame, useTick, useTooltip } from './core';
+import { Bar, BodyDoll, Face, ItemIcon, Money, charTitle, hex, itemTip, sideName, statusIcon, statusText, useGame, useTick, useTooltip } from './core';
+import { Emblem } from './sprites/Emblem';
+import { Icon, ItemSprite } from './sprites/Sprite';
 
 export type Screen = 'construir' | 'investigar' | 'mapa' | 'facciones' | 'cronica' | 'pausa' | 'registro' | null;
+
+const SPEEDS: [number, string][] = [
+  [1, 'play'],
+  [2, 'rapido'],
+  [4, 'rapido2'],
+  [8, 'rapido3'],
+];
+const KEYS: [Screen, string, string, string][] = [
+  ['construir', 'construir', 'Construir', 'B'],
+  ['investigar', 'estudio', 'Estudio', 'I'],
+  ['mapa', 'mapa', 'Mapa', 'M'],
+  ['facciones', 'facciones', 'Facciones', 'G'],
+  ['cronica', 'cronica', 'Crónica', 'K'],
+  ['pausa', 'menu', 'Menú', 'Esc'],
+];
 
 export function TopBar({ open }: { open: (s: Screen) => void }) {
   const g = useGame();
   useTick();
   const sim = g.sim;
-  const speeds = [1, 2, 4, 8];
   return (
     <div className="topbar">
-      <div className="place">{g.placeLabel || 'Metro de Vlianska'}</div>
-      <div className="clock">
-        Día {sim.day} · {sim.clockText()} · {sim.dateText()}
+      <div className="plaque" title="Dónde está la cámara">
+        <Emblem side="JUG" size={34} playerColor={hex(sim.state.playerColor)} />
+        <div>
+          <small>Metro de Vlianska</small>
+          <b>{g.placeLabel || 'Túneles'}</b>
+        </div>
       </div>
-      <div className="row speed">
-        <button className={'btn' + (g.paused ? ' on' : '')} onClick={() => g.togglePause()} title="Pausa (Espacio)">
-          ❚❚
+      <div className="clockbox" title={sim.dateText()}>
+        <span className="day">
+          Día <b>{sim.day}</b>
+        </span>
+        <span className="time">{sim.clockText()}</span>
+        <span className="date">{sim.dateText()}</span>
+      </div>
+      <div className="speed">
+        <button className={'key' + (g.paused ? ' on' : '')} onClick={() => g.togglePause()} title="Pausa (Espacio)">
+          <Icon id="pausa" size={15} />
         </button>
-        {speeds.map((s, i) => (
-          <button key={s} className={'btn' + (!g.paused && g.speed === s ? ' on' : '')} onClick={() => g.setSpeed(s)} title={`Velocidad ×${s} (${i + 1})`}>
-            ×{s}
+        {SPEEDS.map(([sp, icon], i) => (
+          <button key={sp} className={'key' + (!g.paused && g.speed === sp ? ' on' : '')} onClick={() => g.setSpeed(sp)} title={`Velocidad ×${sp} (${i + 1})`}>
+            <Icon id={icon} size={15} />
           </button>
         ))}
       </div>
       <div className="sp" />
-      <div className="money" title="Cartuchos de grado militar: la moneda del metro">
-        <span style={{ display: 'inline-block', width: 7, height: 15, background: 'linear-gradient(#f2d28a,#a8791e)', borderRadius: '3px 3px 1px 1px' }} />
-        {sim.state.money}
+      <div className="counter" title="Cartuchos de grado militar: la moneda del metro">
+        <Money n={sim.state.money} size={24} />
       </div>
-      <div className="dim" title="Tamaño de la escuadra">
-        {sim.players.length}/{squadCap(sim)}
+      <div className="counter" title="Tamaño de la escuadra">
+        <Icon id="escuadra" size={17} />
+        {sim.players.length}
+        <i>/{squadCap(sim)}</i>
       </div>
-      <button className="btn" onClick={() => open('construir')} title="Construir (B)">
-        Construir
-      </button>
-      <button className="btn" onClick={() => open('investigar')} title="Investigación (I)">
-        Estudio
-      </button>
-      <button className="btn" onClick={() => open('mapa')} title="Mapa del metro (M)">
-        Mapa
-      </button>
-      <button className="btn" onClick={() => open('facciones')} title="Facciones (G)">
-        Facciones
-      </button>
-      <button className="btn" onClick={() => open('cronica')} title="Crónica del metro (K)">
-        Crónica
-      </button>
-      <button className="btn" onClick={() => open('pausa')} title="Menú (Esc)">
-        ☰
-      </button>
+      <div className="keys">
+        {KEYS.map(([scr, icon, label, k]) => (
+          <button key={label} className="key tall" onClick={() => open(scr)} title={`${label} (${k})`}>
+            <Icon id={icon} size={19} />
+            <span>{label}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -71,7 +88,6 @@ export function SquadBar() {
   useTick();
   const sim = g.sim;
   const sel = new Set(g.selected);
-  const col = hex(sim.state.playerColor);
   const lastClick = useRef({ id: 0, t: 0 });
   const all = sim.state.chars.filter((c) => c.player);
   return (
@@ -89,9 +105,7 @@ export function SquadBar() {
               if (c.st !== 'muerto') g.select([c.id], e.shiftKey);
             }}
           >
-            <div className="face" style={{ background: c.st === 'muerto' ? '#444' : col, opacity: down ? 0.6 : 1 }}>
-              {c.name[0]}
-            </div>
+            <Face c={c} size={46} playerColor={sim.state.playerColor} />
             <div className="grow">
               <div className="nm">{c.name}</div>
               <Bar v={totalHpFrac(c)} cls="thin" color={c.st === 'muerto' ? '#555' : undefined} />
@@ -99,7 +113,10 @@ export function SquadBar() {
                 <Bar v={c.blood / 100} cls="thin blood" style={{ flex: 1 }} />
                 <Bar v={c.hunger / 100} cls="thin amber" style={{ flex: 1 }} />
               </div>
-              <div className="st">{statusText(g, c)}</div>
+              <div className={'st' + (c.st !== 'ok' || c.bleed > 0.05 ? ' bad' : '')}>
+                <Icon id={statusIcon(c)} size={11} />
+                {statusText(g, c)}
+              </div>
             </div>
           </div>
         );
@@ -108,18 +125,19 @@ export function SquadBar() {
   );
 }
 
-const STANCES: [Stance, string, string][] = [
-  ['agresivo', 'Agresivo', 'Ataca a cualquier enemigo que vea'],
-  ['defensivo', 'Defensivo', 'Solo se defiende y defiende a los suyos'],
-  ['pasivo', 'Pasivo', 'No pelea salvo que se lo ordenes'],
+const STANCES: [Stance, string, string, string][] = [
+  ['agresivo', 'Agresivo', 'Ataca a cualquier enemigo que vea', 'agresivo'],
+  ['defensivo', 'Defensivo', 'Solo se defiende y defiende a los suyos', 'defensivo'],
+  ['pasivo', 'Pasivo', 'No pelea salvo que se lo ordenes', 'pasivo'],
 ];
-const SLOTS: [EquipSlot, string][] = [
-  ['arma', 'Arma'],
-  ['cabeza', 'Cabeza'],
-  ['cara', 'Cara'],
-  ['torso', 'Torso'],
-  ['mochila', 'Espalda'],
-  ['luz', 'Luz'],
+/** Huecos de equipo: nombre y sprite fantasma que se ve cuando está vacío. */
+const SLOTS: [EquipSlot, string, string][] = [
+  ['arma', 'Arma', 'ak'],
+  ['cabeza', 'Cabeza', 'casco'],
+  ['cara', 'Cara', 'mascaraGas'],
+  ['torso', 'Torso', 'chaleco'],
+  ['mochila', 'Espalda', 'mochila'],
+  ['luz', 'Luz', 'linterna'],
 ];
 
 export function SelectionPanel() {
@@ -136,92 +154,104 @@ export function SelectionPanel() {
     chars.forEach(fn);
     g.bump();
   };
-  const w = weaponDef(c);
   const weight = invWeight(c);
   const cap = maxCarry(c);
+  const w = weaponDef(c);
   return (
     <div className="panel selpanel">
       <div className="selhead">
-        <span className="name">{c.name}</span>
-        <span className="dim">{many ? `y ${chars.length - 1} más` : charTitle(c)}</span>
-        <span className="sp" />
-        <span className={c.st !== 'ok' ? 'bad' : 'dim'}>{statusText(g, c)}</span>
+        <Face c={c} size={58} playerColor={sim.state.playerColor} />
+        <div className="grow">
+          <div className="name">{c.name}</div>
+          <div className="sub">
+            {many ? `y ${chars.length - 1} más seleccionados` : charTitle(c) || 'Superviviente'}
+            {w ? ` · ${c.eq.arma ? ITEMS[c.eq.arma.id].name : ''}` : ''}
+          </div>
+        </div>
+        <span className={'chipst' + (c.st !== 'ok' || c.bleed > 0.05 ? ' bad' : '')}>
+          <Icon id={statusIcon(c)} size={13} />
+          {statusText(g, c)}
+        </span>
       </div>
       <div className="tabs">
         <button className={'tab' + (tab === 'inv' ? ' on' : '')} onClick={() => setTab('inv')}>
-          Equipo
+          <Icon id="equipo" size={13} /> Equipo
         </button>
         <button className={'tab' + (tab === 'skills' ? ' on' : '')} onClick={() => setTab('skills')}>
-          Habilidades
+          <Icon id="habilidades" size={13} /> Habilidades
         </button>
         <button className={'tab' + (tab === 'jobs' ? ' on' : '')} onClick={() => setTab('jobs')}>
-          Trabajos {c.jobs.length ? `(${c.jobs.length})` : ''}
+          <Icon id="trabajos" size={13} /> Trabajos {c.jobs.length ? `(${c.jobs.length})` : ''}
         </button>
       </div>
       <div className="selbody">
         <div className="vitals">
-          {BODY_PARTS.map((name, i) => (
-            <div className="part" key={i} title={c.wound[i] > 0.8 ? 'Herida abierta: sangra hasta que se vende' : ''}>
-              <span className={c.wound[i] > 0.8 ? 'bad' : c.hp[i] <= 0 ? 'bad' : ''}>{name}</span>
-              <Bar v={c.hp[i] / c.hpMax[i]} color={c.hp[i] <= 0 ? '#7a1a14' : c.hp[i] < c.hpMax[i] * 0.4 ? '#d98a2a' : undefined} />
+          <BodyDoll c={c} size={116} names={BODY_PARTS} />
+          <div className="meters">
+            <div className="meter" title={`Salud: ${Math.round(totalHpFrac(c) * 100)} %`}>
+              <Icon id="corazon" size={13} />
+              <Bar v={totalHpFrac(c)} />
             </div>
-          ))}
-          <div className="part" style={{ marginTop: 4 }}>
-            <span>Sangre</span>
-            <Bar v={c.blood / 100} cls="blood" />
-          </div>
-          <div className="part">
-            <span>Hambre</span>
-            <Bar v={c.hunger / 100} cls="amber" />
-          </div>
-          <div className="part">
-            <span className={weight > cap ? 'bad' : ''}>Carga</span>
-            <Bar v={weight / cap} color={weight > cap ? '#e0624f' : '#8d8a80'} />
+            <div className="meter" title={`Sangre: ${Math.round(c.blood)} %${c.bleed > 0.05 ? ' · sangrando' : ''}`}>
+              <Icon id="sangre" size={13} className={c.bleed > 0.05 ? 'bad' : ''} />
+              <Bar v={c.blood / 100} cls="blood" />
+            </div>
+            <div className="meter" title={`Hambre: ${Math.round(c.hunger)} %`}>
+              <Icon id="hambre" size={13} />
+              <Bar v={c.hunger / 100} cls="amber" />
+            </div>
+            <div className="meter" title={`Carga: ${weight.toFixed(1)} de ${cap.toFixed(0)} kg`}>
+              <Icon id="carga" size={13} className={weight > cap ? 'bad' : ''} />
+              <Bar v={weight / cap} color={weight > cap ? '#e0624f' : '#9a968a'} />
+            </div>
+            <div className="kg">
+              {weight.toFixed(0)}/{cap.toFixed(0)} kg
+            </div>
           </div>
         </div>
         <div className="grow col" style={{ gap: 0, minHeight: 0 }}>
           <div className="grow scroll">
             {tab === 'inv' && (
               <>
-                <div className="inv" style={{ gridTemplateColumns: 'repeat(6, 1fr)', paddingBottom: 2 }}>
-                  {SLOTS.map(([slot, label]) => {
-                    const s = c.eq[slot];
+                <div className="eqrow">
+                  {SLOTS.map(([slot, label, ghost]) => {
+                    const st = c.eq[slot];
                     return (
                       <div
                         key={slot}
-                        className={'slot eq' + (s ? '' : ' empty')}
-                        {...(s ? tip.bind(itemTip(s) + '\nClic: quitar') : tip.bind(label))}
+                        className={'slot eq' + (st ? ' k-' + (ITEMS[st.id]?.kind ?? 'varios') : ' empty')}
+                        {...(st ? tip.bind(itemTip(st) + '\nClic: quitar', st.id) : tip.bind(`${label}: vacío`))}
                         onClick={() => {
-                          if (s) {
+                          if (st) {
                             unequipSlot(sim, c, slot);
                             tip.clear();
                             g.bump();
                           }
                         }}
                       >
-                        {s ? <ItemIcon id={s.id} size={30} /> : null}
+                        <ItemSprite id={st ? st.id : ghost} size={40} className={st ? '' : 'ghost'} />
                         <span className="lbl">{label}</span>
-                        {s?.mag !== undefined && <span className="n">{s.mag}</span>}
+                        {st?.mag !== undefined && <span className="n">{st.mag}</span>}
                       </div>
                     );
                   })}
                 </div>
                 <div className="inv">
-                  {c.inv.map((s, i) => (
+                  {c.inv.map((st, i) => (
                     <div
-                      key={i + s.id}
-                      className="slot"
-                      {...tip.bind(itemTip(s) + '\nClic: usar o equipar · Mayús+clic: soltar')}
+                      key={i + st.id}
+                      className={'slot k-' + (ITEMS[st.id]?.kind ?? 'varios')}
+                      {...tip.bind(itemTip(st) + '\nClic: usar o equipar · Mayús+clic: soltar', st.id)}
                       onClick={(e) => {
-                        if (e.shiftKey) dropItem(sim, c, i, e.ctrlKey ? s.n : 1);
+                        if (e.shiftKey) dropItem(sim, c, i, e.ctrlKey ? st.n : 1);
                         else useItem(sim, c, i);
                         tip.clear();
                         g.bump();
                       }}
                     >
-                      <ItemIcon id={s.id} size={30} />
-                      {s.n > 1 && <span className="n">{s.n}</span>}
-                      {s.hot && s.hot !== 'acarreo' && <span className="tag">●</span>}
+                      <ItemSprite id={st.id} size={38} />
+                      {st.n > 1 && <span className="n">{st.n}</span>}
+                      {st.hot && st.hot !== 'acarreo' && <span className="tag" title="Robado" />}
                     </div>
                   ))}
                   {c.inv.length === 0 && <div className="dim" style={{ gridColumn: '1 / -1', padding: 6 }}>No lleva nada.</div>}
@@ -240,8 +270,9 @@ export function SelectionPanel() {
                   const b = j.id ? sim.state.buildings.find((x) => x.id === j.id) : null;
                   const label = j.t === 'construir' ? 'Construir obras' : j.t === 'acarrear' ? 'Acarrear al almacén' : j.t === 'chatarrear' ? 'Desguazar chatarra' : b ? `${j.t === 'cultivar' ? 'Cultivar' : j.t === 'investigar' ? 'Investigar' : 'Trabajar'}: ${BUILDS[b.def].name}` : j.t;
                   return (
-                    <div className="row" key={i}>
-                      <span className="amber" style={{ fontFamily: 'var(--mono)', width: 18 }}>{i + 1}.</span>
+                    <div className="jobrow" key={i}>
+                      <span className="num">{i + 1}</span>
+                      <Icon id={j.t === 'construir' ? 'construir' : j.t === 'acarrear' ? 'caja' : j.t === 'chatarrear' ? 'trabajos' : 'trabajar'} size={14} />
                       <span className="grow">{label}</span>
                       <button
                         className="btn small"
@@ -268,7 +299,7 @@ export function SelectionPanel() {
                         })
                       }
                     >
-                      {t === 'construir' ? 'Construir obras' : 'Acarrear'}
+                      <Icon id={t === 'construir' ? 'construir' : 'caja'} size={12} /> {t === 'construir' ? 'Construir obras' : 'Acarrear'}
                     </button>
                   ))}
                 </div>
@@ -276,28 +307,30 @@ export function SelectionPanel() {
             )}
           </div>
           <div className="toggles">
-            {STANCES.map(([id, label, t]) => (
-              <button key={id} className={'btn small' + (c.stance === id ? ' on' : '')} title={t} onClick={() => setAll((q) => (q.stance = id))}>
-                {label}
-              </button>
-            ))}
+            <div className="seg">
+              {STANCES.map(([id, label, t, icon]) => (
+                <button key={id} className={'key' + (c.stance === id ? ' on' : '')} title={`${label}: ${t}`} onClick={() => setAll((q) => (q.stance = id))}>
+                  <Icon id={icon} size={16} />
+                </button>
+              ))}
+            </div>
+            <span className="stance">{STANCES.find((x) => x[0] === c.stance)?.[1]}</span>
             <span className="sp" />
-            <button className={'btn small' + (c.lamp ? ' on' : '')} disabled={!hasLamp(c)} title="Linterna (L): ves mejor, pero te ven desde lejos" onClick={() => setAll((q) => (q.lamp = hasLamp(q) ? !c.lamp : false))}>
-              Luz
+            <button className={'key' + (c.lamp ? ' on' : '')} disabled={!hasLamp(c)} title="Linterna (L): ves mejor, pero te ven desde lejos" onClick={() => setAll((q) => (q.lamp = hasLamp(q) ? !c.lamp : false))}>
+              <Icon id="luz" size={16} />
             </button>
-            <button className={'btn small' + (c.sneak ? ' on' : '')} title="Sigilo (C): lento y difícil de ver, sobre todo a oscuras" onClick={() => setAll((q) => (q.sneak = !c.sneak))}>
-              Sigilo
+            <button className={'key' + (c.sneak ? ' on' : '')} title="Sigilo (C): lento y difícil de ver, sobre todo a oscuras" onClick={() => setAll((q) => (q.sneak = !c.sneak))}>
+              <Icon id="sigilo" size={16} />
             </button>
-            <button className={'btn small' + (c.hold ? ' on' : '')} title="Mantener posición (H)" onClick={() => setAll((q) => (q.hold = !c.hold))}>
-              Quieto
+            <button className={'key' + (c.hold ? ' on' : '')} title="Mantener posición (H)" onClick={() => setAll((q) => (q.hold = !c.hold))}>
+              <Icon id="quieto" size={16} />
             </button>
-            <button className={'btn small' + (c.autoHeal ? ' on' : '')} title="Cura a los compañeros heridos cuando no tiene órdenes" onClick={() => setAll((q) => (q.autoHeal = !c.autoHeal))}>
-              Médico
+            <button className={'key' + (c.autoHeal ? ' on' : '')} title="Médico: cura a los compañeros heridos cuando no tiene órdenes" onClick={() => setAll((q) => (q.autoHeal = !c.autoHeal))}>
+              <Icon id="medico" size={16} />
             </button>
           </div>
         </div>
       </div>
-      {w && false}
       {tip.node}
     </div>
   );
@@ -333,33 +366,55 @@ export function InspectPanel() {
   const first = sim.players[0];
   const hs = first ? hostile(sim, first, c) : false;
   const rel = c.side !== 'MUT' && c.side !== 'LIB' && c.side !== 'JUG' ? relation(sim, 'JUG', c.side) : null;
-  const w = weaponDef(c);
   const wname = c.eq.arma ? ITEMS[c.eq.arma.id].name : c.kind === 'humano' ? 'Desarmado' : '';
+  const mood = c.st === 'muerto' ? 'Muerto' : c.st === 'ko' ? 'Inconsciente' : hs ? 'Hostil' : rel !== null ? (rel > 30 ? 'Amistoso' : rel < -20 ? 'Receloso' : 'Neutral') : 'Neutral';
   return (
     <div className="panel inspect">
-      <h3>{c.name}</h3>
-      <div className="row" style={{ marginBottom: 5 }}>
-        <span style={{ width: 10, height: 10, background: sideColor(c.side, sim.state.playerColor), display: 'inline-block', border: '1px solid #000' }} />
-        <span>{sideName(c.side, sim.state.playerName)}</span>
-        <span className="dim">· {charTitle(c)}</span>
+      <div className="row" style={{ gap: 9, alignItems: 'flex-start' }}>
+        <Face c={c} size={62} playerColor={sim.state.playerColor} />
+        <div className="grow">
+          <h3>{c.name}</h3>
+          <div className="row side">
+            <Emblem side={c.side} size={18} playerColor={hex(sim.state.playerColor)} />
+            <span>{sideName(c.side, sim.state.playerName)}</span>
+          </div>
+          <div className="dim">{charTitle(c)}</div>
+        </div>
       </div>
-      <Bar v={totalHpFrac(c)} color={hs ? '#e0624f' : undefined} />
-      <div className="dim" style={{ margin: '5px 0 2px' }}>
-        {c.st === 'muerto' ? 'Muerto' : c.st === 'ko' ? 'Inconsciente' : hs ? 'Hostil' : rel !== null ? (rel > 30 ? 'Amistoso' : rel < -20 ? 'Receloso' : 'Neutral') : 'Neutral'}
-        {wname ? ` · ${wname}` : ''}
-        {w?.ranged ? ' (arma de fuego)' : ''}
+      <Bar v={totalHpFrac(c)} color={hs ? '#e0624f' : undefined} style={{ margin: '8px 0 6px' }} />
+      <div className="row" style={{ flexWrap: 'wrap', gap: 4 }}>
+        <span className={'chipst' + (hs || c.st !== 'ok' ? ' bad' : '')}>
+          <Icon id={c.st === 'muerto' ? 'calavera' : c.st === 'ko' ? 'ko' : hs ? 'agresivo' : 'ojo'} size={12} />
+          {mood}
+        </span>
+        {wname && (
+          <span className="chipst">
+            {c.eq.arma ? <ItemSprite id={c.eq.arma.id} size={18} /> : <Icon id="pasivo" size={12} />}
+            {wname}
+          </span>
+        )}
       </div>
       {c.kind === 'humano' && (
-        <div className="dim">
+        <div className="dim" style={{ marginTop: 5 }}>
           Combate {Math.floor((c.sk.ataque + c.sk.defensa) / 2)} · Puntería {Math.floor(c.sk.punteria)}
         </div>
       )}
       {c.bio && <div style={{ marginTop: 6, lineHeight: 1.35 }}>{c.bio}</div>}
-      {c.hire && <div className="amber" style={{ marginTop: 5 }}>Se contrata por {c.hire} cartuchos.</div>}
-      {c.vendor && <div className="amber" style={{ marginTop: 5 }}>Comercia. Clic derecho para hablar.</div>}
+      {c.hire && (
+        <div className="amber row" style={{ marginTop: 5 }}>
+          Se contrata por <Money n={c.hire} />
+        </div>
+      )}
+      {c.vendor && (
+        <div className="amber row" style={{ marginTop: 5 }}>
+          <Icon id="comerciar" size={14} /> Comercia. Clic derecho para hablar.
+        </div>
+      )}
     </div>
   );
 }
+
+export const LOG_ICON: Record<string, string> = { bueno: 'check', malo: 'aviso', historia: 'cronica', info: 'diario' };
 
 export function LogView() {
   const g = useGame();
@@ -370,11 +425,35 @@ export function LogView() {
     <div className="log">
       {recent.reverse().map((l) => (
         <div key={l.t + l.msg} className={'logline ' + l.kind}>
-          {l.msg}
+          <Icon id={LOG_ICON[l.kind] ?? 'diario'} size={13} />
+          <span>{l.msg}</span>
         </div>
       ))}
     </div>
   );
+}
+
+/** Icono de cada acción del menú contextual, según lo que dice. */
+function actionIcon(label: string): string {
+  const l = label.toLowerCase();
+  if (/atacar|rematar/.test(l)) return 'atacar';
+  if (/comerciar/.test(l)) return 'comerciar';
+  if (/hablar/.test(l)) return 'hablar';
+  if (/curar|auxilios/.test(l)) return 'curar';
+  if (/cargar|acostar/.test(l)) return 'cargar';
+  if (/seguir/.test(l)) return 'seguir';
+  if (/forzar/.test(l)) return 'candado';
+  if (/recoger|registrar/.test(l)) return 'saquear';
+  if (/abrir|contenido/.test(l)) return 'abrir';
+  if (/construir/.test(l)) return 'construir';
+  if (/descansar/.test(l)) return 'descansar';
+  if (/receta/.test(l)) return 'receta';
+  if (/asignar/.test(l)) return 'fijo';
+  if (/derribar el muro|excavar/.test(l)) return 'excavar';
+  if (/derribar/.test(l)) return 'derribar';
+  if (/desguazar|rascar/.test(l)) return 'trabajos';
+  if (/trabajar|atender|investigar/.test(l)) return 'trabajar';
+  return 'ir';
 }
 
 export function ContextMenuView() {
@@ -382,8 +461,8 @@ export function ContextMenuView() {
   useTick();
   const m = g.menu;
   if (!m) return null;
-  const x = Math.min(m.x, window.innerWidth - 200);
-  const y = Math.min(m.y, window.innerHeight - 40 - m.actions.length * 32);
+  const x = Math.min(m.x, window.innerWidth - 230);
+  const y = Math.min(m.y, window.innerHeight - 50 - m.actions.length * 36);
   return (
     <div className="panel ctx" style={{ left: x, top: y }}>
       <div className="ttl">{m.title}</div>
@@ -397,8 +476,11 @@ export function ContextMenuView() {
             g.bump();
           }}
         >
-          {a.label}
-          {a.hint && <small>{a.hint}</small>}
+          <Icon id={actionIcon(a.label)} size={16} />
+          <span>
+            {a.label}
+            {a.hint && <small>{a.hint}</small>}
+          </span>
         </button>
       ))}
     </div>
@@ -433,7 +515,11 @@ export function Overlays() {
           </div>
         );
       })}
-      {g.paused && !g.panel && <div className="paused-tag pass">PAUSA</div>}
+      {g.paused && !g.panel && (
+        <div className="paused-tag pass">
+          <Icon id="pausa" size={15} /> Pausa
+        </div>
+      )}
       {def && (
         <div className="panel hint">
           <b className="amber">{def.name}</b> · clic para colocar · <kbd>R</kbd> girar · <kbd>Mayús</kbd> colocar varias · clic derecho o <kbd>Esc</kbd> para cancelar

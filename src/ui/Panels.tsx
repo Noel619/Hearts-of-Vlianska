@@ -14,7 +14,9 @@ import { addItem, countItem, invWeight, maxCarry } from '../sim/chars';
 import { relation } from '../sim/combat';
 import { buyItem, buyPrice, deliverLetter, deliverPrisoner, hire, payStaToll, sellItem, sellPrice, shopOf, staTollFee, staTollState } from '../sim/events';
 import type { Char } from '../sim/types';
-import { ItemIcon, Win, charTitle, itemTip, sideColor, sideName, useGame, useTick, useTooltip } from './core';
+import { Cost, Face, ItemIcon, Money, Win, charTitle, itemTip, sideName, useGame, useTick, useTooltip } from './core';
+import { Emblem } from './sprites/Emblem';
+import { Icon } from './sprites/Sprite';
 
 const GREET: Record<string, string[]> = {
   UNI: ['Orden y calma. Circule.', 'La Unión vela por estos túneles.', '¿Documentación? Bah, pase.'],
@@ -69,14 +71,19 @@ function DialogWin({ p }: { p: Extract<Panel, { t: 'hablar' }> }) {
   // En Staraya, quien no ha pagado el peaje no comercia
   const moroso = npc.side === 'STA' && npc.ai.place === 'STA' && staTollState(sim) === 'moroso';
   return (
-    <Win title={npc.name} onClose={close} cls="dialog">
-      <div className="row" style={{ marginBottom: 8 }}>
-        <span style={{ width: 11, height: 11, background: sideColor(npc.side), border: '1px solid #000' }} />
-        <span>{sideName(npc.side)}</span>
-        <span className="dim">· {charTitle(npc)}</span>
+    <Win title={npc.name} icon="hablar" onClose={close} cls="dialog">
+      <div className="talk">
+        <Face c={npc} size={104} />
+        <div className="grow">
+          <div className="row side">
+            <Emblem side={npc.side} size={22} />
+            <span>{sideName(npc.side)}</span>
+            <span className="dim">· {charTitle(npc)}</span>
+          </div>
+          {npc.bio && <p className="dim">{npc.bio}</p>}
+          <p className="quote">{text ?? (rel < -20 ? 'No tengo nada que hablar contigo.' : `«${greet[(npc.id + n) % greet.length]}»`)}</p>
+        </div>
       </div>
-      {npc.bio && <p className="dim">{npc.bio}</p>}
-      <p className="quote">{text ?? (rel < -20 ? 'No tengo nada que hablar contigo.' : `«${greet[(npc.id + n) % greet.length]}»`)}</p>
       <div className="opts">
         {npc.vendor && rel > -40 && !moroso && (
           <button
@@ -86,17 +93,17 @@ function DialogWin({ p }: { p: Extract<Panel, { t: 'hablar' }> }) {
               g.bump();
             }}
           >
-            Comerciar
+            <Icon id="comerciar" size={16} /> Comerciar
           </button>
         )}
         {moroso && (
           <button className="btn" disabled={sim.state.money < staTollFee(sim)} onClick={() => say(payStaToll(sim) ?? '«Así sí. Bienvenidos a la Encrucijada.»')}>
-            Pagar el peaje de Staraya ({staTollFee(sim)} cartuchos)
+            <Icon id="candado" size={16} /> Pagar el peaje de Staraya ({staTollFee(sim)} cartuchos)
           </button>
         )}
         {isDoc && rel > -30 && (
           <button className="btn" disabled={cost <= 0} onClick={() => say(payHeal(sim, actor) ?? 'El médico trabaja en silencio. Cuando termina, tu gente vuelve a tenerse en pie.')}>
-            {cost > 0 ? `Curar a mi gente (${cost} cartuchos)` : 'Nadie necesita cura'}
+            <Icon id="curar" size={16} /> {cost > 0 ? `Curar a mi gente (${cost} cartuchos)` : 'Nadie necesita cura'}
           </button>
         )}
         {npc.hire !== undefined && (
@@ -108,27 +115,27 @@ function DialogWin({ p }: { p: Extract<Panel, { t: 'hablar' }> }) {
               else close();
             }}
           >
-            Contratar ({npc.hire} cartuchos)
+            <Icon id="escuadra" size={16} /> Contratar ({npc.hire} cartuchos)
           </button>
         )}
         {hasLetter && npc.unique === 'volkov' && (
           <button className="btn" onClick={() => say(deliverLetter(sim, letterCarrier, 'volkov'))}>
-            Entregar la carta de Bessmertny
+            <ItemIcon id="cartaBessmertny" size={24} /> Entregar la carta de Bessmertny
           </button>
         )}
         {hasLetter && npc.unique === 'bessmertny' && (
           <button className="btn" onClick={() => say(deliverLetter(sim, letterCarrier, 'bessmertny'))}>
-            Devolverle su carta: nunca llegó a Volkov
+            <ItemIcon id="cartaBessmertny" size={24} /> Devolverle su carta: nunca llegó a Volkov
           </button>
         )}
         {hasLetter && npc.unique === 'orlova' && (
           <button className="btn" onClick={() => say(deliverLetter(sim, letterCarrier, 'orlova'))}>
-            Vender la carta al Consejo Mercantil
+            <ItemIcon id="cartaBessmertny" size={24} /> Vender la carta al Consejo Mercantil
           </button>
         )}
         {prisoner && carrier && authority && (
           <button className="btn" onClick={() => say(deliverPrisoner(sim, carrier, npc) ?? 'No es asunto mío.')}>
-            Entregar a {prisoner.name}
+            <Icon id="cargar" size={16} /> Entregar a {prisoner.name}
           </button>
         )}
         {rel > -40 && (
@@ -139,11 +146,11 @@ function DialogWin({ p }: { p: Extract<Panel, { t: 'hablar' }> }) {
               setText(rumor(npc, n + npc.id));
             }}
           >
-            ¿Qué se cuenta por aquí?
+            <Icon id="ojo" size={16} /> ¿Qué se cuenta por aquí?
           </button>
         )}
         <button className="btn" onClick={close}>
-          Adiós
+          <Icon id="salir" size={16} /> Adiós
         </button>
       </div>
     </Win>
@@ -163,65 +170,73 @@ function TradeWin({ p }: { p: Extract<Panel, { t: 'comercio' }> }) {
   const place = npc.ai.place;
   const qty = (e: React.MouseEvent, n: number) => (e.ctrlKey ? n : e.shiftKey ? Math.min(5, n) : 1);
   return (
-    <Win title={`Comercio · ${npc.name}`} onClose={() => g.closePanel()} width={860}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+    <Win title={`Comercio · ${npc.name}`} icon="comerciar" onClose={() => g.closePanel()} width={900}>
+      <div className="twocol">
         <div>
-          <div className="row" style={{ marginBottom: 6 }}>
-            <b className="amber">{npc.name}</b>
-            <span className="sp" />
-            <span className="dim">Tiene {shop.money} cartuchos</span>
+          <div className="who">
+            <Face c={npc} size={44} />
+            <div className="grow">
+              <b>{npc.name}</b>
+              <small>Vende · clic para comprar</small>
+            </div>
+            <Money n={shop.money} />
           </div>
-          <div className="list scroll" style={{ maxHeight: '54vh' }}>
+          <div className="list scroll" style={{ maxHeight: '52vh' }}>
             {shop.stock.map((s, i) => (
               <div
                 key={i + s.id}
                 className="item"
-                {...tip.bind(itemTip(s))}
+                {...tip.bind(itemTip(s), s.id)}
                 onClick={(e) => {
                   setMsg(buyItem(sim, actor, npc, i, qty(e, s.n)) ?? '');
                   g.bump();
                 }}
               >
                 <ItemIcon id={s.id} />
-                <span>{ITEMS[s.id].name}</span>
+                <span className="nm">{ITEMS[s.id].name}</span>
                 <span className="q">×{s.n}</span>
-                <span className="p">{buyPrice(sim, place, s.id, npc.side)}</span>
+                <Money n={buyPrice(sim, place, s.id, npc.side)} size={15} cls="p" />
               </div>
             ))}
             {!shop.stock.length && <div className="dim">No le queda nada.</div>}
           </div>
         </div>
         <div>
-          <div className="row" style={{ marginBottom: 6 }}>
-            <b className="amber">{actor.name}</b>
-            <span className="sp" />
-            <span className="dim">
-              Tienes {sim.state.money} cartuchos · {invWeight(actor).toFixed(0)}/{maxCarry(actor).toFixed(0)} kg
-            </span>
+          <div className="who">
+            <Face c={actor} size={44} playerColor={sim.state.playerColor} />
+            <div className="grow">
+              <b>{actor.name}</b>
+              <small>
+                Lleva {invWeight(actor).toFixed(0)}/{maxCarry(actor).toFixed(0)} kg · clic para vender
+              </small>
+            </div>
+            <Money n={sim.state.money} />
           </div>
-          <div className="list scroll" style={{ maxHeight: '54vh' }}>
+          <div className="list scroll" style={{ maxHeight: '52vh' }}>
             {actor.inv.map((s, i) => (
               <div
                 key={i + s.id}
                 className="item"
-                {...tip.bind(itemTip(s))}
+                {...tip.bind(itemTip(s), s.id)}
                 onClick={(e) => {
                   setMsg(sellItem(sim, actor, npc, i, qty(e, s.n)) ?? '');
                   g.bump();
                 }}
               >
                 <ItemIcon id={s.id} />
-                <span>{ITEMS[s.id].name}</span>
+                <span className="nm">{ITEMS[s.id].name}</span>
                 <span className="q">×{s.n}</span>
-                <span className="p">{sellPrice(sim, place, s.id, npc.side)}</span>
+                <Money n={sellPrice(sim, place, s.id, npc.side)} size={15} cls="p" />
               </div>
             ))}
             {!actor.inv.length && <div className="dim">No llevas nada que vender.</div>}
           </div>
         </div>
       </div>
-      <div className="row" style={{ marginTop: 10 }}>
-        <span className="dim">Clic: 1 unidad · Mayús: 5 · Ctrl: todas</span>
+      <div className="row foot">
+        <span className="dim">
+          <kbd>Clic</kbd> 1 unidad · <kbd>Mayús</kbd> 5 · <kbd>Ctrl</kbd> todas
+        </span>
         <span className="sp" />
         <span className="bad">{msg}</span>
       </div>
@@ -282,7 +297,7 @@ function LootWin({ p }: { p: Extract<Panel, { t: 'saqueo' }> }) {
     <div
       key={i + s.id + (from === me ? 'a' : 'b')}
       className="item"
-      {...tip.bind(itemTip(s))}
+      {...tip.bind(itemTip(s), s.id)}
       onClick={(e) => {
         setMsg(transfer(sim, from, to, i, qty(e, s.n), actor) ?? '');
         tip.clear();
@@ -290,30 +305,39 @@ function LootWin({ p }: { p: Extract<Panel, { t: 'saqueo' }> }) {
       }}
     >
       <ItemIcon id={s.id} />
-      <span>{ITEMS[s.id].name}</span>
+      <span className="nm">{ITEMS[s.id].name}</span>
       <span className="q">×{s.n}</span>
       <span className="p dim">{(ITEMS[s.id].w * s.n).toFixed(1)} kg</span>
     </div>
   );
   return (
-    <Win title={tgt.title} onClose={() => g.closePanel()} width={820}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+    <Win title={tgt.title} icon="saquear" onClose={() => g.closePanel()} width={860}>
+      <div className="twocol">
         <div>
-          <div className="row" style={{ marginBottom: 6 }}>
-            <b className="amber">{tgt.title}</b>
-            <span className="sp" />
+          <div className="who">
+            {eq ? (
+              <Face c={eq} size={44} />
+            ) : (
+              <span className="face">
+                <Icon id="caja" size={24} />
+              </span>
+            )}
+            <div className="grow">
+              <b>{tgt.title}</b>
+              <small>Clic para coger</small>
+            </div>
             <button className="btn small" onClick={all} disabled={!items.length}>
-              Coger todo
+              <Icon id="recoger" size={12} /> Coger todo
             </button>
           </div>
-          <div className="list scroll" style={{ maxHeight: '52vh' }}>
+          <div className="list scroll" style={{ maxHeight: '50vh' }}>
             {eq &&
               (Object.keys(eq.eq) as EquipSlot[]).map((slot) => {
                 const s = eq.eq[slot]!;
                 return (
-                  <div key={slot} className="item" {...tip.bind(itemTip(s))} onClick={() => takeEq(slot)}>
+                  <div key={slot} className="item" {...tip.bind(itemTip(s), s.id)} onClick={() => takeEq(slot)}>
                     <ItemIcon id={s.id} />
-                    <span>{ITEMS[s.id].name}</span>
+                    <span className="nm">{ITEMS[s.id].name}</span>
                     <span className="q">puesto</span>
                     <span className="p dim">{ITEMS[s.id].w.toFixed(1)} kg</span>
                   </div>
@@ -324,21 +348,25 @@ function LootWin({ p }: { p: Extract<Panel, { t: 'saqueo' }> }) {
           </div>
         </div>
         <div>
-          <div className="row" style={{ marginBottom: 6 }}>
-            <b className="amber">{actor.name}</b>
-            <span className="sp" />
-            <span className="dim">
-              {invWeight(actor).toFixed(0)}/{maxCarry(actor).toFixed(0)} kg
-            </span>
+          <div className="who">
+            <Face c={actor} size={44} playerColor={sim.state.playerColor} />
+            <div className="grow">
+              <b>{actor.name}</b>
+              <small>
+                Lleva {invWeight(actor).toFixed(0)}/{maxCarry(actor).toFixed(0)} kg · clic para dejar
+              </small>
+            </div>
           </div>
-          <div className="list scroll" style={{ maxHeight: '52vh' }}>
+          <div className="list scroll" style={{ maxHeight: '50vh' }}>
             {actor.inv.map((s, i) => row(s, i, me, tgt.h))}
             {!actor.inv.length && <div className="dim">No llevas nada.</div>}
           </div>
         </div>
       </div>
-      <div className="row" style={{ marginTop: 10 }}>
-        <span className="dim">Clic: toda la pila · Mayús: una unidad</span>
+      <div className="row foot">
+        <span className="dim">
+          <kbd>Clic</kbd> toda la pila · <kbd>Mayús</kbd> una unidad
+        </span>
         <span className="sp" />
         <span className="bad">{msg}</span>
       </div>
@@ -357,11 +385,16 @@ function TollWin({ p }: { p: Extract<Panel, { t: 'peaje' }> }) {
     const fee = staTollFee(sim);
     const union = sim.state.rep.UNI >= 40;
     return (
-      <Win title="Peaje de Staraya" cls="dialog">
+      <Win title="Peaje de Staraya" icon="candado" cls="dialog">
+        <div className="talk">
+          <Face c={npc} size={104} />
+          <div className="grow">
         <p className="quote">
           «Alto. Estáis en la Encrucijada: cinco túneles, cinco peajes. Son {fee} cartuchos por vuestra gente y lo que lleváis encima. Quien paga, comercia; quien no, media vuelta.»
         </p>
         <p className="dim">{npc.name}, del Consejo Mercantil, apunta algo en una libreta sin levantar la vista. Detrás, los mercenarios miran vuestras mochilas.</p>
+          </div>
+        </div>
         <div className="opts">
           <button
             className="btn"
@@ -402,11 +435,16 @@ function TollWin({ p }: { p: Extract<Panel, { t: 'peaje' }> }) {
   const toll = Math.max(20, Math.min(160, Math.round(sim.state.money * 0.25)));
   const sq = npc.squad ? sim.squad(npc.squad) : null;
   return (
-    <Win title="Peaje de los bandidos" cls="dialog">
+    <Win title="Peaje de los bandidos" icon="aviso" cls="dialog">
+      <div className="talk">
+        <Face c={npc} size={104} />
+        <div className="grow">
       <p className="quote">
         «Alto ahí. Estos túneles son de la Hermandad. {toll} cartuchos y seguís con todos los dientes. Pagar a Vhlainska es más barato que perder la caravana.»
       </p>
       <p className="dim">{npc.name} y los suyos os cierran el paso con las armas a medio levantar.</p>
+        </div>
+      </div>
       <div className="opts">
         <button
           className="btn"
@@ -444,55 +482,57 @@ function WorkshopWin({ p }: { p: Extract<Panel, { t: 'taller' }> }) {
   const def = BUILDS[b.def];
   const recipes = (def.recipes ?? []).map((id) => RECIPES[id]).filter(Boolean);
   return (
-    <Win title={def.name} onClose={() => g.closePanel()} width={720}>
+    <Win title={def.name} icon="trabajar" onClose={() => g.closePanel()} width={760}>
       <p className="dim" style={{ marginTop: 0 }}>
         Elige qué fabricar y asigna a alguien al taller (clic derecho sobre él). Los materiales se cogen del almacén más cercano.
       </p>
-      <div className="list">
+      <div className="list recipes">
         {recipes.map((r) => {
           const ok = recipeAvailable(sim, r.id);
           const cur = b.recipe === r.id;
           return (
-            <div key={r.id} className={'card' + (cur ? ' sel' : '') + (ok ? '' : ' off')} style={{ cursor: 'default' }}>
-              <div className="row">
-                <ItemIcon id={r.out[0]} />
-                <h4 className="grow">
+            <div key={r.id} className={'recipe' + (cur ? ' sel' : '') + (ok ? '' : ' off')}>
+              <ItemIcon id={r.out[0]} size={46} />
+              <div className="grow">
+                <h4>
                   {r.name} <span className="dim">×{r.out[1]}</span>
                 </h4>
-                {ok ? (
-                  <>
-                    {[1, 5].map((n) => (
-                      <button key={n} className="btn small" onClick={() => (setRecipe(sim, b, r.id, (cur ? b.count : 0) + n, false), g.bump())}>
-                        +{n}
-                      </button>
-                    ))}
-                    <button className={'btn small' + (cur && b.loop ? ' on' : '')} onClick={() => (setRecipe(sim, b, r.id, 0, !(cur && b.loop)), g.bump())}>
-                      Sin parar
+                <div className="row">
+                  <Cost items={r.in} have={(id) => owned(sim, id) + countItem({ inv: b.store }, id)} />
+                  {cur && (
+                    <span className="amber" style={{ fontSize: 12 }}>
+                      {b.loop ? 'En bucle' : `Pendientes: ${b.count}`} · {Math.round(b.craft * 100)} %
+                    </span>
+                  )}
+                </div>
+              </div>
+              {ok ? (
+                <div className="row">
+                  {[1, 5].map((n) => (
+                    <button key={n} className="btn small" onClick={() => (setRecipe(sim, b, r.id, (cur ? b.count : 0) + n, false), g.bump())}>
+                      +{n}
                     </button>
-                  </>
-                ) : (
-                  <span className="bad">Falta investigar</span>
-                )}
-              </div>
-              <div className="cost">
-                {r.in.map(([id, n]) => (
-                  <span key={id} className={owned(sim, id) + countItem({ inv: b.store }, id) >= n ? '' : 'no'}>
-                    {n} × {ITEMS[id].name} ({owned(sim, id)})
-                  </span>
-                ))}
-                {cur && <span className="amber">{b.loop ? 'En bucle' : `Pendientes: ${b.count}`} · {Math.round(b.craft * 100)} %</span>}
-              </div>
+                  ))}
+                  <button className={'btn small' + (cur && b.loop ? ' on' : '')} onClick={() => (setRecipe(sim, b, r.id, 0, !(cur && b.loop)), g.bump())}>
+                    Sin parar
+                  </button>
+                </div>
+              ) : (
+                <span className="bad row">
+                  <Icon id="candado" size={13} /> Falta investigar
+                </span>
+              )}
             </div>
           );
         })}
       </div>
-      <div className="row" style={{ marginTop: 10 }}>
+      <div className="row foot">
         <button className="btn" onClick={() => (setRecipe(sim, b, null, 0, false), g.bump())}>
-          Parar
+          <Icon id="pausa" size={12} /> Parar
         </button>
         <span className="sp" />
         <button className="btn" onClick={() => g.openBuilding(b.id)}>
-          Ver contenido
+          <Icon id="abrir" size={13} /> Ver contenido
         </button>
       </div>
     </Win>

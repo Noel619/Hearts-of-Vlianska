@@ -12,8 +12,14 @@ import type { FactionId } from '../data/tipos';
 import { owned, startResearch, techState } from '../sim/actions';
 import { hasTech } from '../sim/build';
 import { deleteSave, listSaves, loadGame, saveGame } from '../sim/save';
-import { Bar, Win, hex, useGame, useTick } from './core';
+import { propThumb } from '../render/thumbs';
+import { Bar, Cost, ItemIcon, Win, hex, useGame, useTick } from './core';
+import { LOG_ICON } from './Hud';
+import { Emblem } from './sprites/Emblem';
+import { Icon } from './sprites/Sprite';
 import { repWord, type Screen } from './Hud';
+
+const CAT_ICON: Record<BuildCat, string> = { Refugio: 'cama', Supervivencia: 'hambre', Almacén: 'caja', Industria: 'trabajar', Defensa: 'defensivo', Luz: 'luz' };
 
 export function BuildScreen({ close }: { close: () => void }) {
   const g = useGame();
@@ -21,38 +27,49 @@ export function BuildScreen({ close }: { close: () => void }) {
   const sim = g.sim;
   const [cat, setCat] = useState<BuildCat>('Refugio');
   return (
-    <Win title="Construir" onClose={close} width={900}>
-      <div className="tabs" style={{ marginBottom: 10, border: '1px solid var(--line)' }}>
+    <Win title="Construir" icon="construir" onClose={close} width={960}>
+      <div className="tabs big">
         {BUILD_CATS.map((c) => (
           <button key={c} className={'tab' + (cat === c ? ' on' : '')} onClick={() => setCat(c)}>
-            {c}
+            <Icon id={CAT_ICON[c]} size={15} /> {c}
           </button>
         ))}
       </div>
-      <div className="cards">
+      <div className="cards builds">
         {BUILD_LIST.filter((b) => b.cat === cat).map((b) => {
           const locked = !hasTech(sim, b.tech);
+          const thumb = propThumb(g.gfx.renderer, b.prop, b.variant ?? 0);
           return (
             <button
               key={b.id}
-              className={'card' + (locked ? ' off' : '')}
+              className={'card build' + (locked ? ' off' : '')}
               onClick={() => {
                 if (locked) return;
                 g.startBuild(b.id);
                 close();
               }}
             >
-              <h4>{b.name}</h4>
-              <small>{b.desc}</small>
-              <div className="cost">
-                {b.cost.map(([id, n]) => (
-                  <span key={id} className={owned(sim, id) >= n ? '' : 'no'}>
-                    {n} {ITEMS[id].name}
-                  </span>
-                ))}
-              </div>
-              {locked && <small className="bad">Requiere: {TECHS[b.tech!]?.name}</small>}
-              {b.power && b.power > 0 ? <small className="amber">Consume {b.power} de energía</small> : null}
+              <span className="thumb">{thumb ? <img src={thumb} alt="" draggable={false} /> : <Icon id="construir" size={40} />}</span>
+              <span className="info">
+                <h4>{b.name}</h4>
+                <small>{b.desc}</small>
+                <Cost items={b.cost} have={(id) => owned(sim, id)} />
+                {locked && (
+                  <small className="bad row">
+                    <Icon id="candado" size={12} /> Requiere: {TECHS[b.tech!]?.name}
+                  </small>
+                )}
+                {b.power && b.power > 0 ? (
+                  <small className="amber row">
+                    <Icon id="energia" size={12} /> Consume {b.power} de energía
+                  </small>
+                ) : null}
+                {b.power && b.power < 0 ? (
+                  <small className="good row">
+                    <Icon id="energia" size={12} /> Produce {-b.power} de energía
+                  </small>
+                ) : null}
+              </span>
             </button>
           );
         })}
@@ -64,6 +81,31 @@ export function BuildScreen({ close }: { close: () => void }) {
   );
 }
 
+/** Sprite que representa cada técnica. */
+const TECH_SPRITE: Record<string, string> = {
+  construccion: 'tablones',
+  hongos2: 'hongos',
+  cerdos: 'carne',
+  agua: 'agua',
+  medicina1: 'botiquin',
+  antibioticos: 'antibioticos',
+  fundicion: 'acero',
+  herramientas: 'martillo',
+  municion: 'balas',
+  quimica: 'polvora',
+  destilacion: 'combustible',
+  generadores: 'componentes',
+  hidroponia: 'hongosSecos',
+  armas1: 'fusilTunel',
+  armas2: 'carabina',
+  neumaticas: 'neumatico',
+  blindaje: 'chalecoPlacas',
+  mascaras: 'mascaraGas',
+  excavacion: 'pico',
+  mando: 'casco',
+  radio: 'radioPiezas',
+};
+
 export function ResearchScreen({ close }: { close: () => void }) {
   const g = useGame();
   useTick();
@@ -71,45 +113,60 @@ export function ResearchScreen({ close }: { close: () => void }) {
   const [msg, setMsg] = useState('');
   const cur = sim.state.tech.cur ? TECHS[sim.state.tech.cur] : null;
   return (
-    <Win title="Mesa de estudio" onClose={close} width={920}>
+    <Win title="Mesa de estudio" icon="estudio" onClose={close} width={980}>
       {cur ? (
-        <div style={{ marginBottom: 10 }}>
-          <div className="row">
-            <b className="amber">Investigando: {cur.name}</b>
-            <span className="sp" />
-            <span className="dim">
-              {Math.floor(sim.state.tech.prog)}/{cur.cost}
-            </span>
+        <div className="curtech">
+          <ItemIcon id={TECH_SPRITE[cur.id] ?? 'libros'} size={52} />
+          <div className="grow">
+            <div className="row">
+              <b className="amber">Investigando: {cur.name}</b>
+              <span className="sp" />
+              <span className="dim">
+                {Math.floor(sim.state.tech.prog)}/{cur.cost}
+              </span>
+            </div>
+            <Bar v={sim.state.tech.prog / cur.cost} cls="amber fat" />
           </div>
-          <Bar v={sim.state.tech.prog / cur.cost} cls="amber" />
         </div>
       ) : (
         <p className="dim" style={{ marginTop: 0 }}>
           Elige qué estudiar. Hace falta una mesa de estudio y alguien que trabaje en ella; algunas técnicas consumen libros o planos.
         </p>
       )}
-      <div className="cards">
+      <div className="cards techs">
         {TECH_LIST.map((t) => {
           const st = techState(sim, t.id);
           return (
             <button
               key={t.id}
-              className={'card' + (st === 'bloqueada' ? ' off' : '') + (st === 'en curso' ? ' sel' : '')}
+              className={'card tech' + (st === 'bloqueada' ? ' off' : '') + (st === 'en curso' ? ' sel' : '') + (st === 'hecha' ? ' done' : '')}
               onClick={() => st === 'disponible' && (setMsg(startResearch(sim, t.id) ?? ''), g.bump())}
             >
-              <h4>
-                {t.name} {st === 'hecha' && <span className="good">✓</span>}
-              </h4>
-              <small>{t.desc}</small>
-              <div className="cost">
-                <span>{t.cost} de estudio</span>
-                {(t.needs ?? []).map(([id, n]) => (
-                  <span key={id} className={owned(sim, id) >= n || st === 'hecha' ? '' : 'no'}>
-                    {n} {ITEMS[id].name}
+              <span className="medal">
+                <ItemIcon id={TECH_SPRITE[t.id] ?? 'libros'} size={50} />
+                {st === 'hecha' && (
+                  <i className="badge good">
+                    <Icon id="check" size={11} />
+                  </i>
+                )}
+                {st === 'bloqueada' && (
+                  <i className="badge">
+                    <Icon id="candado" size={11} />
+                  </i>
+                )}
+              </span>
+              <span className="info">
+                <h4>{t.name}</h4>
+                <small>{t.desc}</small>
+                <span className="row">
+                  <span className="chip" title="Puntos de estudio">
+                    <Icon id="estudio" size={13} />
+                    {t.cost}
                   </span>
-                ))}
-              </div>
-              {st === 'bloqueada' && <small className="bad">Antes: {(t.req ?? []).map((r) => TECHS[r].name).join(', ')}</small>}
+                  {t.needs && <Cost items={t.needs} have={st === 'hecha' ? undefined : (id) => owned(sim, id)} />}
+                </span>
+                {st === 'bloqueada' && <small className="bad">Antes: {(t.req ?? []).map((r) => TECHS[r].name).join(', ')}</small>}
+              </span>
             </button>
           );
         })}
@@ -221,7 +278,7 @@ export function MapScreen({ close }: { close: () => void }) {
     ctx.strokeRect(sx(f.x) - 12, sz(f.z) - 8, 24, 16);
   });
   return (
-    <Win title="Metro de Vlianska" onClose={close}>
+    <Win title="Metro de Vlianska" icon="mapa" onClose={close}>
       <canvas
         ref={ref}
         width={W}
@@ -271,11 +328,9 @@ export function FactionsScreen({ close }: { close: () => void }) {
     const leader = FIGURE_BY_ID[f.leader];
     const dead = sim.state.flags['muerto_' + f.leader];
     return (
-      <Win title={f.name} onClose={() => setOpen(null)} width={760} cls="lore">
-        <div className="row" style={{ marginBottom: 8 }}>
-          <div className="emblem" style={{ background: f.color }}>
-            {f.id}
-          </div>
+      <Win title={f.name} icon="facciones" onClose={() => setOpen(null)} width={760} cls="lore">
+        <div className="row" style={{ marginBottom: 8, gap: 12 }}>
+          <Emblem side={open} size={76} />
           <div>
             <div>{f.government}</div>
             <div className="dim">
@@ -298,7 +353,7 @@ export function FactionsScreen({ close }: { close: () => void }) {
     );
   }
   return (
-    <Win title="Facciones del metro" onClose={close} width={800}>
+    <Win title="Facciones del metro" icon="facciones" onClose={close} width={820}>
       <div className="list" style={{ gap: 5 }}>
         {FACTION_IDS.map((id) => {
           const f = FACTION_LORE[id];
@@ -307,13 +362,9 @@ export function FactionsScreen({ close }: { close: () => void }) {
           const stations = Object.values(sim.state.stations).filter((s) => s.owner === id).length;
           return (
             <div key={id} className="fac" onClick={() => setOpen(id)}>
-              <div className="emblem" style={{ background: f.color }}>
-                {id}
-              </div>
+              <Emblem side={id} size={52} />
               <div>
-                <b className="amber" style={{ fontFamily: 'var(--stencil)', fontSize: 18, fontWeight: 'normal', letterSpacing: '0.04em' }}>
-                  {f.name}
-                </b>
+                <b className="fname">{f.name}</b>
                 <div className="dim" style={{ fontSize: 12.5 }}>
                   {f.government} · {stations} {stations === 1 ? 'estación' : 'estaciones'}
                   {bounty > 0 ? <span className="bad"> · Te buscan ({bounty})</span> : null}
@@ -340,7 +391,7 @@ export function FactionsScreen({ close }: { close: () => void }) {
 
 export function CodexScreen({ close }: { close: () => void }) {
   return (
-    <Win title="Crónica del metro" onClose={close} width={780} cls="lore">
+    <Win title="Crónica del metro" icon="cronica" onClose={close} width={780} cls="lore">
       {LORE.map((ch) => (
         <section key={ch.title}>
           <h3>{ch.title}</h3>
@@ -358,12 +409,15 @@ export function LogScreen({ close }: { close: () => void }) {
   const g = useGame();
   useTick();
   return (
-    <Win title="Diario" onClose={close} width={720}>
+    <Win title="Diario" icon="diario" onClose={close} width={720}>
       <div className="list">
         {[...g.sim.state.log].reverse().map((l, i) => (
           <div key={i} className={'logline ' + l.kind} style={{ animation: 'none' }}>
-            <span className="dim">Día {Math.floor(l.t / 1440) + 1} · </span>
-            {l.msg}
+            <Icon id={LOG_ICON[l.kind] ?? 'diario'} size={13} />
+            <span>
+              <span className="dim">Día {Math.floor(l.t / 1440) + 1} · </span>
+              {l.msg}
+            </span>
           </div>
         ))}
       </div>
@@ -414,19 +468,19 @@ export function PauseScreen({ close, exit, open }: { close: () => void; exit: ()
   const slots = ['partida1', 'partida2', 'partida3'];
   if (view === 'ayuda')
     return (
-      <Win title="Cómo se juega" onClose={() => setView('menu')} width={700}>
+      <Win title="Cómo se juega" icon="ayuda" onClose={() => setView('menu')} width={700}>
         <HelpBody />
       </Win>
     );
   if (view === 'ajustes')
     return (
-      <Win title="Ajustes" onClose={() => setView('menu')} width={460}>
+      <Win title="Ajustes" icon="ajustes" onClose={() => setView('menu')} width={460}>
         <SettingsBody />
       </Win>
     );
   if (view === 'guardar' || view === 'cargar')
     return (
-      <Win title={view === 'guardar' ? 'Guardar partida' : 'Cargar partida'} onClose={() => setView('menu')} width={520}>
+      <Win title={view === 'guardar' ? 'Guardar partida' : 'Cargar partida'} icon="guardar" onClose={() => setView('menu')} width={560}>
         <div className="list" style={{ gap: 5 }}>
           {(view === 'guardar' ? slots : [...new Set([...saves.map((s) => s.slot), ...slots])]).map((slot) => {
             const m = saves.find((s) => s.slot === slot);
@@ -448,7 +502,7 @@ export function PauseScreen({ close, exit, open }: { close: () => void; exit: ()
                     }
                   }}
                 >
-                  {m ? `${m.name} · día ${m.day} · ${m.squad} en la escuadra · ${new Date(m.when).toLocaleString('es-ES')}` : `${slot === 'auto' ? 'Autoguardado' : slot === 'rapido' ? 'Guardado rápido' : 'Hueco libre'}`}
+                  <Icon id="guardar" size={14} /> {m ? `${m.name} · día ${m.day} · ${m.squad} en la escuadra · ${new Date(m.when).toLocaleString('es-ES')}` : `${slot === 'auto' ? 'Autoguardado' : slot === 'rapido' ? 'Guardado rápido' : 'Hueco libre'}`}
                 </button>
                 {m && view === 'cargar' && (
                   <button className="btn danger" onClick={() => (deleteSave(slot), setMsg('Borrada.'))}>
@@ -463,28 +517,28 @@ export function PauseScreen({ close, exit, open }: { close: () => void; exit: ()
       </Win>
     );
   return (
-    <Win title="Sombras de Vlianska" onClose={close} width={360}>
-      <div className="col">
+    <Win title="Sombras de Vlianska" icon="menu" onClose={close} width={380}>
+      <div className="col menu-list">
         <button className="btn big" onClick={close}>
-          Continuar
+          <Icon id="play" size={16} /> Continuar
         </button>
         <button className="btn big" onClick={() => setView('guardar')}>
-          Guardar
+          <Icon id="guardar" size={16} /> Guardar
         </button>
         <button className="btn big" onClick={() => setView('cargar')}>
-          Cargar
+          <Icon id="recoger" size={16} /> Cargar
         </button>
         <button className="btn big" onClick={() => open('registro')}>
-          Diario
+          <Icon id="diario" size={16} /> Diario
         </button>
         <button className="btn big" onClick={() => setView('ajustes')}>
-          Ajustes
+          <Icon id="ajustes" size={16} /> Ajustes
         </button>
         <button className="btn big" onClick={() => setView('ayuda')}>
-          Cómo se juega
+          <Icon id="ayuda" size={16} /> Cómo se juega
         </button>
         <button className="btn big danger" onClick={exit}>
-          Salir al menú
+          <Icon id="salir" size={16} /> Salir al menú
         </button>
       </div>
     </Win>
@@ -550,7 +604,7 @@ export function GameOver({ exit }: { exit: () => void }) {
   const g = useGame();
   const st = g.sim.state;
   return (
-    <Win title="La escuadra ha caído" width={520}>
+    <Win title="La escuadra ha caído" icon="calavera" width={520}>
       <p className="quote">El metro no guarda luto. Mañana otros ocuparán vuestro sitio junto a la hoguera.</p>
       <p>
         {st.playerName} resistió {g.sim.day} {g.sim.day === 1 ? 'día' : 'días'}. Enemigos abatidos: {st.stats.kills}. Cartuchos ganados: {st.stats.earned}. Obras levantadas: {st.stats.built}.

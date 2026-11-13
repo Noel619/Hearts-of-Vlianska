@@ -9,6 +9,9 @@ import { Game, type Shared } from '../game/game';
 import type { Quality } from '../render/gfx';
 import { listSaves, loadGame, saveGame } from '../sim/save';
 import { GameCtx, hex } from './core';
+import { Emblem } from './sprites/Emblem';
+import { Icon, ItemSprite, SpriteSheet } from './sprites/Sprite';
+import { ITEMS } from '../data/items';
 import { ContextMenuView, InspectPanel, LogView, Overlays, SelectionPanel, SquadBar, TopBar, type Screen } from './Hud';
 import { PanelView } from './Panels';
 import { BuildScreen, CodexScreen, FactionsScreen, GameOver, HelpBody, LogScreen, MapScreen, PauseScreen, ResearchScreen, SettingsBody } from './Screens';
@@ -175,6 +178,7 @@ export function App() {
 
   return (
     <>
+      <SpriteSheet />
       <canvas ref={canvasRef} className="game-canvas" tabIndex={0} />
       {error && (
         <div className="loading">
@@ -187,6 +191,7 @@ export function App() {
       {mode === 'cargando' && !error && (
         <div className="loading">
           <div className="box">
+            <Emblem side="JUG" size={92} />
             <h1 className="title" style={{ fontSize: 52 }}>
               <span>Sombras de</span>Vlianska
             </h1>
@@ -205,26 +210,29 @@ export function App() {
           {mode === 'menu' && (
             <div className="menu">
               <div className="side">
-                <h1 className="title">
-                  <span>Sombras de</span>Vlianska
-                </h1>
+                <div className="logo">
+                  <Emblem side="JUG" size={84} />
+                  <h1 className="title">
+                    <span>Sombras de</span>Vlianska
+                  </h1>
+                </div>
                 <p className="tagline">
                   Enero de 2033. Veinte años después de las bombas, ocho facciones se reparten las dieciséis estaciones del metro. Tú no eres ninguna de ellas. Todavía.
                 </p>
                 <button className="btn big" onClick={() => setMode('nueva')}>
-                  Nueva partida
+                  <Icon id="play" size={17} /> Nueva partida
                 </button>
                 <button className="btn big" disabled={!listSaves().length} onClick={() => setMenuView('cargar')}>
-                  Continuar
+                  <Icon id="guardar" size={17} /> Continuar
                 </button>
                 <button className="btn big" onClick={() => setMenuView('cronica')}>
-                  Crónica del metro
+                  <Icon id="cronica" size={17} /> Crónica del metro
                 </button>
                 <button className="btn big" onClick={() => setMenuView('ayuda')}>
-                  Cómo se juega
+                  <Icon id="ayuda" size={17} /> Cómo se juega
                 </button>
                 <button className="btn big" onClick={() => setMenuView('ajustes')}>
-                  Ajustes
+                  <Icon id="ajustes" size={17} /> Ajustes
                 </button>
                 <div className="sp" />
                 <div className="dim" style={{ fontSize: 12 }}>
@@ -232,7 +240,7 @@ export function App() {
                 </div>
               </div>
               {menuView === 'cronica' && (
-                <Win title="Crónica del metro" onClose={() => setMenuView('main')} width={780} cls="lore">
+                <Win title="Crónica del metro" icon="cronica" onClose={() => setMenuView('main')} width={780} cls="lore">
                   {LORE.map((ch) => (
                     <section key={ch.title}>
                       <h3>{ch.title}</h3>
@@ -244,17 +252,17 @@ export function App() {
                 </Win>
               )}
               {menuView === 'ayuda' && (
-                <Win title="Cómo se juega" onClose={() => setMenuView('main')} width={700}>
+                <Win title="Cómo se juega" icon="ayuda" onClose={() => setMenuView('main')} width={700}>
                   <HelpBody />
                 </Win>
               )}
               {menuView === 'ajustes' && (
-                <Win title="Ajustes" onClose={() => setMenuView('main')} width={460}>
+                <Win title="Ajustes" icon="ajustes" onClose={() => setMenuView('main')} width={460}>
                   <SettingsBody />
                 </Win>
               )}
               {menuView === 'cargar' && (
-                <Win title="Continuar" onClose={() => setMenuView('main')} width={520}>
+                <Win title="Continuar" icon="guardar" onClose={() => setMenuView('main')} width={620}>
                   <div className="list" style={{ gap: 5 }}>
                     {listSaves().map((m) => (
                       <button
@@ -269,7 +277,7 @@ export function App() {
                           }
                         }}
                       >
-                        {m.name} · día {m.day} · {m.squad} en la escuadra · {m.slot === 'auto' ? 'autoguardado' : m.slot === 'rapido' ? 'guardado rápido' : m.slot} · {new Date(m.when).toLocaleString('es-ES')}
+                        <Icon id="guardar" size={14} /> {m.name} · día {m.day} · {m.squad} en la escuadra · {m.slot === 'auto' ? 'autoguardado' : m.slot === 'rapido' ? 'guardado rápido' : m.slot} · {new Date(m.when).toLocaleString('es-ES')}
                       </button>
                     ))}
                   </div>
@@ -319,23 +327,32 @@ function NewGame({ back, start }: { back: () => void; start: (scenario: string, 
   const [name, setName] = useState('Los Sin Nombre');
   const [color, setColor] = useState(COLORS[0]);
   const sc = SCENARIOS.find((s) => s.id === sel)!;
+  // Lo que lleva la escuadra al empezar, sumado
+  const kitMap = new Map<string, number>();
+  for (const m of sc.members) {
+    if (m.weapon) kitMap.set(m.weapon, (kitMap.get(m.weapon) ?? 0) + 1);
+    for (const a of m.armor ?? []) kitMap.set(a, (kitMap.get(a) ?? 0) + 1);
+    for (const [id, n] of m.items ?? []) kitMap.set(id, (kitMap.get(id) ?? 0) + n);
+  }
+  const kit = [...kitMap].filter(([id]) => ITEMS[id]);
   return (
     <div className="shade">
       <div className="panel win newgame">
         <header>
+          <Icon id="play" size={20} className="hic" />
           <h2>Nueva partida</h2>
-          <button className="x" onClick={back}>
-            ✕
+          <button className="x" onClick={back} aria-label="Cerrar">
+            <Icon id="cerrar" size={13} />
           </button>
         </header>
         <div className="body">
           <div className="cols">
             <div className="col">
               {SCENARIOS.map((s) => (
-                <button key={s.id} className={'card' + (s.id === sel ? ' sel' : '')} onClick={() => setSel(s.id)}>
+                <button key={s.id} className={'card scen' + (s.id === sel ? ' sel' : '')} onClick={() => setSel(s.id)}>
                   <h4>{s.name}</h4>
-                  <small>
-                    {s.members.length} {s.members.length === 1 ? 'persona' : 'personas'} · {s.difficulty}
+                  <small className="row">
+                    <Icon id="escuadra" size={12} /> {s.members.length} · <span className={'diff d-' + s.difficulty.replace(/\s/g, '')}>{s.difficulty}</span>
                   </small>
                 </button>
               ))}
@@ -345,9 +362,22 @@ function NewGame({ back, start }: { back: () => void; start: (scenario: string, 
               {sc.intro.map((p, i) => (
                 <p key={i}>{p}</p>
               ))}
-              <p className="dim">
-                Dificultad: {sc.difficulty} · {sc.money} cartuchos · {sc.members.length} en la escuadra
-              </p>
+              <div className="startkit">
+                <span className="chip" title="Cartuchos para empezar">
+                  <ItemSprite id="cartucho" size={22} />
+                  {sc.money}
+                </span>
+                <span className="chip" title="Gente en la escuadra">
+                  <Icon id="escuadra" size={15} />
+                  {sc.members.length}
+                </span>
+                {kit.map(([id, n]) => (
+                  <span key={id} className="chip" title={ITEMS[id]?.name}>
+                    <ItemSprite id={id} size={24} />
+                    {n > 1 ? n : ''}
+                  </span>
+                ))}
+              </div>
               <div className="sp" />
               <label className="dim">Nombre de tu gente</label>
               <input className="txt" value={name} maxLength={28} onChange={(e) => setName(e.target.value)} />
@@ -356,12 +386,14 @@ function NewGame({ back, start }: { back: () => void; start: (scenario: string, 
               </label>
               <div className="swatches">
                 {COLORS.map((c) => (
-                  <div key={c} className={'swatch' + (c === color ? ' on' : '')} style={{ background: hex(c) }} onClick={() => setColor(c)} />
+                  <div key={c} className={'swatch' + (c === color ? ' on' : '')} onClick={() => setColor(c)}>
+                    <Emblem side="JUG" size={34} playerColor={hex(c)} />
+                  </div>
                 ))}
               </div>
               <div className="row" style={{ marginTop: 14 }}>
                 <button className="btn big" onClick={() => start(sel, name.trim() || 'Los Sin Nombre', color)}>
-                  Bajar al metro
+                  <Icon id="play" size={17} /> Bajar al metro
                 </button>
                 <button className="btn" onClick={back}>
                   Volver
