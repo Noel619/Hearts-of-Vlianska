@@ -341,6 +341,8 @@ export function sellItem(sim: Sim, seller: Char, vendor: Char, index: number, n:
   if (def.kind === 'clave') return 'Eso no se vende';
   if (s.hot && s.hot === vendor.ai.place && shop.kind !== 'negro') return 'Aquí reconocen la mercancía robada';
   n = Math.min(n, s.n);
+  // Nadie regala nada, y nadie lo acepta regalado: lo que no vale ni un cartucho no se vende
+  if (sellPrice(sim, vendor.ai.place, s.id, vendor.side) <= 0) return 'Aquí no te dan nada por eso';
   let price = sellPrice(sim, vendor.ai.place, s.id, vendor.side) * n;
   if (price > shop.money) {
     if (shop.money <= 0) return 'El vendedor no tiene cartuchos';
@@ -589,7 +591,7 @@ export function stepWorldEvents(sim: Sim, dt: number) {
   // Asaltos a la base
   const base = baseCenter(sim);
   if (base && base.n >= 3) {
-    if (timer(sim, 'asalto', 2.2 * 1440)) {
+    if (timer(sim, 'asalto', 3 * 1440)) {
       setTimer(sim, 'asalto', (1.6 + sim.rng.next() * 1.8) * 1440);
       raid(sim, base);
     }
@@ -669,6 +671,39 @@ export function payStaToll(sim: Sim): string | null {
   return null;
 }
 
+/** Cuánto cuenta alguien como defensor: quien sabe pelear (nivel 25 o más) cuenta entero; un novato, menos. */
+export function fighterWeight(skill: number): number {
+  return Math.max(0.3, Math.min(1, skill / 25));
+}
+
+/** Defensores de la escuadra, cada uno según lo que sabe pelear. */
+export function defenders(sim: Sim): number {
+  let n = 0;
+  for (const c of sim.players) if (c.st !== 'muerto') n += fighterWeight(Math.max(c.sk.ataque, c.sk.punteria));
+  return n;
+}
+
+/**
+ * Gente que trae un asalto (sin contar al cabecilla). Crece con lo que hay que
+ * defender (las obras), con quien lo defiende (`squad`: los defensores, ver
+ * `defenders`) y, despacio, con el tiempo: ni arrasa una colonia recién
+ * fundada ni se queda atrás en una partida larga.
+ */
+export function raidStrength(day: number, buildings: number, squad: number): number {
+  const v = squad * 0.4 + buildings / 8 + Math.min(day, 60) / 15;
+  return Math.max(2, Math.min(RAID_MAX, Math.round(v)));
+}
+
+/** Veteranía de los asaltantes (0..1): desde el día 20 llegan más curtidos y mejor armados. */
+export function raidGrade(day: number): number {
+  return Math.max(0, Math.min(1, (day - 20) / 60));
+}
+
+/** Tope de asaltantes. */
+export const RAID_MAX = 14;
+/** A partir de cuántos asaltantes viene un cabecilla al mando. */
+export const RAID_LEADER = 5;
+
 function raid(sim: Sim, base: { x: number; z: number; n: number }) {
   const st = sim.state;
   const vhlAlive = st.stations.VHL.owner === 'VHL' && !st.flags.muerto_rybak;
@@ -681,15 +716,21 @@ function raid(sim: Sim, base: { x: number; z: number; n: number }) {
   if (!cands.length) return;
   const from = sim.rng.pick(cands);
   if (g.travelDistance(from.x, from.z, base.x, base.z) > 600) return;
-  const strength = Math.min(8, 2 + Math.floor(base.n / 3) + Math.floor(sim.day / 4));
+  const strength = raidStrength(sim.day, base.n, defenders(sim));
   const human = vhlAlive && st.rep.VHL < 30 && sim.rng.chance(0.6);
-  const roster = human ? ['jefe', ...Array(strength).fill('bandido')] : sim.rng.chance(0.5) ? Array(strength + 3).fill('rata') : Array(Math.max(2, strength - 1)).fill('skrebun');
+  // Los primeros asaltos son de muertos de hambre (sin cabecilla) o de ratas; los skrebuns, más adelante
+  const roster = human
+    ? [...(strength >= RAID_LEADER ? ['jefe'] : []), ...Array(strength).fill('bandido')]
+    : strength < 4 || sim.rng.chance(0.5)
+      ? Array(strength + 2).fill('rata')
+      : Array(Math.round(strength * 0.55)).fill('skrebun');
   const sq = newSquad(sim, human ? 'VHL' : 'MUT', 'asalto', human ? 'Asalto de saqueadores' : 'Jauría hambrienta', roster, from, [], human ? 'VHL' : '');
   const p = sim.world.nav.nearestPassable(base.x, base.z, 12) ?? base;
   sq.gx = p.x;
   sq.gz = p.z;
   sq.mode = 'asalto';
   sq.angry = true;
+  if (human) sq.grade = raidGrade(sim.day);
   sq.life = 1440;
   sim.log(human ? 'Tus vigías dan la alarma: una banda de saqueadores se acerca a la base.' : 'Algo se mueve en la oscuridad: una jauría viene hacia la base.', 'malo');
   sim.emit({ t: 'sonido', k: 'alarma', x: base.x, z: base.z });

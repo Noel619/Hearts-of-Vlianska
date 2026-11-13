@@ -1,7 +1,7 @@
 {
   "name": "sombras-de-vlianska",
   "private": true,
-  "version": "0.1.0-beta",
+  "version": "0.2.0-beta",
   "description": "RPG de escuadra y supervivencia en mundo abierto, en 3D, ambientado en el metro de Vlianska.",
   "type": "module",
   "scripts": {

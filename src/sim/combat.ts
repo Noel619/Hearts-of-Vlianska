@@ -433,11 +433,12 @@ export function stepFight(sim: Sim, c: Char, dt: number): boolean {
     c.speed = Math.max(0, c.speed - dt * 10);
     return true;
   }
-  if (ranged) {
+  // A quemarropa no se dispara: se pelea cuerpo a cuerpo, aunque sea con la culata
+  if (ranged && dist > 2.2) {
     const r = w!.ranged!;
-    const sight = dist < 2 ? 1 : sim.world.nav.sightLine(c.x, c.z, t.x, t.z);
+    const sight = sim.world.nav.sightLine(c.x, c.z, t.x, t.z);
     const inRange = dist <= r.range && sight > 0.97;
-    if (inRange && dist > 2.2) {
+    if (inRange) {
       // Apunta y dispara
       clearDest(c);
       c.speed = Math.max(0, c.speed - dt * 10);
@@ -460,7 +461,8 @@ export function stepFight(sim: Sim, c: Char, dt: number): boolean {
       const aimed = Math.abs(Math.atan2(dz, dx) - c.face) < 0.2 || Math.abs(Math.abs(Math.atan2(dz, dx) - c.face) - Math.PI * 2) < 0.2;
       if (c.cd <= 0 && aimed) {
         st.mag = (st.mag ?? 1) - 1;
-        c.cd = r.rof * (1 + sim.rng.next() * 0.25) + (c.player ? 0 : 0.25);
+        // La gente del metro apunta con menos prisa que la tuya: un tercio más lenta con cualquier arma
+        c.cd = r.rof * (1 + sim.rng.next() * 0.25) * (c.player ? 1 : 1.35);
         c.sinceFire = 0;
         fire(sim, c, t, dist, r, w!.pierce);
       }
@@ -553,7 +555,8 @@ function fire(sim: Sim, c: Char, t: Char, dist: number, r: NonNullable<ReturnTyp
   if (c.sinceHit < 1) spread *= 1.5;
   spread *= 1.5 - 0.5 * Math.min(1, t.lit * 1.6 + (t.lamp ? 0.6 : 0));
   if (c.hp[3] <= 0) spread *= 1.5;
-  const ang = Math.atan(0.34 / Math.max(1, dist));
+  // Medio ancho del blanco: un cuerpo con los brazos
+  const ang = Math.atan(0.42 / Math.max(1, dist));
   let any = false;
   for (let i = 0; i < pellets; i++) {
     const p = clamp(ang / (spread * 1.25), 0.04, 0.97);

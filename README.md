@@ -2,7 +2,7 @@
 
 RPG de escuadra y supervivencia en mundo abierto, en 3D, ambientado en el metro de Vlianska.
 
-**Versión 0.1 (beta).** El juego se puede jugar de principio a fin: todos los hilos de la trama se pueden cerrar y la emisora de onda corta lleva al final abierto. Los cambios de cada versión están en [`CHANGELOG.md`](CHANGELOG.md).
+**Versión 0.2 (beta).** El juego se puede jugar de principio a fin: todos los hilos de la trama se pueden cerrar y la emisora de onda corta lleva al final abierto. Los cambios de cada versión están en [`CHANGELOG.md`](CHANGELOG.md).
 
 Enero de 2033. Veinte años después de las bombas, ocho facciones se reparten las dieciséis estaciones del metro. Tú no eres ninguna de ellas: empiezas con un puñado de supervivientes, un cuchillo y sesenta cartuchos, y nadie te espera ni te debe nada. Comercia, rebusca chatarra, caza lo que vive en los túneles, contrata gente en las cantinas y levanta tu propia estación donde nadie mande.
 
@@ -11,7 +11,8 @@ Este repositorio contenía antes *Hearts of Vlianska* (gran estrategia en 2D). E
 ## Qué hay dentro
 
 - **El metro entero, de una pieza.** Las 16 estaciones y los 24 cruces del plano original, unidos por más de nueve kilómetros de túneles que se recorren a pie y sin pantallas de carga. Cada estación es un asentamiento distinto: el Gran Mercado de Tsentral'naya alrededor del edificio quemado del gobierno, los pozos de aire frío de Kholodnogo Vozduha, las escaleras mecánicas de Severnyy hacia la superficie, las granjas de Rassvetnaya, el manantial esmeralda de Izumrudnaya, el trono del Tuerto en Vhlainska… y Tenevskaya, a oscuras, con sus almacenes intactos.
-- **Escuadra, no héroe.** Hasta doce personas (veinte con estructura de mando) a las que das órdenes en tiempo real con pausa. Veintidós habilidades que suben con el uso; siete partes del cuerpo con su propia salud; heridas que sangran hasta que alguien las venda; inconscientes a los que se puede cargar, curar, saquear o rematar.
+- **Escuadra, no héroe.** Hasta doce personas (veinte con estructura de mando) a las que das órdenes en tiempo real con pausa. Veintidós habilidades que suben con el uso (el atletismo, corriendo; la fuerza, también cargando peso); siete partes del cuerpo con su propia salud; heridas que sangran hasta que alguien las venda; inconscientes a los que se puede cargar, curar, saquear o rematar. Se puede cambiar el nombre a cualquiera y despedir a quien sobre.
+- **Gas en los túneles.** Cinco bolsas de gas en los túneles y salas más peligrosos, marcadas en el mapa. Sin máscara quema el pecho, hace toser y delata; quien cae dentro se asfixia si nadie lo saca. La máscara antigás lo deja fuera mientras aguanta el filtro; el respirador, solo el gas ligero. El equipo pesado estorba al sigilo y a la esquiva.
 - **Ocho facciones y sus figuras.** Reputación con cada una, patrullas, caravanas, bandas, recompensas, guardias que recuerdan los robos. Volkov, Bessmertny, Orlova, Morozov, el Tuerto Rybak, Baghdadi, Voronov y Lebedeva están en sus estaciones.
 - **Economía.** Cartuchos por moneda, tiendas con existencias y dinero limitados, precios distintos en cada estación, mercado negro, peajes («cinco túneles, cinco peajes»), médicos y gente de alquiler.
 - **Tu propia base.** Tiendas, barracones, bancales de hongos, corrales, colectores de agua, talleres, fragua, armero, laboratorio, generador, muros, portones y alambradas. Recetas, almacenes, energía, turnos de trabajo automáticos, asaltos a la base y un árbol de investigación con las técnicas de la historia.
@@ -33,6 +34,8 @@ Hace falta un navegador con WebGL 2. La partida se guarda en el almacenamiento l
 
 ### Controles
 
+Estas son las teclas de siempre; todas, salvo `Esc` y las combinaciones con `Ctrl`, `Alt` y `Mayús`, se pueden cambiar en *Ajustes → Teclas*.
+
 | Tecla | Acción |
 | --- | --- |
 | Clic izquierdo | Seleccionar a alguien de tu escuadra (arrastra para elegir a varios; Mayús para añadir) |
@@ -50,6 +53,8 @@ Hace falta un navegador con WebGL 2. La partida se guarda en el almacenamiento l
 | `B` · `I` · `M` · `G` · `K` · `J` | Construir · Estudio · Mapa · Facciones · Crónica · Hilos |
 | `R` | Girar la obra antes de colocarla |
 | `F5` / `F9` | Guardado y carga rápidos |
+| `Ctrl` + `1`…`4` · `Alt` + `1`…`4` | Guardar un grupo de la escuadra · volver a seleccionarlo |
+| `Ctrl` + `A` | Seleccionar a toda la escuadra |
 
 ### Comienzos
 
@@ -70,7 +75,7 @@ src/
   ui/sprites/  sprites vectoriales: objetos, iconos, retratos y emblemas
   dev/      visor de desarrollo
 tests/      pruebas de la simulación y de la partida (Vitest)
-tools/      utilidades (plano 2D del trazado)
+tools/      utilidades (plano 2D del trazado, banco de equilibrio)
 docs/       la historia completa del universo
 ```
 
@@ -79,6 +84,18 @@ La simulación es determinista, no depende del render y su estado es JSON puro: 
 ```bash
 npm test             # pruebas
 npm run typecheck    # comprobación de tipos
+```
+
+### Banco de equilibrio
+
+`tools/balance.ts` mide el juego sin pantalla para ajustar con datos y no a ojo:
+
+```bash
+npx tsx tools/balance.ts economia   # rutas de comercio, recetas rentables y lo que no se puede vender
+npx tsx tools/balance.ts combate    # peleas típicas repetidas con semillas distintas
+npx tsx tools/balance.ts asaltos    # tamaño de los asaltos según el día, la base y la escuadra
+npx tsx tools/balance.ts etapas     # asaltos de cada etapa de la partida contra escuadras de esa etapa
+npx tsx tools/balance.ts larga 30   # una partida de 30 días con base y asaltos; vigila que nada se desboque
 ```
 
 ### Visor de desarrollo

@@ -216,7 +216,7 @@ function TradeWin({ p }: { p: Extract<Panel, { t: 'comercio' }> }) {
             {actor.inv.map((s, i) => (
               <div
                 key={i + s.id}
-                className="item"
+                className={'item' + (sellPrice(sim, place, s.id, npc.side) <= 0 || ITEMS[s.id].kind === 'clave' ? ' no' : '')}
                 {...tip.bind(itemTip(s), s.id)}
                 onClick={(e) => {
                   setMsg(sellItem(sim, actor, npc, i, qty(e, s.n)) ?? '');

@@ -5,10 +5,12 @@
 import { CREATURES } from '../data/criaturas';
 import { FIGURES } from '../data/historia/figuras';
 import { ROLE_NAMES, type Role } from '../data/gente';
+import { ITEMS } from '../data/items';
 import { HAIR_COLORS, SKIN_TONES, type Look } from '../data/looks';
+import type { SkillId } from '../data/skills';
 import type { FactionId, SideId } from '../data/tipos';
 import { seedFrom } from '../core/rng';
-import { hirePrice, makeCreature, makeHuman } from './chars';
+import { addItem, hirePrice, makeCreature, makeHuman } from './chars';
 import { hostile } from './combat';
 import { clearDest, setDest } from './move';
 import type { Sim } from './sim';
@@ -312,6 +314,7 @@ function materialize(sim: Sim, s: Squad) {
     const p = nav.nearestPassable(s.x + Math.cos(a) * r, s.z + Math.sin(a) * r, 5) ?? nav.nearestPassable(s.x, s.z, 8);
     if (!p) continue;
     const c = CREATURES[m.k] ? makeCreature(sim, m.k, p.x, p.z) : makeHuman(sim, s.side, m.k as Role, p.x, p.z);
+    if (s.grade && c.kind === 'humano') toughen(sim, c, s.grade);
     c.squad = s.id;
     c.ai.mode = CREATURES[m.k] ? 'fiera' : 'escuadra';
     c.ai.homeX = s.x;
@@ -325,6 +328,38 @@ function materialize(sim: Sim, s: Squad) {
     sim.addChar(c);
     k++;
   }
+}
+
+const COMBAT_SKILLS: SkillId[] = ['fuerza', 'destreza', 'aguante', 'percepcion', 'ataque', 'defensa', 'filo', 'contundente', 'asta', 'pelea', 'punteria', 'esquiva', 'atletismo'];
+
+/** Gente curtida: más pericia en el combate y mejor equipo según la veteranía (0..1). */
+export function toughen(sim: Sim, c: Char, grade: number) {
+  const rng = sim.rng;
+  for (const k of COMBAT_SKILLS) c.sk[k] = Math.min(90, c.sk[k] + grade * rng.range(18, 30));
+  const leader = c.role === 'jefe';
+  // En la recta final, parte de la banda es tropa de choque: placas, casco y Kaláshnikov
+  const shock = !leader && rng.chance(Math.max(0, grade - 0.4) * 0.7);
+  if (shock) {
+    const old = c.eq.arma;
+    if (old && !ITEMS[old.id].weapon?.ranged) addItem(c, old.id, 1);
+    c.eq.arma = { id: 'ak', n: 1, mag: 30 };
+    addItem(c, 'balas', 60);
+    c.eq.torso = { id: 'chalecoPlacas', n: 1 };
+    c.eq.cabeza = { id: 'casco', n: 1 };
+    return;
+  }
+  // Armas: más fusiles, y los cabecillas con Kaláshnikov
+  if (rng.chance(grade * (leader ? 0.9 : 0.55))) {
+    const gun = leader ? 'ak' : rng.pick(['fusilTunel', 'escopeta', 'subfusil', ...(grade > 0.6 ? ['ak', 'cerrojo'] : [])]);
+    const old = c.eq.arma;
+    if (old && !ITEMS[old.id].weapon?.ranged) addItem(c, old.id, 1);
+    const r = ITEMS[gun].weapon!.ranged!;
+    c.eq.arma = { id: gun, n: 1, mag: r.mag };
+    if (r.ammo !== 'aire') addItem(c, r.ammo, r.mag * 3);
+  }
+  // Blindaje
+  if (rng.chance(grade * 0.7)) c.eq.torso = { id: leader && grade > 0.5 ? 'chalecoPlacas' : 'petoCuero', n: 1 };
+  if (rng.chance(grade * (leader ? 0.9 : 0.45))) c.eq.cabeza = { id: 'casco', n: 1 };
 }
 
 function dematerialize(sim: Sim, s: Squad) {

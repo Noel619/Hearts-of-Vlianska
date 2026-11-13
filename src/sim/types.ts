@@ -199,6 +199,8 @@ export interface Squad {
   aim?: number;
   /** Temporizador de vida (bandas y asaltos se retiran). */
   life: number;
+  /** Veteranía (0..1): en una partida avanzada los asaltos traen gente más curtida y mejor armada. */
+  grade?: number;
   talked?: boolean;
 }
 

@@ -1383,6 +1383,15 @@ input.txt.nameedit.bad {
   justify-content: flex-end;
   text-align: right;
 }
+/* Lo que aquí no se puede vender */
+.item.no {
+  opacity: 0.45;
+  cursor: default;
+}
+.item.no:hover {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.015));
+  color: inherit;
+}
 .foot {
   margin-top: 12px;
   padding-top: 9px;

@@ -154,14 +154,14 @@ const gun = (
   price: number,
   blunt = 8,
 ) => add({ id, name, desc, kind: 'arma', w, price, stack: 1, model: id, weapon: { cls, hold, cut: 0, blunt, pierce, reach: 1.3, speed: 1.0, parry: 0, ranged: r } });
-gun('pistola', 'Pistola', 'Una Makárov con más años que su dueño.', 'pistola', 'pistola', 20, { ammo: 'balas', range: 22, spread: 0.07, rof: 0.7, mag: 8, reload: 2.2, noise: 55 }, 0.8, 120, 5);
-gun('subfusil', 'Subfusil de taller', 'Un tubo, un muelle y mala puntería. Escupe plomo.', 'pistola', 'fusil', 15, { ammo: 'balas', range: 20, spread: 0.11, rof: 0.16, mag: 25, reload: 2.8, noise: 60 }, 2.6, 210, 7);
-gun('escopeta', 'Recortada', 'Dos cañones, dos respuestas.', 'escopeta', 'pistola', 11, { ammo: 'cartuchosEscopeta', range: 13, spread: 0.16, rof: 0.9, mag: 2, reload: 2.6, noise: 70, pellets: 6 }, 2.4, 160);
-gun('fusilTunel', 'Fusil del túnel', 'Corto, robusto y fácil de fabricar con chatarra.', 'fusil', 'fusil', 26, { ammo: 'balas', range: 30, spread: 0.06, rof: 1.3, mag: 5, reload: 3.0, noise: 65 }, 3.4, 180, 12);
-gun('cerrojo', 'Fusil de cerrojo', 'De los abuelos. Lento, largo y certero.', 'fusil', 'fusil', 44, { ammo: 'balas', range: 46, spread: 0.022, rof: 2.0, mag: 5, reload: 3.6, noise: 75 }, 4.0, 320, 14);
-gun('ak', 'Kalashnikov restaurado', 'Limpiado y reparado pieza a pieza. Nunca falla.', 'fusil', 'fusil', 30, { ammo: 'balas', range: 36, spread: 0.05, rof: 0.22, mag: 30, reload: 2.6, noise: 75 }, 3.6, 520, 12);
+gun('pistola', 'Pistola', 'Una Makárov con más años que su dueño.', 'pistola', 'pistola', 24, { ammo: 'balas', range: 22, spread: 0.06, rof: 0.55, mag: 8, reload: 2.2, noise: 55 }, 0.8, 120, 5);
+gun('subfusil', 'Subfusil de taller', 'Un tubo, un muelle y mala puntería. Escupe plomo.', 'pistola', 'fusil', 16, { ammo: 'balas', range: 20, spread: 0.09, rof: 0.18, mag: 25, reload: 2.8, noise: 60 }, 2.6, 210, 7);
+gun('escopeta', 'Recortada', 'Dos cañones, dos respuestas.', 'escopeta', 'pistola', 13, { ammo: 'cartuchosEscopeta', range: 13, spread: 0.14, rof: 0.8, mag: 2, reload: 2.6, noise: 70, pellets: 6 }, 2.4, 160);
+gun('fusilTunel', 'Fusil del túnel', 'Corto, robusto y fácil de fabricar con chatarra.', 'fusil', 'fusil', 30, { ammo: 'balas', range: 30, spread: 0.05, rof: 0.85, mag: 8, reload: 2.6, noise: 65 }, 3.4, 180, 12);
+gun('cerrojo', 'Fusil de cerrojo', 'De los abuelos. Lento, largo y certero.', 'fusil', 'fusil', 44, { ammo: 'balas', range: 46, spread: 0.022, rof: 1.6, mag: 5, reload: 3.6, noise: 75 }, 4.0, 320, 14);
+gun('ak', 'Kalashnikov restaurado', 'Limpiado y reparado pieza a pieza. Nunca falla.', 'fusil', 'fusil', 30, { ammo: 'balas', range: 36, spread: 0.05, rof: 0.36, mag: 30, reload: 2.6, noise: 75 }, 3.6, 520, 12);
 gun('carabina', 'Carabina de grado militar', 'Cañón rectificado y mira. Lo mejor que ha visto el metro desde 2013.', 'fusil', 'fusil', 40, { ammo: 'balas', range: 52, spread: 0.016, rof: 0.5, mag: 20, reload: 2.8, noise: 75 }, 3.8, 950, 12);
-gun('neumatico', 'Fusil neumático', 'Aire comprimido y bolas de acero: silencioso y sin pólvora.', 'fusil', 'fusil', 22, { ammo: 'aire', range: 24, spread: 0.04, rof: 1.6, mag: 12, reload: 6, noise: 8 }, 3.2, 380, 9);
+gun('neumatico', 'Fusil neumático', 'Aire comprimido y bolas de acero: silencioso y sin pólvora.', 'fusil', 'fusil', 26, { ammo: 'aire', range: 24, spread: 0.04, rof: 1.1, mag: 12, reload: 5, noise: 8 }, 3.2, 380, 9);
 gun('ametralladora', 'Ametralladora', 'Rescatada de un arsenal de la defensa civil. Nadie cruza un túnel recto bajo su fuego.', 'pesada', 'fusil', 34, { ammo: 'balas', range: 44, spread: 0.07, rof: 0.11, mag: 100, reload: 6.5, noise: 90 }, 9.5, 1400, 14);
 
 // --- Herramientas -------------------------------------------------------------------
