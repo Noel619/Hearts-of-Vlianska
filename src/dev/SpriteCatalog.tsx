@@ -4,6 +4,12 @@
 import { ITEM_LIST } from '../data/items';
 import { Icon, ItemSprite, SpriteSheet } from '../ui/sprites/Sprite';
 import { UI_SPRITES } from '../ui/sprites/icons';
+import { Emblem } from '../ui/sprites/Emblem';
+import { Portrait } from '../ui/sprites/Portrait';
+import { DEFAULT_LOOK, type Look } from '../data/looks';
+import { FACTION_IDS } from '../data/historia/facciones';
+import { TEST_CASES } from './charTest';
+import type { SideId } from '../data/tipos';
 
 export function SpriteCatalog() {
   return (
@@ -29,6 +35,26 @@ export function SpriteCatalog() {
             <Icon id={id} size={18} />
           </div>
         ))}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 18 }}>
+        {([...FACTION_IDS, 'JUG', 'LIB', 'MUT'] as SideId[]).map((id) => (
+          <div key={id} style={{ textAlign: 'center' }}>
+            <Emblem side={id} size={84} />
+            <br />
+            <Emblem side={id} size={30} />
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 18 }}>
+        {TEST_CASES.map((c, i) => {
+          const look: Look = { ...DEFAULT_LOOK, seed: i * 17 + 3, ...c.look };
+          return (
+            <div key={i} style={{ background: '#101114', border: '1px solid #34363c', padding: 4 }}>
+              <Portrait look={look} size={110} />
+              <Portrait look={look} size={40} />
+            </div>
+          );
+        })}
       </div>
     </div>
   );
