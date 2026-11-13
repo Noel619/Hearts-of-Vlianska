@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { BUILDS, RECIPES } from '../data/edificios';
+import { keyName, withKeys } from '../game/keys';
 import { propThumb } from '../render/thumbs';
 import { FILTER_LIFE, GAS_DENSE } from '../data/gases';
 import { ITEMS, type EquipSlot } from '../data/items';
@@ -27,14 +28,15 @@ const SPEEDS: [number, string][] = [
   [4, 'rapido2'],
   [8, 'rapido3'],
 ];
-const KEYS: [Screen, string, string, string][] = [
-  ['construir', 'construir', 'Construir', 'B'],
-  ['investigar', 'estudio', 'Estudio', 'I'],
-  ['mapa', 'mapa', 'Mapa', 'M'],
-  ['facciones', 'facciones', 'Facciones', 'G'],
-  ['hilos', 'estrella', 'Hilos', 'J'],
-  ['cronica', 'cronica', 'Crónica', 'K'],
-  ['pausa', 'menu', 'Menú', 'Esc'],
+/** Botones de la barra superior: pantalla, icono, rótulo y acción de su tecla (el menú va siempre con Esc). */
+const KEYS: [Screen, string, string, string | null][] = [
+  ['construir', 'construir', 'Construir', 'construir'],
+  ['investigar', 'estudio', 'Estudio', 'investigar'],
+  ['mapa', 'mapa', 'Mapa', 'mapa'],
+  ['facciones', 'facciones', 'Facciones', 'facciones'],
+  ['hilos', 'estrella', 'Hilos', 'hilos'],
+  ['cronica', 'cronica', 'Crónica', 'cronica'],
+  ['pausa', 'menu', 'Menú', null],
 ];
 
 export function TopBar({ open }: { open: (s: Screen) => void }) {
@@ -64,11 +66,11 @@ export function TopBar({ open }: { open: (s: Screen) => void }) {
         <span className="date">{sim.dateText()}</span>
       </div>
       <div className="speed">
-        <button className={'key' + (g.paused ? ' on' : '')} onClick={() => g.togglePause()} title="Pausa (Espacio)">
+        <button className={'key' + (g.paused ? ' on' : '')} onClick={() => g.togglePause()} title={`Pausa (${keyName('pausa')})`}>
           <Icon id="pausa" size={15} />
         </button>
         {SPEEDS.map(([sp, icon], i) => (
-          <button key={sp} className={'key' + (!g.paused && g.speed === sp ? ' on' : '')} onClick={() => g.setSpeed(sp)} title={`Velocidad ×${sp} (${i + 1})`}>
+          <button key={sp} className={'key' + (!g.paused && g.speed === sp ? ' on' : '')} onClick={() => g.setSpeed(sp)} title={`Velocidad ×${sp} (${keyName(`vel${i + 1}`)})`}>
             <Icon id={icon} size={15} />
           </button>
         ))}
@@ -84,7 +86,7 @@ export function TopBar({ open }: { open: (s: Screen) => void }) {
       </div>
       <div className="keys">
         {KEYS.map(([scr, icon, label, k]) => (
-          <button key={label} className="key tall" onClick={() => open(scr)} title={`${label} (${k})`}>
+          <button key={label} className="key tall" onClick={() => open(scr)} title={`${label} (${k ? keyName(k) : 'Esc'})`}>
             <Icon id={icon} size={19} />
             <span>{label}</span>
           </button>
@@ -376,13 +378,13 @@ export function SelectionPanel() {
             </div>
             <span className="stance">{STANCES.find((x) => x[0] === c.stance)?.[1]}</span>
             <span className="sp" />
-            <button className={'key' + (c.lamp ? ' on' : '')} disabled={!hasLamp(c)} title="Linterna (L): ves mejor, pero te ven desde lejos" onClick={() => setAll((q) => (q.lamp = hasLamp(q) ? !c.lamp : false))}>
+            <button className={'key' + (c.lamp ? ' on' : '')} disabled={!hasLamp(c)} title={`Linterna (${keyName('linterna')}): ves mejor, pero te ven desde lejos`} onClick={() => setAll((q) => (q.lamp = hasLamp(q) ? !c.lamp : false))}>
               <Icon id="luz" size={16} />
             </button>
-            <button className={'key' + (c.sneak ? ' on' : '')} title="Sigilo (C): lento y difícil de ver, sobre todo a oscuras" onClick={() => setAll((q) => (q.sneak = !c.sneak))}>
+            <button className={'key' + (c.sneak ? ' on' : '')} title={`Sigilo (${keyName('sigilo')}): lento y difícil de ver, sobre todo a oscuras`} onClick={() => setAll((q) => (q.sneak = !c.sneak))}>
               <Icon id="sigilo" size={16} />
             </button>
-            <button className={'key' + (c.hold ? ' on' : '')} title="Mantener posición (H)" onClick={() => setAll((q) => (q.hold = !c.hold))}>
+            <button className={'key' + (c.hold ? ' on' : '')} title={`Mantener posición (${keyName('mantener')}): no se mueve por su cuenta, ni para apartarse del gas`} onClick={() => setAll((q) => (q.hold = !c.hold))}>
               <Icon id="quieto" size={16} />
             </button>
             <button className={'key' + (c.autoHeal ? ' on' : '')} title="Médico: cura a los compañeros heridos cuando no tiene órdenes" onClick={() => setAll((q) => (q.autoHeal = !c.autoHeal))}>
@@ -708,13 +710,13 @@ export function Tracker({ open }: { open: (s: Screen) => void }) {
   const next = steps.find((s) => !s.done);
   if (!next || g.sim.state.flags.tOculto) return null;
   return (
-    <div className="tracker" onClick={() => open('hilos')} title="Abrir los hilos (J)">
+    <div className="tracker" onClick={() => open('hilos')} title={`Abrir los hilos (${keyName('hilos')})`}>
       <span className="count">
         {done}/{steps.length}
       </span>
       <div className="grow">
         <b>{next.title}</b>
-        <small>{next.hint}</small>
+        <small>{withKeys(next.hint)}</small>
       </div>
       <button
         className="x mini"
@@ -839,7 +841,7 @@ export function Overlays() {
       )}
       {def && (
         <div className="panel hint">
-          <b className="amber">{def.name}</b> · clic para colocar · <kbd>R</kbd> girar · <kbd>Mayús</kbd> colocar varias · clic derecho o <kbd>Esc</kbd> para cancelar
+          <b className="amber">{def.name}</b> · clic para colocar · <kbd>{keyName('girarObra')}</kbd> girar · <kbd>Mayús</kbd> colocar varias · clic derecho o <kbd>Esc</kbd> para cancelar
           {g.buildWhy && <span className="bad"> · {g.buildWhy}</span>}
         </div>
       )}

@@ -39,8 +39,8 @@ export function firstSteps(sim: Sim): Step[] {
     { id: 'hablar', title: 'Habla con alguien', hint: 'Selecciona a uno de los tuyos y haz clic derecho sobre cualquier persona: «Hablar».', done: !!f.tHablar },
     { id: 'comercio', title: 'Compra o vende algo', hint: 'Los comerciantes están en los puestos de los andenes. Habla con uno y elige «Comerciar».', done: !!f.tComercio || st.stats.earned > 0 },
     { id: 'chatarra', title: 'Desguaza chatarra', hint: 'Clic derecho sobre un montón de chatarra de los túneles: «Desguazar». Es la materia prima de todo.', done: !!f.tChatarra },
-    { id: 'construir', title: 'Levanta tu primera obra', hint: 'Pulsa B, elige un jergón o una hoguera y colócalo en un túnel o cruce sin dueño.', done: st.stats.built > 0 || st.buildings.some((b) => b.prog >= 1) },
-    { id: 'estudio', title: 'Investiga una técnica', hint: 'Construye una mesa de estudio, elige qué estudiar (I) y pon a alguien a trabajar en ella.', done: st.tech.done.length > 0 },
+    { id: 'construir', title: 'Levanta tu primera obra', hint: 'Pulsa {tecla:construir}, elige un jergón o una hoguera y colócalo en un túnel o cruce sin dueño.', done: st.stats.built > 0 || st.buildings.some((b) => b.prog >= 1) },
+    { id: 'estudio', title: 'Investiga una técnica', hint: 'Construye una mesa de estudio, elige qué estudiar ({tecla:investigar}) y pon a alguien a trabajar en ella.', done: st.tech.done.length > 0 },
     { id: 'recluta', title: 'Contrata a alguien', hint: 'En las cantinas hay gente que se alquila: habla con ellos y paga lo que piden.', done: !!f.tRecluta },
   ];
 }

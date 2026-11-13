@@ -19,6 +19,7 @@ import { SCENARIOS } from '../data/escenarios';
 import { burnLetter } from '../sim/events';
 import { epilogue, firstSteps, storyThreads } from '../sim/hilos';
 import { VERSION, VERSION_LABEL } from '../version';
+import { actionLabel, KEY_ACTIONS, KEY_GROUPS, keyFor, keyLabel, keyName, keyProblem, keysCustomized, onKeysChange, resetKeys, setKey, withKeys } from '../game/keys';
 import { Bar, Cost, Face, ItemIcon, Money, Win, hex, useGame, useTick } from './core';
 import { LOG_ICON } from './Hud';
 import { Emblem } from './sprites/Emblem';
@@ -481,7 +482,7 @@ export function ThreadsScreen({ close }: { close: () => void }) {
             <div key={s.id} className={'step' + (s.done ? ' done' : '')}>
               <i className={'badge' + (s.done ? ' good' : '')}>{s.done && <Icon id="check" size={11} />}</i>
               <b>{s.title}</b>
-              {!s.done && <small>{s.hint}</small>}
+              {!s.done && <small>{withKeys(s.hint)}</small>}
             </div>
           ))}
         </div>
@@ -505,7 +506,7 @@ export function ThreadsScreen({ close }: { close: () => void }) {
               <p>{t.text}</p>
               {t.hint && (
                 <p className="hintline">
-                  <Icon id="flecha" size={11} /> {t.hint}
+                  <Icon id="flecha" size={11} /> {withKeys(t.hint)}
                 </p>
               )}
               {t.progress !== undefined && t.progress > 0 && t.state !== 'hecho' && <Bar v={t.progress} cls="amber" />}
@@ -549,15 +550,19 @@ export function Briefing({ scenario, close }: { scenario: string; close: () => v
         <span>Seleccionar a los tuyos (arrastra para elegir a varios)</span>
         <kbd>Clic derecho</kbd>
         <span>En el suelo, ir; sobre algo o alguien, menú de acciones</span>
-        <kbd>Espacio</kbd>
+        <kbd>{keyName('pausa')}</kbd>
         <span>Pausa: da órdenes con calma</span>
-        <kbd>W A S D · Q E · Rueda</kbd>
+        <kbd>
+          {moveKeys()} · {keyName('girarIzq')} {keyName('girarDer')} · Rueda
+        </kbd>
         <span>Mover, girar y acercar la cámara</span>
-        <kbd>J</kbd>
+        <kbd>{keyName('hilos')}</kbd>
         <span>Hilos: qué se cuece en el metro y qué te falta por hacer</span>
       </div>
       <div className="row foot">
-        <span className="dim">La partida se guarda sola cada minuto. F5 guarda, F9 carga.</span>
+        <span className="dim">
+          La partida se guarda sola cada minuto. {keyName('guardar')} guarda, {keyName('cargar')} carga.
+        </span>
         <span className="sp" />
         <button className="btn big" onClick={close} autoFocus>
           <Icon id="play" size={16} /> Empezar
@@ -649,34 +654,45 @@ export function LogScreen({ close }: { close: () => void }) {
   );
 }
 
+/** Las cuatro teclas de mover la cámara, en el orden de siempre (W A S D). */
+function moveKeys(): string {
+  return ['camArriba', 'camIzq', 'camAbajo', 'camDer'].map(keyName).join(' ');
+}
+
 export function HelpBody() {
+  const k = keyName;
   const rows: [string, string][] = [
     ['Clic izquierdo', 'Seleccionar a alguien de tu escuadra (arrastra para elegir a varios; Mayús para añadir)'],
     ['Clic derecho', 'En el suelo: ir. Sobre algo o alguien: menú de acciones. Sobre un enemigo: atacar'],
     ['Mayús + clic derecho', 'Encadenar órdenes'],
-    ['W A S D', 'Mover la cámara'],
-    ['Q / E', 'Girar la cámara (o arrastra con el botón central o el derecho)'],
+    [`${moveKeys()} · flechas`, 'Mover la cámara'],
+    [`${k('girarIzq')} / ${k('girarDer')}`, 'Girar la cámara (o arrastra con el botón central o el derecho)'],
     ['Rueda', 'Acercar y alejar'],
-    ['Espacio', 'Pausa'],
-    ['1 2 3 4', 'Velocidad del tiempo'],
-    ['Tab', 'Siguiente miembro de la escuadra'],
-    ['F', 'Centrar la cámara en el seleccionado'],
-    ['L · C · H', 'Linterna · Sigilo · Mantener posición'],
-    ['X', 'Cancelar órdenes'],
-    ['B · I · M · G · K · J', 'Construir · Estudio · Mapa · Facciones · Crónica · Hilos'],
-    ['R', 'Girar la obra antes de colocarla'],
-    ['F5 / F9', 'Guardado y carga rápidos'],
+    [k('pausa'), 'Pausa'],
+    [['vel1', 'vel2', 'vel3', 'vel4'].map(k).join(' '), 'Velocidad del tiempo'],
+    [k('siguiente'), 'Siguiente miembro de la escuadra'],
+    [k('centrar'), 'Centrar la cámara en el seleccionado'],
+    [`${k('linterna')} · ${k('sigilo')} · ${k('mantener')}`, 'Linterna · Sigilo · Mantener posición'],
+    [k('cancelar'), 'Cancelar órdenes'],
+    [['construir', 'investigar', 'mapa', 'facciones', 'cronica', 'hilos'].map(k).join(' · '), 'Construir · Estudio · Mapa · Facciones · Crónica · Hilos'],
+    [k('girarObra'), 'Girar la obra antes de colocarla'],
+    [`${k('guardar')} / ${k('cargar')}`, 'Guardado y carga rápidos'],
+    ['Ctrl + 1…4 · Alt + 1…4', 'Guardar un grupo de la escuadra · volver a seleccionarlo'],
+    ['Ctrl + A', 'Seleccionar a toda la escuadra'],
   ];
   return (
     <>
       <div className="help">
-        {rows.map(([k, d]) => (
-          <div key={k} style={{ display: 'contents' }}>
-            <kbd>{k}</kbd>
+        {rows.map(([key, d]) => (
+          <div key={d} style={{ display: 'contents' }}>
+            <kbd>{key}</kbd>
             <span>{d}</span>
           </div>
         ))}
       </div>
+      <p className="dim" style={{ fontSize: 12.5, margin: '10px 0 0' }}>
+        Las teclas se cambian en Ajustes, en la pestaña «Teclas».
+      </p>
       <p className="dim" style={{ lineHeight: 1.5 }}>
         Nadie te espera ni te debe nada. Las habilidades suben con el uso; los golpes van a partes concretas del cuerpo; las heridas abiertas sangran hasta que alguien las venda. Quien cae inconsciente puede levantarse… o desangrarse. Comercia, rebusca chatarra, caza skrebuns, contrata gente en los bares y levanta tu propia estación donde nadie mande.
       </p>
@@ -776,8 +792,99 @@ export function PauseScreen({ close, exit, open }: { close: () => void; exit: ()
   );
 }
 
-/** Volúmenes y calidad gráfica. */
+/** Ajustes: sonido e imagen, y teclas. */
 export function SettingsBody() {
+  const [tab, setTab] = useState<'general' | 'teclas'>('general');
+  return (
+    <>
+      <div className="tabs settabs">
+        <button className={'tab' + (tab === 'general' ? ' on' : '')} onClick={() => setTab('general')}>
+          <Icon id="ajustes" size={13} /> Sonido e imagen
+        </button>
+        <button className={'tab' + (tab === 'teclas' ? ' on' : '')} onClick={() => setTab('teclas')}>
+          <Icon id="editar" size={13} /> Teclas
+        </button>
+      </div>
+      {tab === 'general' ? <GeneralSettings /> : <KeySettings />}
+    </>
+  );
+}
+
+/** Teclas: clic en una y pulsa la nueva. Si ya la usaba otra acción, intercambian. */
+function KeySettings() {
+  const [, force] = useState(0);
+  const [wait, setWait] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
+  useEffect(() => onKeysChange(() => force((n) => n + 1)), []);
+  useEffect(() => {
+    if (!wait) return;
+    // Se escucha antes que el juego y la tecla no le llega
+    const h = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (e.code === 'Escape') {
+        setWait(null);
+        setMsg(null);
+        return;
+      }
+      const bad = keyProblem(e.code);
+      if (bad) {
+        setMsg({ text: bad + '.', bad: true });
+        return;
+      }
+      const prev = keyFor(wait);
+      const other = setKey(wait, e.code);
+      setMsg(other ? { text: `${keyLabel(e.code)} era la tecla de «${actionLabel(other)}»: ahora esa va con ${keyLabel(prev)}.` } : null);
+      setWait(null);
+    };
+    window.addEventListener('keydown', h, true);
+    return () => window.removeEventListener('keydown', h, true);
+  }, [wait]);
+  return (
+    <div className="col settings">
+      <div className="keylist scroll">
+        {KEY_GROUPS.map((grp) => (
+          <section key={grp}>
+            <h4>{grp}</h4>
+            {KEY_ACTIONS.filter((a) => a.group === grp).map((a) => (
+              <div className="keyrow" key={a.id}>
+                <span>{a.label}</span>
+                <button
+                  className={'btn small keybtn' + (wait === a.id ? ' on' : '') + (keyFor(a.id) !== a.def ? ' custom' : '')}
+                  title={keyFor(a.id) !== a.def ? `Cambiada (la de siempre: ${keyLabel(a.def)})` : 'Clic para cambiarla'}
+                  onClick={() => {
+                    setMsg(null);
+                    setWait(wait === a.id ? null : a.id);
+                  }}
+                >
+                  {wait === a.id ? 'Pulsa una tecla…' : keyLabel(keyFor(a.id))}
+                </button>
+              </div>
+            ))}
+          </section>
+        ))}
+      </div>
+      <p className={'keymsg' + (msg?.bad ? ' bad' : msg ? ' amber' : ' dim')}>{msg ? msg.text : wait ? 'Pulsa la tecla nueva. Esc la deja como estaba.' : 'Haz clic en una tecla para cambiarla.'}</p>
+      <div className="dim fixedkeys">
+        Fijas: <kbd>Esc</kbd> cancelar y menú · <kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>4</kbd> guardar un grupo · <kbd>Alt</kbd>+<kbd>1</kbd>…<kbd>4</kbd> llamarlo · <kbd>Ctrl</kbd>+<kbd>A</kbd> todos · <kbd>Mayús</kbd> encadenar órdenes · flechas: cámara
+      </div>
+      <button
+        className="btn"
+        disabled={!keysCustomized()}
+        onClick={() => {
+          resetKeys();
+          setWait(null);
+          setMsg({ text: 'Vuelven a ser las teclas de siempre.' });
+        }}
+      >
+        Restablecer las teclas de siempre
+      </button>
+    </div>
+  );
+}
+
+/** Volúmenes y calidad gráfica. */
+function GeneralSettings() {
   const [v, setV] = useState<Volumes>(audio.volumes);
   const [q, setQ] = useState<string>(() => localStorage.getItem('sombras:calidad') ?? 'media');
   const [changed, setChanged] = useState(false);

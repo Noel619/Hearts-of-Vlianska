@@ -24,6 +24,7 @@ import type { Char, JobType, Order, SimState } from '../sim/types';
 import { buildWorld, placeName, resetWorld, type World } from '../sim/world';
 import type { GasPocket } from '../world/gas';
 import { Fx, type DynLight, type SpotReq } from './fx';
+import { actionFor, keyFor } from './keys';
 import { CharViews, ThingViews } from './views';
 
 export type Target =
@@ -262,17 +263,17 @@ export class Game {
 
   private cameraKeys(dt: number) {
     const k = this.keys;
+    // Con Ctrl, Alt o Cmd pulsadas las teclas son atajos (grupos, todos), no cámara
+    if (k.has('ControlLeft') || k.has('ControlRight') || k.has('AltLeft') || k.has('AltRight') || k.has('MetaLeft') || k.has('MetaRight')) return;
     const sp = this.rig.dist * 1.1 * dt;
-    let moved = false;
-    if (k.has('KeyW') || k.has('ArrowUp')) (this.rig.pan(0, sp), (moved = true));
-    if (k.has('KeyS') || k.has('ArrowDown')) (this.rig.pan(0, -sp), (moved = true));
-    if (k.has('KeyA') || k.has('ArrowLeft')) (this.rig.pan(-sp, 0), (moved = true));
-    if (k.has('KeyD') || k.has('ArrowRight')) (this.rig.pan(sp, 0), (moved = true));
+    if (k.has(keyFor('camArriba')) || k.has('ArrowUp')) this.rig.pan(0, sp);
+    if (k.has(keyFor('camAbajo')) || k.has('ArrowDown')) this.rig.pan(0, -sp);
+    if (k.has(keyFor('camIzq')) || k.has('ArrowLeft')) this.rig.pan(-sp, 0);
+    if (k.has(keyFor('camDer')) || k.has('ArrowRight')) this.rig.pan(sp, 0);
     if (!this.buildDef) {
-      if (k.has('KeyQ')) this.rig.rotate(dt * 1.6, 0);
-      if (k.has('KeyE')) this.rig.rotate(-dt * 1.6, 0);
+      if (k.has(keyFor('girarIzq'))) this.rig.rotate(dt * 1.6, 0);
+      if (k.has(keyFor('girarDer'))) this.rig.rotate(-dt * 1.6, 0);
     }
-    void moved;
   }
 
   private drainEvents() {
@@ -880,33 +881,59 @@ export class Game {
     on(window, 'resize', () => this.gfx.resize());
   }
 
-  /** Atajos de teclado (los paneles los gestiona la interfaz a través de onHotkey). */
-  onHotkey: ((code: string) => boolean) | null = null;
+  /**
+   * Atajos de las pantallas y de la partida: los gestiona la interfaz. Recibe
+   * el código de la tecla y la acción que tiene asignada (o null).
+   */
+  onHotkey: ((code: string, action: string | null) => boolean) | null = null;
 
   private onKey(e: KeyboardEvent) {
-    if (this.onHotkey?.(e.code)) {
+    const mod = e.ctrlKey || e.metaKey || e.altKey;
+    const action = mod ? null : actionFor(e.code);
+    if (this.onHotkey?.(e.code, action)) {
       e.preventDefault();
       return;
     }
+    // Combinaciones fijas: grupos (Ctrl o Alt + 1-4) y todos (Ctrl + A)
+    const digit = /^Digit([1-4])$/.exec(e.code);
+    if (digit && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      this.groups[Number(digit[1])] = [...this.selected];
+      return;
+    }
+    if (digit && e.altKey) {
+      e.preventDefault();
+      const grp = this.groups[Number(digit[1])];
+      if (grp) this.select(grp);
+      return;
+    }
+    if (e.code === 'KeyA' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      this.select(this.sim.players.filter((c) => c.st === 'ok').map((c) => c.id));
+      return;
+    }
+    if (e.code === 'Escape') {
+      if (this.buildDef) this.startBuild(null);
+      else if (this.menu) {
+        this.menu = null;
+        this.bump();
+      } else if (this.panel) this.closePanel();
+      return;
+    }
+    if (!action) return;
     const sq = this.squad();
-    switch (e.code) {
-      case 'Space':
+    switch (action) {
+      case 'pausa':
         e.preventDefault();
         this.togglePause();
         break;
-      case 'Digit1':
-      case 'Digit2':
-      case 'Digit3':
-      case 'Digit4': {
-        const n = Number(e.code.slice(5));
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          this.groups[n] = [...this.selected];
-        } else if (e.altKey && this.groups[n]) this.select(this.groups[n]);
-        else this.setSpeed([1, 2, 4, 8][n - 1]);
+      case 'vel1':
+      case 'vel2':
+      case 'vel3':
+      case 'vel4':
+        this.setSpeed([1, 2, 4, 8][Number(action.slice(3)) - 1]);
         break;
-      }
-      case 'Tab': {
+      case 'siguiente': {
         e.preventDefault();
         const ps = this.sim.players.filter((c) => c.st === 'ok');
         if (!ps.length) break;
@@ -916,34 +943,28 @@ export class Game {
         this.focusOn(nx.id);
         break;
       }
-      case 'KeyA':
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          this.select(this.sim.players.filter((c) => c.st === 'ok').map((c) => c.id));
-        }
-        break;
-      case 'KeyF':
+      case 'centrar':
         if (this.selected[0]) this.focusOn(this.selected[0]);
         break;
-      case 'KeyL': {
+      case 'linterna': {
         const v = !sq[0]?.lamp;
         for (const c of sq) c.lamp = v && (!!c.eq.luz || c.inv.some((q) => ITEMS[q.id]?.light));
         this.bump();
         break;
       }
-      case 'KeyC': {
+      case 'sigilo': {
         const v = !sq[0]?.sneak;
         for (const c of sq) c.sneak = v;
         this.bump();
         break;
       }
-      case 'KeyH': {
+      case 'mantener': {
         const v = !sq[0]?.hold;
         for (const c of sq) c.hold = v;
         this.bump();
         break;
       }
-      case 'KeyX':
+      case 'cancelar':
         for (const c of sq) {
           c.order = null;
           c.queue.length = 0;
@@ -952,21 +973,14 @@ export class Game {
         }
         this.bump();
         break;
-      case 'KeyR':
+      case 'girarObra':
         if (this.buildDef) this.buildRot += (e.shiftKey ? -1 : 1) * (Math.PI / 12);
         break;
-      case 'KeyQ':
+      case 'girarIzq':
         if (this.buildDef) this.buildRot += Math.PI / 12;
         break;
-      case 'KeyE':
+      case 'girarDer':
         if (this.buildDef) this.buildRot -= Math.PI / 12;
-        break;
-      case 'Escape':
-        if (this.buildDef) this.startBuild(null);
-        else if (this.menu) {
-          this.menu = null;
-          this.bump();
-        } else if (this.panel) this.closePanel();
         break;
       default:
         break;

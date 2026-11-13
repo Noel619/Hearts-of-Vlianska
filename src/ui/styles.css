@@ -1833,6 +1833,50 @@ kbd {
   text-transform: uppercase;
   font-size: 16px;
 }
+.settabs {
+  margin: -4px -4px 12px;
+}
+.keylist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(52vh, 480px);
+  padding-right: 6px;
+}
+.keylist section {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.keyrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 1px 0 1px 11px;
+}
+.keyrow span {
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+  font-size: 13.5px;
+}
+.btn.keybtn {
+  min-width: 112px;
+  font-family: var(--mono);
+}
+.btn.keybtn.custom:not(.on) {
+  color: var(--amber2);
+}
+.keymsg {
+  margin: 2px 0 0;
+  min-height: 2.6em;
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+.fixedkeys {
+  font-size: 12px;
+  line-height: 1.9;
+}
 .slider {
   display: grid;
   grid-template-columns: 90px 1fr 34px;

@@ -119,25 +119,27 @@ export function App() {
   // Atajos de las pantallas
   useEffect(() => {
     if (!game) return;
-    game.onHotkey = (code) => {
+    game.onHotkey = (code, action) => {
       if (modeRef.current !== 'juego') return true;
-      const map: Record<string, Screen> = { KeyB: 'construir', KeyI: 'investigar', KeyM: 'mapa', KeyG: 'facciones', KeyK: 'cronica', KeyJ: 'hilos' };
-      if (map[code]) {
-        setScreen((s) => (s === map[code] ? null : map[code]));
+      const screens: Record<string, Screen> = { construir: 'construir', investigar: 'investigar', mapa: 'mapa', facciones: 'facciones', cronica: 'cronica', hilos: 'hilos' };
+      const target = action ? screens[action] : undefined;
+      if (target) {
+        setScreen((s) => (s === target ? null : target));
         return true;
       }
       if (code === 'Escape' && !game.buildDef && !game.menu && !game.panel) {
         setScreen((s) => (s ? null : 'pausa'));
         return true;
       }
-      if (code === 'F5') {
+      if (action === 'guardar') {
         saveGame('rapido', game.sim.state);
         game.sim.log('Partida guardada.', 'info');
         return true;
       }
-      if (code === 'F9') {
+      if (action === 'cargar') {
         const st = loadGame('rapido');
         if (st) game.loadState(st);
+        else game.sim.log('No hay ningún guardado rápido.', 'info');
         return true;
       }
       return false;
