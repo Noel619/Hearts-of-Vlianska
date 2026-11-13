@@ -100,6 +100,8 @@ function makeContainer(sim: Sim, x: number, z: number, place: string, kind: stri
     add('escopeta', 1, 1, 0.5);
     add('petoCuero', 1, 1, 0.5);
     add('componentes', 1, 4, 0.6);
+    // Lo que la Hermandad le quitó a un oficial de la defensa civil
+    addItem({ inv: items }, 'llaveAlmacen', 1);
   } else if (kind === 'arsenal') {
     label = 'Taquilla del arsenal';
     ckind = 'almacen';
@@ -209,6 +211,7 @@ export function workNode(sim: Sim, c: Char, o: Order, dt: number): boolean {
   c.workT += dt * (0.5 + c.sk.chatarreria * 0.025) * tool;
   gainXp(sim, c, 'chatarreria', dt * 0.3);
   if ((sim.tick + c.id) % 36 === 0) sim.emit({ t: 'sonido', k: 'chatarra', x: n.x, z: n.z });
+  sim.state.flags.tChatarra = 1;
   if (c.workT >= 4) {
     c.workT = 0;
     n.amount--;
@@ -326,6 +329,7 @@ export function buyItem(sim: Sim, buyer: Char, vendor: Char, index: number, n: n
   s.n -= n;
   if (s.n <= 0) shop.stock.splice(index, 1);
   sim.emit({ t: 'sonido', k: 'moneda', x: buyer.x, z: buyer.z });
+  sim.state.flags.tComercio = 1;
   return null;
 }
 
@@ -347,6 +351,7 @@ export function sellItem(sim: Sim, seller: Char, vendor: Char, index: number, n:
   shop.money -= price;
   sim.state.money += price;
   sim.state.stats.earned += price;
+  sim.state.flags.tComercio = 1;
   addItem({ inv: shop.stock }, s.id, n, { mag: s.mag });
   s.n -= n;
   if (s.n <= 0) seller.inv.splice(index, 1);
@@ -373,6 +378,7 @@ export function hire(sim: Sim, npc: Char, free = false): string | null {
   const price = free ? 0 : (npc.hire ?? 0);
   if (price > sim.state.money) return 'No tienes cartuchos suficientes';
   sim.state.money -= price;
+  if (!free) sim.state.flags.tRecluta = 1;
   joinPlayer(sim, npc);
   sim.log(`${npc.name} se une a tu escuadra.`, 'bueno');
   return null;
@@ -532,10 +538,7 @@ export function stepWorldEvents(sim: Sim, dt: number) {
     }
   }
   // La radio: el final abierto de la historia
-  if (!st.flags.senal) {
-    const radio = st.buildings.find((b) => b.prog >= 1 && BUILDS[b.def].radio && b.user);
-    void radio;
-  }
+  if (!st.flags.senal && st.buildings.some((b) => b.prog >= 1 && BUILDS[b.def].radio && b.craft >= 1)) radioSignal(sim);
 }
 
 /** Peaje de Staraya: tanto por cabeza y una parte de lo que se lleva en la bolsa. */
@@ -658,6 +661,18 @@ export function deliverPrisoner(sim: Sim, carrier: Char, to: Char): string | nul
     return `${to.name} asiente despacio. «Juicio justo, como prometimos.» Te paga 500 cartuchos.`;
   }
   return null;
+}
+
+/** ¿Es uno de los almacenes blindados de Tenevskaya? */
+export function isCivilDefense(c: Container): boolean {
+  return c.kind === 'almacen' && c.label.startsWith('Almacén de la defensa civil');
+}
+
+/** Quema la carta de Bessmertny, la lleve quien la lleve. */
+export function burnLetter(sim: Sim): string | null {
+  const carrier = sim.players.find((q) => countItem(q, 'cartaBessmertny') > 0);
+  if (!carrier) return null;
+  return deliverLetter(sim, carrier, 'quemar');
 }
 
 /** La emisora capta la señal (final abierto). */

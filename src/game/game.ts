@@ -14,7 +14,7 @@ import { buildTextures, type TextureSet } from '../render/textures';
 import { buildWaterMesh } from '../render/waterMesh';
 import { buildWorldMesh } from '../render/worldMesh';
 import { building, buildingLight, canPlace, placeBuilding, restoreBuildings } from '../sim/build';
-import { applyNodes } from '../sim/events';
+import { applyNodes, isCivilDefense } from '../sim/events';
 import { totalHpFrac } from '../sim/chars';
 import { hostile, needsCare } from '../sim/combat';
 import { newGame, type NewGameOptions } from '../sim/newGame';
@@ -76,6 +76,8 @@ export class Game {
   // --- Estado para la interfaz
   selected: number[] = [];
   inspect = 0;
+  /** La emisora ha captado la señal: toca mostrar el epílogo. */
+  epilogue = false;
   hover: Target | null = null;
   menu: ContextMenu | null = null;
   panel: Panel = null;
@@ -167,6 +169,7 @@ export class Game {
     this.things?.dispose();
     this.fx?.dispose();
     this.sim = sim;
+    this.epilogue = false;
     if (loaded) {
       // Recoloca derrumbes y obras de la partida guardada
       applyNodes(sim);
@@ -342,6 +345,10 @@ export class Game {
             if (t) this.panel = { t: 'saqueo', actor: e.a, target: { kind: 'cont', id: e.id, x: t.x, z: t.z } };
           } else if (e.k === 'peaje' && e.id) {
             this.panel = { t: 'peaje', npc: e.id };
+            this.paused = true;
+          } else if (e.k === 'senal') {
+            // El final abierto: la partida sigue, pero se cuenta lo que ha pasado
+            this.epilogue = true;
             this.paused = true;
           }
           this.bump();
@@ -640,8 +647,8 @@ export class Game {
             },
           });
         }
-        if (def.recipes || def.farm || def.research) {
-          actions.push({ label: def.farm ? 'Atender el cultivo' : def.research ? 'Investigar' : 'Trabajar aquí', run: one({ t: 'operar', id: b.id }) });
+        if (def.recipes || def.farm || def.research || (def.radio && !sim.state.flags.senal)) {
+          actions.push({ label: def.farm ? 'Atender el cultivo' : def.research ? 'Investigar' : def.radio ? 'Escuchar la radio' : 'Trabajar aquí', run: one({ t: 'operar', id: b.id }) });
           actions.push({ label: 'Asignar como trabajo fijo', hint: 'Lo hará siempre que no tenga órdenes', run: job(def.farm ? 'cultivar' : def.research ? 'investigar' : 'operar') });
         }
         if (def.store || def.recipes || def.farm || def.passive) actions.push({ label: def.store && !def.recipes ? 'Abrir almacén' : 'Ver contenido', run: () => this.openBuilding(b.id) });
@@ -651,7 +658,8 @@ export class Game {
       const c = sim.container(t.id);
       if (!c) return { title, actions };
       title = c.label;
-      if (first) actions.push({ label: c.lock > 0 && !c.opened ? 'Forzar la cerradura' : 'Abrir', hint: c.owner ? 'Es un robo' : undefined, run: one({ t: 'abrir', id: c.id }), danger: !!c.owner });
+      const key = isCivilDefense(c) && sim.players.some((q) => q.inv.some((i) => i.id === 'llaveAlmacen'));
+      if (first) actions.push({ label: c.lock > 0 && !c.opened ? (key ? 'Abrir con la llave' : 'Forzar la cerradura') : 'Abrir', hint: c.owner ? 'Es un robo' : undefined, run: one({ t: 'abrir', id: c.id }), danger: !!c.owner });
     } else if (t.kind === 'drop') {
       title = 'Objetos en el suelo';
       if (first) actions.push({ label: 'Recoger', run: one({ t: 'recoger', id: t.id }) });

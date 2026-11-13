@@ -3,12 +3,12 @@
 
 import { CREATURES } from '../data/criaturas';
 import { ITEMS } from '../data/items';
-import { addItem, crawling, gainXp, healthFrac, invWeight, limpSide, maxCarry } from './chars';
+import { addItem, countItem, crawling, gainXp, healthFrac, invWeight, limpSide, maxCarry } from './chars';
 import { findEnemy, hostile, needsCare, stepFight, topUpMagazine, treat } from './combat';
 import { clearDest, faceTo, setDest, stepMove } from './move';
 import { stepJobs, workOnBuilding } from './build';
 import { freeSpot, occupySpot, pickSpot } from './population';
-import { workNode } from './events';
+import { isCivilDefense, workNode } from './events';
 import type { Sim } from './sim';
 import type { Char, Order } from './types';
 
@@ -252,6 +252,12 @@ function runOrder(sim: Sim, c: Char, o: Order, dt: number): void {
         c.pose = 'arrodillado';
         c.work = 'rebuscar';
         faceTo(c, tx, tz, dt);
+        if (cont && cont.lock > 0 && !cont.opened && c.player && isCivilDefense(cont) && sim.players.some((q) => countItem(q, 'llaveAlmacen') > 0)) {
+          // La llave de la defensa civil abre las puertas blindadas de Tenevskaya
+          cont.opened = true;
+          sim.log('La llave de la defensa civil gira con un chasquido. La puerta blindada se abre por primera vez en veinte años.', 'historia');
+          sim.emit({ t: 'sonido', k: 'cerradura', x: cont.x, z: cont.z });
+        }
         if (cont && cont.lock > 0 && !cont.opened) {
           // Forzar la cerradura
           c.workT += dt * (0.5 + c.sk.cerraduras * 0.03 + (c.inv.some((s) => s.id === 'ganzuas') ? 0.4 : 0));
@@ -279,6 +285,7 @@ function runOrder(sim: Sim, c: Char, o: Order, dt: number): void {
       }
       if (approach(sim, c, t.x, t.z, 3.1, false)) {
         faceTo(c, t.x, t.z, dt);
+        if (c.player) sim.state.flags.tHablar = 1;
         sim.emit({ t: 'mundo', k: 'hablar', id: t.id, a: c.id });
         done(c);
       }

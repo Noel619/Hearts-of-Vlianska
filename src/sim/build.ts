@@ -20,6 +20,14 @@ function lightMap(sim: Sim) {
   return m;
 }
 
+/** Segundos de escucha (con ciencia 0) hasta captar la señal. */
+export const RADIO_TIME = 420;
+const RADIO_STATIC: [number, string][] = [
+  [0.2, 'La emisora solo devuelve estática. Arriba, la antena cruje con el viento de la superficie.'],
+  [0.5, 'Entre el ruido, un pitido que se repite: algo emite ahí fuera, muy lejos.'],
+  [0.8, 'La onda corta trae fragmentos: números, una palabra en ruso, otra vez números. Hay alguien.'],
+];
+
 export function hasTech(sim: Sim, id?: string): boolean {
   return !id || sim.state.tech.done.includes(id);
 }
@@ -395,6 +403,25 @@ export function workOnBuilding(sim: Sim, c: Char, o: Order, dt: number): boolean
     }
     return true;
   }
+  if (def.radio) {
+    // Barrer las frecuencias noche tras noche, hasta que alguien conteste
+    if (sim.state.flags.senal) return false;
+    if (!near(c, b)) {
+      goTo(sim, c, b);
+      return true;
+    }
+    clearDest(c);
+    faceTo(c, b.x, b.z, dt);
+    c.work = 'operar';
+    const before = b.craft;
+    b.craft = Math.min(1, b.craft + (dt * (0.6 + c.sk.ciencia * 0.02)) / RADIO_TIME);
+    gainXp(sim, c, 'ciencia', dt * 0.25);
+    for (const [at, text] of RADIO_STATIC) {
+      if (before < at && b.craft >= at) sim.log(text, 'info');
+    }
+    if ((sim.tick + c.id) % 240 === 0) sim.emit({ t: 'flota', x: b.x, z: b.z, text: '…estática…', color: '#9fb8d8' });
+    return true;
+  }
   if (def.farm) {
     // Atender el cultivo acelera el ciclo; cosechar lo vacía
     if (!near(c, b)) {
@@ -527,6 +554,7 @@ function hasWork(sim: Sim, b: Building): boolean {
   if (b.prog < 1) return false;
   if (def.power && def.power > 0 && !powered(sim, b)) return false;
   if (def.research) return !!sim.state.tech.cur;
+  if (def.radio) return !sim.state.flags.senal;
   if (def.farm) return b.grow >= 1 || b.fuel > 0;
   if (def.recipes) {
     const r = b.recipe ? RECIPES[b.recipe] : null;
