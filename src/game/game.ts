@@ -54,6 +54,7 @@ export type Panel =
   | { t: 'saqueo'; actor: number; target: Target }
   | { t: 'peaje'; npc: number }
   | { t: 'taller'; id: number }
+  | { t: 'despedir'; id: number }
   | null;
 
 /** Recursos compartidos entre partidas: mundo, texturas y mallas estáticas. */
@@ -738,7 +739,7 @@ export class Game {
   }
 
   closePanel() {
-    if (this.panel && (this.panel.t === 'hablar' || this.panel.t === 'peaje' || this.panel.t === 'comercio')) this.paused = false;
+    if (this.panel && (this.panel.t === 'hablar' || this.panel.t === 'peaje' || this.panel.t === 'comercio' || this.panel.t === 'despedir')) this.paused = false;
     this.panel = null;
     this.bump();
   }

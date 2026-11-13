@@ -8,15 +8,15 @@ import { STATION_BY_ID } from '../data/historia/mapa';
 import { ITEMS, stackState, type EquipSlot, type Stack } from '../data/items';
 import type { FactionId } from '../data/tipos';
 import type { Panel, Target } from '../game/game';
-import { healCost, holderItems, owned, payHeal, recipeAvailable, setRecipe, transfer, type Holder } from '../sim/actions';
+import { healCost, holderItems, owned, payHeal, recipeAvailable, setRecipe, transfer, unequipSlot, type Holder } from '../sim/actions';
 import { building } from '../sim/build';
-import { addItem, countItem, invWeight, maxCarry } from '../sim/chars';
+import { addItem, countItem, hirePrice, invWeight, maxCarry } from '../sim/chars';
 import { relation } from '../sim/combat';
-import { buyItem, buyPrice, deliverLetter, deliverPrisoner, hire, payStaToll, sellItem, sellPrice, shopOf, staTollFee, staTollState } from '../sim/events';
+import { buyItem, buyPrice, canDismiss, deliverLetter, deliverPrisoner, dismiss, hire, nearestHome, payStaToll, sellItem, sellPrice, shopOf, staTollFee, staTollState } from '../sim/events';
 import type { Char } from '../sim/types';
 import { Cost, Face, ItemIcon, Money, Win, charTitle, itemTip, sideName, useGame, useTick, useTooltip } from './core';
 import { Emblem } from './sprites/Emblem';
-import { Icon } from './sprites/Sprite';
+import { Icon, ItemSprite } from './sprites/Sprite';
 
 const GREET: Record<string, string[]> = {
   UNI: ['Orden y calma. Circule.', 'La Unión vela por estos túneles.', '¿Documentación? Bah, pase.'],
@@ -539,6 +539,88 @@ function WorkshopWin({ p }: { p: Extract<Panel, { t: 'taller' }> }) {
   );
 }
 
+const SLOT_NAMES: Record<EquipSlot, string> = { arma: 'Arma', arma2: 'Arma', cabeza: 'Cabeza', cara: 'Cara', torso: 'Torso', mochila: 'Espalda', luz: 'Luz' };
+
+/** Confirmación para despedir a alguien: qué se lleva, qué deja y adónde va. */
+function DismissWin({ p }: { p: Extract<Panel, { t: 'despedir' }> }) {
+  const g = useGame();
+  useTick();
+  const tip = useTooltip();
+  const sim = g.sim;
+  const c = sim.char(p.id);
+  if (!c || !c.player) {
+    queueMicrotask(() => g.closePanel());
+    return null;
+  }
+  const close = () => g.closePanel();
+  const why = canDismiss(sim, c);
+  const home = nearestHome(sim, c.x, c.z);
+  const homeName = home ? sim.world.layout.stationById[home].def.shortName : 'los túneles';
+  const worn = (Object.keys(c.eq) as EquipSlot[]).filter((k) => c.eq[k]);
+  return (
+    <Win title={`Despedir a ${c.name}`} icon="salir" onClose={close} width={560} cls="dialog">
+      <div className="talk">
+        <Face c={c} size={96} playerColor={sim.state.playerColor} />
+        <div className="grow col" style={{ gap: 7 }}>
+          <p style={{ margin: 0, lineHeight: 1.4 }}>
+            Dejará la escuadra y se irá a {homeName}. Si cambias de idea, allí podrás volver a contratarle por <Money n={hirePrice(c)} size={15} />.
+          </p>
+          <div className="dim">Se lleva lo que lleva puesto{worn.length ? ' (clic en una pieza para que la deje):' : ':'}</div>
+          <div className="stacks">
+            {worn.length === 0 && <span className="dim">nada</span>}
+            {worn.map((k) => {
+              const s = c.eq[k]!;
+              return (
+                <button
+                  key={k}
+                  className="chip btnchip"
+                  {...tip.bind(`${ITEMS[s.id].name}\n${SLOT_NAMES[k]} · clic para que lo deje con lo demás`, s.id)}
+                  onClick={() => {
+                    unequipSlot(sim, c, k);
+                    tip.clear();
+                    g.bump();
+                  }}
+                >
+                  <ItemSprite id={s.id} size={26} />
+                </button>
+              );
+            })}
+          </div>
+          <div className="dim">Deja en el suelo, para los demás, lo que lleva en la mochila:</div>
+          <div className="stacks">
+            {c.inv.length === 0 && <span className="dim">nada</span>}
+            {c.inv.map((s, i) => (
+              <span key={i + s.id} className="chip" {...tip.bind(itemTip(s), s.id)}>
+                <ItemSprite id={s.id} size={26} />
+                {s.n > 1 ? s.n : ''}
+              </span>
+            ))}
+          </div>
+          {why && <p className="bad" style={{ margin: 0 }}>{why}.</p>}
+        </div>
+      </div>
+      <div className="opts">
+        <button
+          className="btn danger"
+          disabled={!!why}
+          onClick={() => {
+            if (!dismiss(sim, c)) {
+              g.selected = g.selected.filter((id) => id !== c.id);
+              close();
+            }
+          }}
+        >
+          <Icon id="salir" size={16} /> Despedir
+        </button>
+        <button className="btn" onClick={close}>
+          Cancelar
+        </button>
+      </div>
+      {tip.node}
+    </Win>
+  );
+}
+
 export function PanelView() {
   const g = useGame();
   useTick();
@@ -555,6 +637,8 @@ export function PanelView() {
       return <TollWin p={p} />;
     case 'taller':
       return <WorkshopWin p={p} />;
+    case 'despedir':
+      return <DismissWin key={'d' + p.id} p={p} />;
     default:
       return null;
   }

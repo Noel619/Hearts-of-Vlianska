@@ -4,12 +4,12 @@
 
 import { BUILDS } from '../data/edificios';
 import { FACTION_LORE } from '../data/historia/facciones';
-import { ITEMS, type ItemDef, type Stack } from '../data/items';
+import { ITEMS, stackState, type ItemDef, type Stack } from '../data/items';
 import type { FactionId, SideId } from '../data/tipos';
 import { F_DYN, F_TALL } from '../world/grid';
 import { insideStation, linkPointAt } from '../world/layout';
 import { COLLAPSE_NODES } from '../world/plans';
-import { addItem, countItem, gainXp, invWeight, maxCarry, takeItem } from './chars';
+import { addItem, countItem, gainXp, hirePrice, invWeight, maxCarry, NAME_MAX, takeItem } from './chars';
 import { hasTech } from './build';
 import { clearDest, faceTo, setDest } from './move';
 import { newSquad, placePos } from './population';
@@ -385,6 +385,12 @@ export function hire(sim: Sim, npc: Char, free = false): string | null {
 }
 
 export function joinPlayer(sim: Sim, c: Char) {
+  // Su sitio en la cantina queda libre: con el tiempo lo ocupará otra persona (no un clon suyo)
+  if (c.slot) {
+    const [place] = c.slot.split(':');
+    const st = sim.state.stations[place];
+    if (st) st.dead[c.slot] = sim.state.time + 2 * 1440;
+  }
   c.side = 'JUG';
   c.player = true;
   c.persist = true;
@@ -400,6 +406,103 @@ export function joinPlayer(sim: Sim, c: Char) {
   c.order = null;
   if (c.look) c.look = { ...c.look, armband: sim.state.playerColor };
   sim.emit({ t: 'mundo', k: 'escuadra', id: c.id });
+}
+
+/** ¿Se puede despedir a alguien ahora? Devuelve el motivo si no. */
+export function canDismiss(sim: Sim, c: Char): string | null {
+  if (!c.player) return 'No es de tu escuadra';
+  if (c.st === 'muerto') return 'Ha muerto';
+  if (c.st === 'ko') return 'Está inconsciente: espera a que se despierte';
+  if (c.carriedBy) return 'Lo llevan a hombros';
+  if (!sim.players.some((o) => o !== c && o.st !== 'muerto')) return 'Es lo único que queda de tu escuadra';
+  return null;
+}
+
+/** Estación habitada más cercana por los túneles (adonde va quien se queda sin escuadra). */
+export function nearestHome(sim: Sim, x: number, z: number): string | null {
+  let best: string | null = null;
+  let bd = Infinity;
+  for (const f of sim.world.layout.stations) {
+    if (!sim.state.stations[f.id]?.owner) continue;
+    let d = sim.world.graph.travelDistance(x, z, f.x, f.z);
+    if (!Number.isFinite(d)) d = Math.hypot(f.x - x, f.z - z) * 3;
+    if (d < bd) {
+      bd = d;
+      best = f.id;
+    }
+  }
+  return best;
+}
+
+/**
+ * Despide a alguien de la escuadra: se va con lo puesto a la estación más
+ * cercana, y lo que llevaba en la mochila lo deja en el suelo para los demás.
+ * Allí sigue: si le pagas lo que pide, vuelve.
+ */
+export function dismiss(sim: Sim, c: Char): string | null {
+  const why = canDismiss(sim, c);
+  if (why) return why;
+  // Quien lleva a alguien a hombros lo deja en el suelo
+  if (c.carry) {
+    const o = sim.char(c.carry);
+    if (o) {
+      o.carriedBy = 0;
+      o.x = c.x + 0.4;
+      o.z = c.z + 0.3;
+      if (o.st === 'ok') o.pose = 'normal';
+    }
+    c.carry = 0;
+  }
+  let left = 0;
+  if (c.inv.length) {
+    const nav = sim.world.nav;
+    const p = nav.nearestPassable(c.x + Math.cos(c.face) * 0.6, c.z + Math.sin(c.face) * 0.6, 2, true) ?? { x: c.x, z: c.z };
+    const d = { id: sim.state.nextId++, x: p.x, z: p.z, items: [] as Stack[], t: 3600 };
+    for (const s of c.inv) {
+      // Lo que acarreaba para la base deja de ser «carga de faena»
+      addItem({ inv: d.items }, s.id, s.n, { ...stackState(s), hot: s.hot === 'acarreo' ? undefined : s.hot });
+      left += s.n;
+    }
+    c.inv = [];
+    sim.state.drops.push(d);
+    sim.emit({ t: 'sonido', k: 'soltar', x: c.x, z: c.z });
+  }
+  c.side = 'LIB';
+  c.player = false;
+  c.persist = false;
+  c.order = null;
+  c.queue.length = 0;
+  c.target = 0;
+  c.jobs = [];
+  c.hold = false;
+  c.sneak = false;
+  c.stance = 'defensivo';
+  c.hire = hirePrice(c);
+  c.bio = `Fue de ${sim.state.playerName}. Si le pagas lo que pide, vuelve.`;
+  if (c.look) c.look = { ...c.look, armband: undefined };
+  const home = nearestHome(sim, c.x, c.z);
+  const f = home ? sim.world.layout.stationById[home] : null;
+  c.ai = { ...c.ai, mode: 'residente', sub: '', n: 0, spot: -1, place: home ?? '', homeX: f?.x ?? c.x, homeZ: f?.z ?? c.z };
+  if (f) setDest(c, f.x, f.z, 4, false);
+  sim.log(`${c.name} deja la escuadra${left ? ' y os deja en el suelo lo que llevaba en la mochila' : ''}.`, 'info');
+  sim.emit({ t: 'mundo', k: 'escuadra', id: c.id });
+  return null;
+}
+
+/** Qué falla en un nombre (o null si vale). */
+export function nameError(name: string): string | null {
+  const n = name.replace(/\s+/g, ' ').trim();
+  if (!n) return 'El nombre no puede quedar vacío';
+  if (n.length > NAME_MAX) return `Como mucho ${NAME_MAX} letras`;
+  return null;
+}
+
+/** Cambia el nombre de alguien de la escuadra. Devuelve el motivo si no se puede. */
+export function renameChar(c: Char, name: string): string | null {
+  const err = nameError(name);
+  if (err) return err;
+  c.name = name.replace(/\s+/g, ' ').trim();
+  return null;
 }
 
 // ---------------------------------------------------------------------------

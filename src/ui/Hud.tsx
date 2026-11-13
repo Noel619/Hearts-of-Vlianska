@@ -9,9 +9,9 @@ import { ITEMS, type EquipSlot } from '../data/items';
 import { BODY_PARTS, SKILLS, SKILL_IDS, skillWord, type SkillId } from '../data/skills';
 import type { FactionId } from '../data/tipos';
 import { dropItem, hasLamp, unequipSlot, useItem } from '../sim/actions';
-import { armorBulk, BULK_WEIGHT, invWeight, maxCarry, totalHpFrac, weaponDef } from '../sim/chars';
+import { armorBulk, BULK_WEIGHT, invWeight, maxCarry, NAME_MAX, totalHpFrac, weaponDef } from '../sim/chars';
 import { hostile, relation } from '../sim/combat';
-import { squadCap } from '../sim/events';
+import { nameError, renameChar, squadCap } from '../sim/events';
 import { filterMask, spareFilters } from '../sim/gas';
 import { firstSteps } from '../sim/hilos';
 import type { Char, Stance } from '../sim/types';
@@ -155,10 +155,13 @@ export function SelectionPanel() {
   const g = useGame();
   useTick();
   const [tab, setTab] = useState<'inv' | 'skills' | 'jobs'>('inv');
+  const [editing, setEditing] = useState(false);
   const tip = useTooltip();
   const sim = g.sim;
   const chars = g.selected.map((id) => sim.char(id)).filter((c): c is Char => !!c);
   const c = chars[0];
+  const firstId = c?.id ?? 0;
+  useEffect(() => setEditing(false), [firstId]);
   if (!c) return null;
   const many = chars.length > 1;
   const setAll = (fn: (c: Char) => void) => {
@@ -177,8 +180,21 @@ export function SelectionPanel() {
     <div className="panel selpanel">
       <div className="selhead">
         <Face c={c} size={58} playerColor={sim.state.playerColor} />
-        <div className="grow">
-          <div className="name">{c.name}</div>
+        <div className="grow" style={{ minWidth: 0 }}>
+          {editing && !many ? (
+            <NameEdit key={c.id} c={c} done={() => setEditing(false)} />
+          ) : (
+            <div className="namerow">
+              <div className="name" title={many ? undefined : 'Doble clic para cambiarle el nombre'} onDoubleClick={() => !many && setEditing(true)}>
+                {c.name}
+              </div>
+              {!many && (
+                <button className="key mini" title="Cambiar el nombre" onClick={() => setEditing(true)}>
+                  <Icon id="editar" size={12} />
+                </button>
+              )}
+            </div>
+          )}
           <div className="sub">
             {many ? `y ${chars.length - 1} más seleccionados` : charTitle(c) || 'Superviviente'}
             {w ? ` · ${c.eq.arma ? ITEMS[c.eq.arma.id].name : ''}` : ''}
@@ -188,6 +204,19 @@ export function SelectionPanel() {
           <Icon id={statusIcon(c)} size={13} />
           {statusText(g, c)}
         </span>
+        {!many && (
+          <button
+            className="key mini"
+            title="Despedir de la escuadra…"
+            onClick={() => {
+              g.panel = { t: 'despedir', id: c.id };
+              g.paused = true;
+              g.bump();
+            }}
+          >
+            <Icon id="salir" size={13} />
+          </button>
+        )}
       </div>
       <div className="tabs">
         <button className={'tab' + (tab === 'inv' ? ' on' : '')} onClick={() => setTab('inv')}>
@@ -363,6 +392,53 @@ export function SelectionPanel() {
         </div>
       </div>
       {tip.node}
+    </div>
+  );
+}
+
+/** Campo para cambiar el nombre: Intro acepta, Esc o un nombre vacío lo dejan como estaba. */
+function NameEdit({ c, done }: { c: Char; done: () => void }) {
+  const g = useGame();
+  const [v, setV] = useState(c.name);
+  const [err, setErr] = useState('');
+  const finished = useRef(false);
+  const finish = (save: boolean) => {
+    if (finished.current) return;
+    if (save) {
+      const e = renameChar(c, v);
+      if (e) {
+        setErr(e);
+        return;
+      }
+      g.bump();
+    }
+    finished.current = true;
+    done();
+  };
+  return (
+    <div className="namerow">
+      <input
+        className={'txt nameedit' + (err ? ' bad' : '')}
+        autoFocus
+        value={v}
+        maxLength={NAME_MAX}
+        aria-label="Nombre"
+        title={err || 'Intro para aceptar · Esc para dejarlo como estaba'}
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => {
+          setV(e.target.value);
+          setErr('');
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') finish(true);
+          else if (e.key === 'Escape') {
+            e.stopPropagation();
+            finish(false);
+          }
+        }}
+        onBlur={() => finish(!nameError(v))}
+      />
+      {err && <span className="bad small">{err}</span>}
     </div>
   );
 }

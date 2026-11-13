@@ -8,7 +8,7 @@ import { ROLE_NAMES, type Role } from '../data/gente';
 import { HAIR_COLORS, SKIN_TONES, type Look } from '../data/looks';
 import type { FactionId, SideId } from '../data/tipos';
 import { seedFrom } from '../core/rng';
-import { makeCreature, makeHuman } from './chars';
+import { hirePrice, makeCreature, makeHuman } from './chars';
 import { hostile } from './combat';
 import { clearDest, setDest } from './move';
 import type { Sim } from './sim';
@@ -222,8 +222,7 @@ function spawnPlace(sim: Sim, place: string) {
     } else if (sp.kind === 'recluta') {
       const role: Role = (['mercenario', 'obrero', 'cazador', 'refugiado', 'medico', 'soldado'] as Role[])[seed % 6];
       const c = makeHuman(sim, 'LIB', role, sp.x, sp.z, seed);
-      const power = c.sk.ataque + c.sk.punteria + c.sk.medicina * 0.5 + c.sk.ingenieria * 0.5;
-      c.hire = Math.round((40 + power * 3.2) / 10) * 10;
+      c.hire = hirePrice(c);
       c.bio = `${ROLE_NAMES[role]} sin trabajo. Se une a quien pague.`;
       base(c, slot, sp, 'vendedor');
       c.ai.sub = 'sentado';

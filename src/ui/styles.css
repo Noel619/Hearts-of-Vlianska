@@ -727,6 +727,46 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.selhead .namerow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.selhead .namerow .name {
+  min-width: 0;
+}
+.key.mini {
+  --c: 4px;
+  width: 22px;
+  height: 20px;
+  flex: none;
+}
+.selhead .namerow .key.mini {
+  opacity: 0.55;
+}
+.selhead:hover .namerow .key.mini {
+  opacity: 1;
+}
+input.txt.nameedit {
+  width: 100%;
+  max-width: 260px;
+  padding: 2px 7px;
+  font-family: var(--stencil);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.04em;
+  color: var(--amber2);
+}
+input.txt.nameedit.bad {
+  box-shadow:
+    inset 0 2px 4px #000,
+    0 0 0 1px var(--bad);
+}
+.namerow .small {
+  font-size: 11.5px;
+  white-space: nowrap;
+}
 .selhead .sub {
   margin-top: 3px;
   font-size: 12.5px;
@@ -1838,6 +1878,14 @@ kbd {
 .thumb.sm {
   width: 68px;
   height: 68px;
+}
+.chip.btnchip {
+  border: none;
+  cursor: pointer;
+  padding: 2px 5px;
+}
+.chip.btnchip:hover {
+  box-shadow: 0 0 0 1px var(--amber);
 }
 .stacks {
   display: flex;

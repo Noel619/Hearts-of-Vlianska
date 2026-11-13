@@ -151,6 +151,15 @@ export function makeCreature(sim: Sim, kind: string, x: number, z: number): Char
   return c;
 }
 
+/** Lo que pide alguien por unirse a la escuadra, según lo que sabe hacer. */
+export function hirePrice(c: Char): number {
+  const power = c.sk.ataque + c.sk.punteria + c.sk.medicina * 0.5 + c.sk.ingenieria * 0.5;
+  return Math.round((40 + power * 3.2) / 10) * 10;
+}
+
+/** Largo máximo de un nombre. */
+export const NAME_MAX = 24;
+
 // --- Inventario -----------------------------------------------------------------
 
 export function addItem(c: { inv: Stack[] }, id: string, n: number, extra?: Partial<Stack>): void {
