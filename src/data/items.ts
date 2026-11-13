@@ -150,7 +150,7 @@ const gun = (
   blunt = 8,
 ) => add({ id, name, desc, kind: 'arma', w, price, stack: 1, model: id, weapon: { cls, hold, cut: 0, blunt, pierce, reach: 1.3, speed: 1.0, parry: 0, ranged: r } });
 gun('pistola', 'Pistola', 'Una Makárov con más años que su dueño.', 'pistola', 'pistola', 20, { ammo: 'balas', range: 22, spread: 0.07, rof: 0.7, mag: 8, reload: 2.2, noise: 55 }, 0.8, 120, 5);
-gun('subfusil', 'Subfusil de taller', 'Un tubo, un muelle y mala puntería. Escupe plomo.', 'pistola', 'pistola', 15, { ammo: 'balas', range: 20, spread: 0.11, rof: 0.16, mag: 25, reload: 2.8, noise: 60 }, 2.6, 210, 7);
+gun('subfusil', 'Subfusil de taller', 'Un tubo, un muelle y mala puntería. Escupe plomo.', 'pistola', 'fusil', 15, { ammo: 'balas', range: 20, spread: 0.11, rof: 0.16, mag: 25, reload: 2.8, noise: 60 }, 2.6, 210, 7);
 gun('escopeta', 'Recortada', 'Dos cañones, dos respuestas.', 'escopeta', 'pistola', 11, { ammo: 'cartuchosEscopeta', range: 13, spread: 0.16, rof: 0.9, mag: 2, reload: 2.6, noise: 70, pellets: 6 }, 2.4, 160);
 gun('fusilTunel', 'Fusil del túnel', 'Corto, robusto y fácil de fabricar con chatarra.', 'fusil', 'fusil', 26, { ammo: 'balas', range: 30, spread: 0.06, rof: 1.3, mag: 5, reload: 3.0, noise: 65 }, 3.4, 180, 12);
 gun('cerrojo', 'Fusil de cerrojo', 'De los abuelos. Lento, largo y certero.', 'fusil', 'fusil', 44, { ammo: 'balas', range: 46, spread: 0.022, rof: 2.0, mag: 5, reload: 3.6, noise: 75 }, 4.0, 320, 14);

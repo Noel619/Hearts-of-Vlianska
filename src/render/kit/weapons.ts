@@ -10,8 +10,32 @@ type Fn = (b: MeshBuilder) => void;
 const REG = new Map<string, Fn>();
 const CACHE = new Map<string, THREE.BufferGeometry>();
 
-function def(id: string, fn: Fn) {
+/** Cómo se empuña una pieza: dónde va la mano de apoyo y cómo la envuelve. */
+export interface Grip {
+  /** Convenio del modelo: arma de fuego (cañón a +Z) o asta (eje largo a +Y). */
+  gun: boolean;
+  /** Punto de la mano de apoyo, en coordenadas del arma. */
+  off?: [number, number, number];
+  /** `bajo`: la palma sostiene el guardamanos por debajo; `puño`: mismo agarre que la mano principal. */
+  offMode?: 'bajo' | 'puño';
+  /** Radio de lo que agarra la mano de apoyo. */
+  offR?: number;
+  /** Distancia de la empuñadura a la cantonera (armas que se apoyan en el hombro). */
+  stock?: number;
+  /** Centro de gravedad a lo largo del eje, para colgarla a la espalda. */
+  mid?: number;
+}
+
+const GRIPS = new Map<string, Grip>();
+
+function def(id: string, fn: Fn, grip?: Partial<Grip>) {
   REG.set(id, fn);
+  if (grip) GRIPS.set(id, { gun: false, ...grip });
+}
+
+/** Empuñadura de una pieza (las que no declaran nada se llevan en una mano). */
+export function heldGrip(id: string): Grip | null {
+  return GRIPS.get(id) ?? null;
 }
 
 export function heldGeometry(id: string): THREE.BufferGeometry | null {
@@ -83,7 +107,7 @@ def('ak', (b) => {
   barrel(b, 0.03, 0.62, 0.66, 0.014);
   curvedMag(b, 0.13, 0.19);
   b.color(C.iron).cube(0, -0.045, 0.045, 0.006, 0.04, 0.06);
-});
+}, { gun: true, offMode: 'bajo', off: [0, 0.028, 0.3], offR: 0.026, stock: 0.325, mid: 0.14 });
 
 def('fusilTunel', (b) => {
   // Fusil del túnel: tubo, chapa soldada y culata de tablón
@@ -103,7 +127,7 @@ def('fusilTunel', (b) => {
   barrel(b, 0.03, 0.26, 0.4, 0.024, 8);
   b.color(C.steelDark).cube(0, -0.15, 0.1, 0.026, 0.15, 0.05);
   b.color(C.copper).cube(0, 0.03, 0.42, 0.036, 0.01, 0.01);
-});
+}, { gun: true, offMode: 'bajo', off: [0, 0.03, 0.31], offR: 0.026, stock: 0.31, mid: 0.13 });
 
 def('carabina', (b) => {
   // Carabina de grado militar
@@ -129,7 +153,7 @@ def('carabina', (b) => {
   b.push().translate(0, 0.115, 0.222).rotateX(Math.PI / 2).disc(0, 0, 0, 0.017, 8, 1).pop();
   b.glow(0);
   b.color(C.steelDark).cube(0, -0.16, 0.12, 0.024, 0.16, 0.05);
-});
+}, { gun: true, offMode: 'bajo', off: [0, 0.03, 0.3], offR: 0.03, stock: 0.3, mid: 0.14 });
 
 def('subfusil', (b) => {
   b.color(C.steelDark);
@@ -146,7 +170,7 @@ def('subfusil', (b) => {
   b.color(C.iron);
   b.tube([0.012, 0.03, -0.08, 0.012, 0.02, -0.3, 0.012, -0.08, -0.31], 0.006, 3);
   b.tube([-0.012, 0.03, -0.08, -0.012, 0.02, -0.3, -0.012, -0.08, -0.31], 0.006, 3);
-});
+}, { gun: true, offMode: 'bajo', off: [0, 0.025, 0.25], offR: 0.024, stock: 0.31, mid: 0.04 });
 
 def('pistola', (b) => {
   b.color(C.steelDark).cube(0, 0.012, 0.03, 0.024, 0.036, 0.16);
@@ -156,7 +180,7 @@ def('pistola', (b) => {
   b.cube(0, -0.09, 0, 0.026, 0.105, 0.036);
   b.pop();
   b.color(C.iron).cube(0, -0.02, 0.04, 0.005, 0.03, 0.045);
-});
+}, { gun: true, offMode: 'puño', off: [0.012, -0.062, 0.008], mid: 0.02 });
 
 def('escopeta', (b) => {
   // Recortada de dos cañones
@@ -172,7 +196,7 @@ def('escopeta', (b) => {
     b.cyl(0, 0, 0, 0.013, 0.013, 0.34, 6, 3);
     b.pop();
   }
-});
+}, { gun: true, offMode: 'bajo', off: [0, 0.006, 0.17], offR: 0.024, mid: 0.12 });
 
 def('cerrojo', (b) => {
   // Fusil de cerrojo de caja larga
@@ -187,7 +211,7 @@ def('cerrojo', (b) => {
   b.tube([0.016, 0.045, 0.02, 0.05, 0.03, 0.02, 0.055, 0.0, 0.02], 0.007, 4);
   b.sphere(0.055, -0.004, 0.02, 0.012, 0.012, 0.012, 5, 3);
   b.cube(0, 0.04, 0.82, 0.008, 0.03, 0.01);
-});
+}, { gun: true, offMode: 'bajo', off: [0, 0.008, 0.33], offR: 0.024, stock: 0.335, mid: 0.2 });
 
 def('neumatico', (b) => {
   // Fusil de aire comprimido casero: depósito, manómetro y cañón largo
@@ -209,7 +233,7 @@ def('neumatico', (b) => {
   b.cube(0, -0.1, 0, 0.028, 0.1, 0.038);
   b.pop();
   b.color(C.rubber).tube([0, -0.02, 0.5, 0.02, 0.0, 0.46, 0, 0.03, 0.4], 0.006, 3);
-});
+}, { gun: true, offMode: 'bajo', off: [0, -0.03, 0.3], offR: 0.03, stock: 0.33, mid: 0.16 });
 
 def('ametralladora', (b) => {
   b.color(C.steelDark).cube(0, 0, 0.1, 0.05, 0.075, 0.36);
@@ -231,7 +255,7 @@ def('ametralladora', (b) => {
   b.color(C.iron);
   b.beam(0.02, 0.02, 0.7, 0.03, -0.04, 0.42, 0.008, 0.008);
   b.beam(-0.02, 0.02, 0.7, -0.03, -0.04, 0.42, 0.008, 0.008);
-});
+}, { gun: true, offMode: 'bajo', off: [0, 0.03, 0.34], offR: 0.03, stock: 0.335, mid: 0.2 });
 
 // --- Armas blancas y herramientas (eje largo hacia +Y) ------------------------------
 
@@ -243,7 +267,7 @@ def('cuchillo', (b) => {
   b.triangle(-0.004, 0.21, -0.014, 0.004, 0.21, 0.02, 0, 0.27, -0.008);
   b.triangle(0.004, 0.21, -0.014, 0, 0.27, -0.008, 0.004, 0.21, 0.02);
   b.triangle(-0.004, 0.21, 0.02, -0.004, 0.21, -0.014, 0, 0.27, -0.008);
-});
+}, { mid: 0.08 });
 
 def('machete', (b) => {
   b.color(C.woodDark).cube(0, -0.06, 0, 0.026, 0.13, 0.036);
@@ -254,7 +278,7 @@ def('machete', (b) => {
   b.color(C.steel);
   b.cube(0, 0.43, 0.014, 0.006, 0.08, 0.066);
   b.color(C.rust, 0.8).cube(0, 0.2, 0.0, 0.007, 0.1, 0.02);
-});
+}, { mid: 0.2 });
 
 def('hacha', (b) => {
   b.color(C.wood).cube(0, -0.12, 0, 0.028, 0.72, 0.036);
@@ -262,21 +286,21 @@ def('hacha', (b) => {
   b.color(C.steelLight);
   b.prism([-0.018, 0.06, 0.018, 0.06, 0.004, 0.17, -0.004, 0.17], 0.46, 0.64, true);
   b.color(C.red, 0.7).cube(0, 0.42, 0, 0.03, 0.06, 0.038);
-});
+}, { off: [0, 0.3, 0], offMode: 'puño', mid: 0.26 });
 
 def('maza', (b) => {
   b.color(C.woodDark).cube(0, -0.15, 0, 0.032, 0.95, 0.036);
   b.color(C.iron).cube(0, 0.72, 0, 0.1, 0.11, 0.2);
   b.color(C.steelLight, 0.7).cube(0, 0.735, 0.1, 0.09, 0.08, 0.012);
   b.cube(0, 0.735, -0.1, 0.09, 0.08, 0.012);
-});
+}, { off: [0, 0.36, 0], offMode: 'puño', mid: 0.32 });
 
 def('tubo', (b) => {
   // Tubo de plomo con un codo y cinta aislante
   b.color(C.rust).cyl(0, -0.12, 0, 0.018, 0.018, 0.72, 6, 3);
   b.color(C.rustDark).cyl(0, 0.52, 0, 0.03, 0.03, 0.09, 6, 3);
   b.color(C.black).cyl(0, -0.1, 0, 0.021, 0.021, 0.16, 6, 0);
-});
+}, { mid: 0.2 });
 
 def('pala', (b) => {
   b.color(C.wood).cyl(0, -0.12, 0, 0.016, 0.016, 0.56, 6, 3);
@@ -284,7 +308,7 @@ def('pala', (b) => {
   b.prism([-0.07, -0.006, 0.07, -0.006, 0.07, 0.006, -0.07, 0.006], 0.44, 0.6, true);
   b.triangle(-0.07, 0.6, 0, 0.07, 0.6, 0, 0, 0.68, 0);
   b.triangle(0.07, 0.6, 0, -0.07, 0.6, 0, 0, 0.68, 0);
-});
+}, { mid: 0.25 });
 
 def('lanza', (b) => {
   // Lanza improvisada: tubo con bayoneta atada
@@ -295,30 +319,30 @@ def('lanza', (b) => {
   b.triangle(0.004, 1.2, -0.014, 0, 1.3, 0, 0.004, 1.2, 0.014);
   b.triangle(-0.004, 1.2, 0.014, -0.004, 1.2, -0.014, 0, 1.3, 0);
   b.color(C.burlap).cyl(0, 0.88, 0, 0.022, 0.022, 0.1, 6, 0);
-});
+}, { off: [0, 0.46, 0], offMode: 'puño', mid: 0.3 });
 
 def('llave', (b) => {
   b.color(C.steel).cube(0, -0.08, 0, 0.012, 0.34, 0.03);
   b.cube(0, 0.26, 0.012, 0.014, 0.07, 0.06);
   b.color(C.steelDark).cube(0, 0.3, -0.02, 0.014, 0.03, 0.02);
-});
+}, { mid: 0.1 });
 
 def('palanca', (b) => {
   b.color(C.iron).cyl(0, -0.12, 0, 0.013, 0.013, 0.66, 6, 3);
   b.tube([0, 0.54, 0, 0, 0.6, 0.02, 0, 0.62, 0.07], 0.013, 5);
   b.color(C.red, 0.6).cyl(0, 0.2, 0, 0.0135, 0.0135, 0.2, 6, 0);
-});
+}, { mid: 0.2 });
 
 def('pico', (b) => {
   b.color(C.wood).cube(0, -0.15, 0, 0.03, 0.9, 0.036);
   b.color(C.iron);
   b.tube([0, 0.7, -0.24, 0, 0.74, -0.1, 0, 0.75, 0, 0, 0.74, 0.1, 0, 0.7, 0.24], 0.02, 5);
-});
+}, { off: [0, 0.34, 0], offMode: 'puño', mid: 0.3 });
 
 def('martillo', (b) => {
   b.color(C.wood).cube(0, -0.08, 0, 0.022, 0.32, 0.028);
   b.color(C.iron).cube(0, 0.22, 0, 0.032, 0.04, 0.1);
-});
+}, { mid: 0.08 });
 
 def('farol', (b) => {
   // Farol de queroseno

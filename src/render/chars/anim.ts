@@ -49,10 +49,14 @@ export interface AnimInput {
   hitSide: number;
   sinceBlock: number;
   seed: number;
+  /** Lleva algo empuñado en la mano derecha (cierra el puño). */
+  armed: boolean;
+  /** Cierre de la mano izquierda (0 relajada … 1 puño), cuando apoya en el arma. */
+  offHand: number;
 }
 
 export function defaultAnimInput(seed = 1): AnimInput {
-  return { speed: 0, sneak: false, limp: 0, hold: 'nada', aim: 0, pose: 'normal', work: 'nada', carrying: false, attack: null, attackT: 0, sinceFire: 9, sinceHit: 9, hitSide: 0, sinceBlock: 9, seed };
+  return { speed: 0, sneak: false, limp: 0, hold: 'nada', aim: 0, pose: 'normal', work: 'nada', carrying: false, attack: null, attackT: 0, sinceFire: 9, sinceHit: 9, hitSide: 0, sinceBlock: 9, seed, armed: false, offHand: 0 };
 }
 
 const NB = 19;
@@ -93,7 +97,61 @@ class Pose {
 }
 
 const T = new Pose();
+
 const tmpE = new THREE.Euler();
+const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+
+/**
+ * Posturas del arma en el espacio del pecho (x a la izquierda del personaje,
+ * y arriba, z al frente): dónde queda la empuñadura, hacia dónde apunta el
+ * eje largo y hacia dónde mira el lomo (armas de fuego) o el filo (astas).
+ * Los brazos se resuelven después para que las manos lleguen al arma.
+ */
+interface WKey {
+  p: THREE.Vector3;
+  d: THREE.Vector3;
+  u: THREE.Vector3;
+  /** Cuánto se acerca la mano de apoyo a la principal (1 = en su sitio). */
+  slide: number;
+}
+const key = (p: [number, number, number], d: [number, number, number], u: [number, number, number], slide = 1): WKey => ({ p: V(...p), d: V(...d).normalize(), u: V(...u).normalize(), slide });
+
+const RIFLE = {
+  // Arma terciada: culata bajo el brazo derecho, boca hacia abajo y a la izquierda
+  ready: key([-0.13, -0.1, 0.25], [0.72, -0.42, 0.55], [-0.15, 1, 0.2]),
+  // A la carrera: cruzada sobre el pecho, boca arriba
+  port: key([-0.13, -0.1, 0.25], [0.74, 0.5, 0.45], [-0.3, 0.6, 0.75]),
+  sneak: key([-0.1, -0.02, 0.3], [0.45, -0.3, 0.84], [-0.1, 1, 0.1]),
+  wind: key([-0.2, -0.04, 0.14], [0.25, 0.1, 0.96], [0, 1, 0]),
+  strike: key([-0.08, 0.02, 0.42], [0.15, 0.25, 0.95], [0, 1, -0.25], 0.8),
+  block: key([-0.1, 0.1, 0.3], [0.85, 0.45, 0.25], [0, 0.3, 1]),
+};
+const POLE = {
+  // Asta en guardia: mano atrás junto a la cadera, cabeza del arma arriba y al frente
+  ready: key([-0.15, -0.3, 0.2], [0.6, 0.62, 0.5], [0.5, -0.5, 0.7]),
+  run: key([-0.17, -0.22, 0.2], [0.55, 0.78, 0.3], [0.5, -0.4, 0.75]),
+  golpeWind: key([-0.08, 0.3, 0.08], [0.12, 0.86, -0.5], [0, 0.5, 0.86], 0.8),
+  golpeStrike: key([-0.04, -0.12, 0.34], [0.04, -0.22, 0.97], [0, -0.97, -0.22]),
+  tajoWind: key([-0.24, 0.02, 0.08], [-0.66, 0.42, -0.62], [-0.6, 0, 0.8], 0.75),
+  tajoStrike: key([0.0, -0.1, 0.32], [0.62, -0.08, 0.78], [0.78, 0, -0.62]),
+  thrustWind: key([-0.22, -0.14, 0.02], [0.12, 0.12, 0.98], [0, -1, 0.1], 0.9),
+  thrustStrike: key([-0.1, -0.06, 0.2], [0.04, 0.3, 0.95], [0, -1, 0.3], 0.62),
+  block: key([-0.14, 0.02, 0.28], [0.8, 0.55, 0.22], [0, -0.2, 1]),
+};
+
+function blendKey(out: WKey, k: WKey, w: number) {
+  if (w <= 0) return;
+  out.p.lerp(k.p, w);
+  out.d.lerp(k.d, w).normalize();
+  out.u.lerp(k.u, w).normalize();
+  out.slide += (k.slide - out.slide) * w;
+}
+
+const TW: WKey = key([0, 0, 0.3], [0, 0, 1], [0, 1, 0]);
+const Q_ID = new THREE.Quaternion();
+/** Pulgar cerrado sobre el mango (mano derecha; la izquierda es su espejo). */
+const THUMB_GRIP_R = new THREE.Quaternion().setFromUnitVectors(V(0.006, -0.066, 0.042).normalize(), V(0.05, -0.05, -0.004).normalize());
+const THUMB_GRIP_L = new THREE.Quaternion(-THUMB_GRIP_R.x, THUMB_GRIP_R.y, THUMB_GRIP_R.z, -THUMB_GRIP_R.w).normalize();
 
 export class HumanAnimator {
   /** Fase del ciclo de paso. */
@@ -107,10 +165,17 @@ export class HumanAnimator {
   private fz = 0;
   private aimW = 0;
   private first = true;
+  private gripR = 0.15;
+  private gripL = 0.15;
   /** Peso de apuntado suavizado (lo usa la vista para orientar el arma). */
   get aimWeight() {
     return this.aimW;
   }
+  /** Postura deseada del arma en el espacio del pecho (fusiles y armas a dos manos). */
+  readonly weapon: WKey = key([0, 0, 0.3], [0, 0, 1], [0, 1, 0]);
+  /** Retroceso del último disparo (0..1) y peso del golpe en curso. */
+  recoil = 0;
+  striking = 0;
 
   constructor(
     readonly bones: THREE.Bone[],
@@ -213,10 +278,12 @@ export class HumanAnimator {
         p.mix(B.forearmR, aw, -1.9);
         p.mix(B.upperArmL, aw, -1.36, -0.34, 0.1);
         p.mix(B.forearmL, aw, -0.42);
-        p.add(B.chest, 0.04 * aw, -0.34 * aw, 0);
-        p.add(B.hips, 0, -0.14 * aw, 0);
-        p.add(B.neck, 0.05 * aw, 0.2 * aw, -0.06 * aw);
-        p.add(B.head, 0.03 * aw, 0.22 * aw, -0.08 * aw);
+        // Cuerpo de perfil: hombro izquierdo adelantado, cabeza sobre la culata
+        p.add(B.spine, 0.05 * aw, -0.16 * aw, 0);
+        p.add(B.chest, 0.06 * aw, -0.36 * aw, 0);
+        p.add(B.hips, 0, -0.2 * aw, 0);
+        p.add(B.neck, 0.08 * aw, 0.3 * aw, -0.1 * aw);
+        p.add(B.head, 0.04 * aw, 0.36 * aw, -0.12 * aw);
         p.add(B.thighL, -0.14 * aw * idle);
         p.add(B.shinL, 0.26 * aw * idle);
         p.add(B.thighR, 0.1 * aw * idle);
@@ -234,8 +301,10 @@ export class HumanAnimator {
         p.add(B.chest, 0, -0.12 * aw, 0);
       }
     } else if (s.hold === 'una') {
-      p.mix(B.upperArmR, 0.8, -0.16 + sway, 0, -0.14);
-      p.mix(B.forearmR, 0.8, -0.62);
+      // Brazo suelto con el arma apuntando al frente; la muñeca la deja caer un poco
+      p.mix(B.upperArmR, 0.85, -0.12 + sway, 0, -0.16);
+      p.mix(B.forearmR, 0.85, -0.5 - 0.25 * walk);
+      p.set(B.handR, 0.42, 0, 0.1);
     } else if (s.hold === 'dos') {
       p.mix(B.upperArmR, 0.9, -0.22 + sway, 0.5, -0.1);
       p.mix(B.forearmR, 0.9, -1.0);
@@ -243,6 +312,7 @@ export class HumanAnimator {
       p.mix(B.forearmL, 0.9, -0.92);
     }
     // Retroceso del disparo
+    this.recoil = s.sinceFire < 0.4 ? Math.exp(-s.sinceFire * 16) : 0;
     if (s.sinceFire < 0.4) {
       const r = Math.exp(-s.sinceFire * 16);
       p.add(B.chest, -0.07 * r);
@@ -266,6 +336,7 @@ export class HumanAnimator {
 
     // --- Ataques cuerpo a cuerpo ---------------------------------------------------------
     if (s.attack) this.attack(p, s.attack, clamp01(s.attackT), s.hold);
+    this.weaponPose(s, run, dt);
     if (s.sinceBlock < 0.35) {
       const r = Math.sin(clamp01(s.sinceBlock / 0.35) * Math.PI);
       p.mix(B.upperArmR, r, -1.05, 0.2, 0.35);
@@ -290,6 +361,7 @@ export class HumanAnimator {
     const k = this.first ? 1 : 1 - Math.exp(-fast * dt);
     const lying = s.pose === 'ko' || s.pose === 'muerto' || s.pose === 'tumbado' || s.pose === 'gateo';
     const kr = this.first ? 1 : 1 - Math.exp(-(lying ? 7 : 9) * dt);
+    const wasFirst = this.first;
     this.first = false;
     const c = this.cur;
     for (let i = 0; i < NB * 3; i++) c[i] += (p.e[i] - c[i]) * k;
@@ -307,6 +379,68 @@ export class HumanAnimator {
     tmpE.set(this.rx + c[0], this.ry + c[1], this.rz + c[2], 'YXZ');
     bones[0].quaternion.setFromEuler(tmpE);
     bones[0].position.set(0, this.y, this.fz);
+    // Dedos: abiertos y algo curvados en reposo, cerrados en puño al empuñar
+    if (bones.length > B.thumbR) {
+      const limp = s.pose === 'ko' || s.pose === 'muerto' || s.pose === 'cargado';
+      const fist = s.attack === 'punetazo' ? 1 : 0;
+      const tR = limp ? 0.2 : s.armed ? 1 : Math.max(fist, s.work === 'cargarCaja' ? 0.45 : s.work === 'calentarse' || s.work === 'hablar' ? 0.02 : 0.16);
+      const tL = limp ? 0.2 : Math.max(s.offHand, fist, s.work === 'cargarCaja' ? 0.45 : s.work === 'pico' ? 1 : s.work === 'calentarse' ? 0.02 : 0.16);
+      const kg = wasFirst ? 1 : 1 - Math.exp(-14 * dt);
+      this.gripR += (tR - this.gripR) * kg;
+      this.gripL += (tL - this.gripL) * kg;
+      const gR = this.gripR;
+      const gL = this.gripL;
+      tmpE.set(0, 0, 1.32 * gR, 'YXZ');
+      bones[B.fingersR].quaternion.setFromEuler(tmpE);
+      tmpE.set(0, 0, 1.5 * gR, 'YXZ');
+      bones[B.tipsR].quaternion.setFromEuler(tmpE);
+      bones[B.thumbR].quaternion.copy(Q_ID).slerp(THUMB_GRIP_R, gR);
+      tmpE.set(0, 0, -1.32 * gL, 'YXZ');
+      bones[B.fingersL].quaternion.setFromEuler(tmpE);
+      tmpE.set(0, 0, -1.5 * gL, 'YXZ');
+      bones[B.tipsL].quaternion.setFromEuler(tmpE);
+      bones[B.thumbL].quaternion.copy(Q_ID).slerp(THUMB_GRIP_L, gL);
+    }
+  }
+
+  /** Calcula dónde debe estar el arma (fusiles y astas) según lo que hace el personaje. */
+  private weaponPose(s: AnimInput, run: number, dt: number) {
+    const o = TW;
+    const t = clamp01(s.attackT);
+    const wind = s.attack ? smoothstep(0, 0.28, t) * (1 - smoothstep(0.3, 0.44, t)) : 0;
+    const strike = s.attack ? smoothstep(0.3, 0.46, t) * (1 - smoothstep(0.58, 1, t)) : 0;
+    const block = s.sinceBlock < 0.35 ? Math.sin(clamp01(s.sinceBlock / 0.35) * Math.PI) : 0;
+    this.striking = Math.max(wind, strike, block);
+    if (s.hold === 'fusil') {
+      o.p.copy(RIFLE.ready.p);
+      o.d.copy(RIFLE.ready.d);
+      o.u.copy(RIFLE.ready.u);
+      o.slide = 1;
+      blendKey(o, RIFLE.port, run);
+      if (s.sneak) blendKey(o, RIFLE.sneak, 1);
+      blendKey(o, RIFLE.wind, wind);
+      blendKey(o, RIFLE.strike, strike);
+      blendKey(o, RIFLE.block, block);
+    } else {
+      o.p.copy(POLE.ready.p);
+      o.d.copy(POLE.ready.d);
+      o.u.copy(POLE.ready.u);
+      o.slide = 1;
+      blendKey(o, POLE.run, run);
+      const k = s.attack === 'golpe' ? 0 : s.attack === 'estocada' ? 2 : 1;
+      blendKey(o, k === 0 ? POLE.golpeWind : k === 2 ? POLE.thrustWind : POLE.tajoWind, wind);
+      blendKey(o, k === 0 ? POLE.golpeStrike : k === 2 ? POLE.thrustStrike : POLE.tajoStrike, strike);
+      blendKey(o, POLE.block, block);
+    }
+    // Balanceo al andar y al respirar
+    const sw = Math.sin(this.phase * 2) * 0.012 * smoothstep(0.04, 0.5, s.speed);
+    o.p.y += sw + Math.sin(this.time * 1.5) * 0.004;
+    const w = this.weapon;
+    const k2 = this.first ? 1 : 1 - Math.exp(-(s.attack ? 34 : 14) * dt);
+    w.p.lerp(o.p, k2);
+    w.d.lerp(o.d, k2).normalize();
+    w.u.lerp(o.u, k2).normalize();
+    w.slide += (o.slide - w.slide) * k2;
   }
 
   private work(p: Pose, s: AnimInput, t: number) {
@@ -422,6 +556,9 @@ export class HumanAnimator {
     const strike = smoothstep(0.3, 0.46, t) * (1 - smoothstep(0.58, 1, t));
     const two = hold === 'dos' || hold === 'fusil';
     if (kind === 'tajo') {
+      // La muñeca se arma hacia atrás y latiguea al golpear
+      p.mix(B.handR, wind, -0.45, 0, 0);
+      p.mix(B.handR, strike, 0.75, 0, 0);
       p.mix(B.upperArmR, wind, 0.55, -0.2, -1.5);
       p.mix(B.forearmR, wind, -1.5);
       p.add(B.chest, -0.06 * wind, -0.55 * wind, 0);
@@ -459,6 +596,9 @@ export class HumanAnimator {
       p.y -= 0.08 * strike;
       p.fz += 0.1 * strike;
     } else if (kind === 'estocada') {
+      // La punta se alinea con el antebrazo para clavar
+      p.mix(B.handR, wind, 0.9, 0, 0);
+      p.mix(B.handR, strike, 1.25, 0, 0);
       p.mix(B.upperArmR, wind, 0.75, 0.2, -0.3);
       p.mix(B.forearmR, wind, -1.75);
       p.add(B.chest, 0, -0.42 * wind, 0);

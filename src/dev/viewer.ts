@@ -14,10 +14,12 @@ import { buildLayout } from '../world/layout';
 import { LightField } from '../world/lights';
 import { addCharTest } from './charTest';
 import { startKit } from './kitView';
+import { startPoses } from './poseView';
 
 export async function startViewer(root: HTMLElement) {
   const params = new URLSearchParams(location.search);
   if (params.has('kit')) return startKit(root, params);
+  if (params.has('poses')) return startPoses(root, params);
   const canvas = document.createElement('canvas');
   canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block';
   root.appendChild(canvas);

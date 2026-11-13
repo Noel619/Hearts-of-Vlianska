@@ -8,6 +8,9 @@ import { hash2 } from '../../core/math';
 import { lin, mixc, scalec, type RGB } from '../geo';
 import { SkinBuilder, type BoneDef, type W } from './skin';
 
+/** Medidas de la mano en reposo (brazo caído): alturas de muñeca, nudillos y falange. */
+export const HAND = { wrist: 0.87, knuckle: 0.787, joint: 0.743, thumbY: 0.852, thumbZ: 0.03, palm: 0.017 } as const;
+
 export const HUMAN_BONES: BoneDef[] = [
   { name: 'hips', parent: -1, pos: [0, 0.98, 0] },
   { name: 'spine', parent: 0, pos: [0, 1.1, 0] },
@@ -28,6 +31,13 @@ export const HUMAN_BONES: BoneDef[] = [
   { name: 'thighR', parent: 0, pos: [-0.1, 0.94, 0] },
   { name: 'shinR', parent: 16, pos: [-0.1, 0.52, 0] },
   { name: 'footR', parent: 17, pos: [-0.1, 0.09, 0] },
+  // Dedos: los cuatro dedos se doblan juntos por dos falanges; el pulgar, aparte
+  { name: 'fingersL', parent: 8, pos: [0.205, HAND.knuckle, 0] },
+  { name: 'tipsL', parent: 19, pos: [0.205, HAND.joint, 0] },
+  { name: 'thumbL', parent: 8, pos: [0.205, HAND.thumbY, HAND.thumbZ] },
+  { name: 'fingersR', parent: 12, pos: [-0.205, HAND.knuckle, 0] },
+  { name: 'tipsR', parent: 22, pos: [-0.205, HAND.joint, 0] },
+  { name: 'thumbR', parent: 12, pos: [-0.205, HAND.thumbY, HAND.thumbZ] },
 ];
 
 export const HB = {
@@ -50,6 +60,12 @@ export const HB = {
   thighR: 16,
   shinR: 17,
   footR: 18,
+  fingersL: 19,
+  tipsL: 20,
+  thumbL: 21,
+  fingersR: 22,
+  tipsR: 23,
+  thumbR: 24,
 } as const;
 
 interface Sec {
@@ -260,13 +276,17 @@ export function buildHumanoid(look: Look): THREE.BufferGeometry {
     const handC = gloves ?? skin;
     const bare = look.top === 'harapos' && rnd(s + 5) > 0.5;
     const lower = bare ? skin : sleeve;
+    const f1 = s > 0 ? B.fingersL : B.fingersR;
+    const f2 = s > 0 ? B.tipsL : B.tipsR;
+    const th = s > 0 ? B.thumbL : B.thumbR;
+    // Brazo y palma: la palma mira hacia el cuerpo
     column(
       sb,
       [
-        { y: 0.775, rx: 0.014, rz: 0.03, w: [[hd, 1]], c: scalec(handC, 0.85), cx: x, shape: 2.6 },
-        { y: 0.8, rx: 0.024, rz: 0.044, w: [[hd, 1]], c: handC, cx: x, shape: 2.6 },
-        { y: 0.845, rx: 0.025, rz: 0.042, w: [[hd, 1]], c: handC, cx: x, shape: 2.4 },
-        { y: 0.872, rx: 0.026, rz: 0.03, w: [[hd, 0.5], [fa, 0.5]], c: handC, cx: x },
+        { y: HAND.knuckle - 0.004, rx: HAND.palm * 0.8, rz: 0.04, w: [[hd, 1]], c: scalec(handC, 0.88), cx: x, shape: 3 },
+        { y: HAND.knuckle + 0.012, rx: HAND.palm, rz: 0.044, w: [[hd, 1]], c: handC, cx: x, shape: 3 },
+        { y: 0.84, rx: HAND.palm * 1.06, rz: 0.042, w: [[hd, 1]], c: handC, cx: x, shape: 2.6 },
+        { y: 0.866, rx: 0.021, rz: 0.031, w: [[hd, 0.6], [fa, 0.4]], c: handC, cx: x },
         { y: 0.885, rx: armR * 0.66 + pad * 0.9, rz: armR * 0.7 + pad * 0.9, w: [[fa, 0.8], [hd, 0.2]], c: scalec(lower, 0.82), cx: x },
         { y: 1.0, rx: armR * 0.82 + pad, rz: armR * 0.86 + pad, w: [[fa, 1]], c: lower, cx: x },
         { y: 1.09, rx: armR * 0.88 + pad, rz: armR * 0.9 + pad, w: [[fa, 0.85], [ua, 0.15]], c: lower, cx: x },
@@ -281,8 +301,41 @@ export function buildHumanoid(look: Look): THREE.BufferGeometry {
       true,
       true,
     );
-    // Pulgar
-    sb.color(handC).box(x, 0.835, 0.045, 0.022, 0.05, 0.022, [[hd, 1]]);
+    // Cuatro dedos de dos falanges (índice hacia delante) y pulgar
+    const FZ = [0.0305, 0.0105, -0.0095, -0.029];
+    const FL = [0.038, 0.043, 0.039, 0.03];
+    const FW = [0.0092, 0.0096, 0.0092, 0.0084];
+    for (let k = 0; k < 4; k++) {
+      const z = FZ[k];
+      const r = FW[k];
+      const dark = scalec(handC, 0.9);
+      column(
+        sb,
+        [
+          { y: HAND.knuckle + 0.006, rx: r * 0.95, rz: r, w: [[hd, 1]], c: handC, cx: x, cz: z, shape: 2.8 },
+          { y: HAND.knuckle - 0.004, rx: r, rz: r, w: [[hd, 0.45], [f1, 0.55]], c: handC, cx: x, cz: z, shape: 2.8 },
+          { y: HAND.joint + 0.012, rx: r * 0.96, rz: r * 0.98, w: [[f1, 1]], c: handC, cx: x, cz: z, shape: 2.8 },
+          { y: HAND.joint, rx: r * 0.94, rz: r * 0.96, w: [[f1, 0.5], [f2, 0.5]], c: dark, cx: x, cz: z, shape: 2.8 },
+          { y: HAND.joint - 0.012, rx: r * 0.9, rz: r * 0.94, w: [[f2, 1]], c: handC, cx: x, cz: z, shape: 2.8 },
+          { y: HAND.joint - FL[k], rx: r * 0.74, rz: r * 0.8, w: [[f2, 1]], c: dark, cx: x, cz: z, shape: 2.4 },
+        ],
+        6,
+        true,
+        false,
+      );
+    }
+    column(
+      sb,
+      [
+        { y: HAND.thumbY + 0.006, rx: 0.011, rz: 0.014, w: [[hd, 1]], c: handC, cx: x - s * 0.002, cz: HAND.thumbZ - 0.002 },
+        { y: HAND.thumbY - 0.012, rx: 0.0115, rz: 0.0135, w: [[hd, 0.4], [th, 0.6]], c: handC, cx: x - s * 0.004, cz: HAND.thumbZ + 0.012 },
+        { y: HAND.thumbY - 0.036, rx: 0.0105, rz: 0.012, w: [[th, 1]], c: handC, cx: x - s * 0.007, cz: HAND.thumbZ + 0.028 },
+        { y: HAND.thumbY - 0.062, rx: 0.008, rz: 0.009, w: [[th, 1]], c: scalec(handC, 0.9), cx: x - s * 0.009, cz: HAND.thumbZ + 0.04 },
+      ],
+      6,
+      true,
+      false,
+    );
     if (look.armband !== undefined && s > 0) {
       column(
         sb,

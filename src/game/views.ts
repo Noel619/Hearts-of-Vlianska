@@ -147,13 +147,20 @@ export class CharViews {
         }
         const tool = WORK_TOOL[c.work];
         const w = weaponItem(c);
-        h.setWeapon(c.st !== 'ok' ? null : (tool ?? w?.model ?? null));
+        // El arma va en la mano salvo que las tenga ocupadas, esté sentado o tumbado:
+        // entonces se la cuelga a la espalda (o al cinto, si es corta)
+        const up = c.st === 'ok' && c.pose !== 'tumbado';
+        const busy = c.work !== 'nada' && c.work !== 'guardia';
+        const seated = c.pose === 'sentado' || c.pose === 'sentadoSuelo' || c.pose === 'cuclillas';
+        const drawn = !busy && !seated && c.carry === 0 ? (w?.model ?? null) : c.carry !== 0 && w?.weapon?.hold !== 'dos' && w?.weapon?.hold !== 'fusil' ? (w?.model ?? null) : null;
+        const inHand = up ? (tool ?? drawn) : null;
+        h.setWeapon(inHand);
+        h.setBack(up && w?.model && inHand !== w.model ? w.model : null);
         const inp = h.input;
         inp.speed = c.speed;
         inp.sneak = c.sneak;
         inp.limp = limpSide(c);
-        inp.hold = tool ? (tool === 'pico' ? 'dos' : 'nada') : (w?.weapon?.hold ?? 'nada');
-        if (tool) inp.hold = tool === 'pico' ? 'dos' : 'nada';
+        inp.hold = tool ? (tool === 'pico' ? 'dos' : 'nada') : inHand ? (w?.weapon?.hold ?? 'nada') : 'nada';
         inp.aim = c.aim;
         inp.pose = c.st === 'muerto' ? 'muerto' : c.st === 'ko' ? (c.carriedBy ? 'cargado' : 'ko') : c.pose;
         inp.work = c.work;
