@@ -19,6 +19,11 @@ if (new URLSearchParams(location.search).has('view')) {
       root.textContent = String(e?.stack ?? e);
     }),
   );
+} else if (new URLSearchParams(location.search).has('sprites')) {
+  void import('./dev/SpriteCatalog').then((m) => {
+    createRoot(root).render(<m.SpriteCatalog />);
+    (window as unknown as Record<string, unknown>).__ready = true;
+  });
 } else {
   createRoot(root).render(<App />);
 }
