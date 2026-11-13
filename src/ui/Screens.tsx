@@ -13,7 +13,11 @@ import { owned, startResearch, techState } from '../sim/actions';
 import { hasTech } from '../sim/build';
 import { deleteSave, listSaves, loadGame, saveGame } from '../sim/save';
 import { propThumb } from '../render/thumbs';
-import { Bar, Cost, ItemIcon, Win, hex, useGame, useTick } from './core';
+import { SCENARIOS } from '../data/escenarios';
+import { burnLetter } from '../sim/events';
+import { epilogue, firstSteps, storyThreads } from '../sim/hilos';
+import { VERSION, VERSION_LABEL } from '../version';
+import { Bar, Cost, Face, ItemIcon, Money, Win, hex, useGame, useTick } from './core';
 import { LOG_ICON } from './Hud';
 import { Emblem } from './sprites/Emblem';
 import { Icon } from './sprites/Sprite';
@@ -409,6 +413,164 @@ export function FactionsScreen({ close }: { close: () => void }) {
   );
 }
 
+const STATE_LABEL: Record<string, string> = { pendiente: 'Por hacer', 'en curso': 'En marcha', hecho: 'Cerrado' };
+
+/** Hilos de la trama, primeros pasos y estado de la base. */
+export function ThreadsScreen({ close }: { close: () => void }) {
+  const g = useGame();
+  useTick();
+  const sim = g.sim;
+  const [msg, setMsg] = useState('');
+  const steps = firstSteps(sim);
+  const threads = storyThreads(sim);
+  const stepsDone = steps.filter((s) => s.done).length;
+  const hasLetter = sim.players.some((q) => q.inv.some((i) => i.id === 'cartaBessmertny'));
+  return (
+    <Win title="Hilos del metro" icon="estrella" onClose={close} width={940}>
+      {stepsDone < steps.length && (
+        <div className="steps">
+          <h4>
+            Primeros pasos{' '}
+            <span className="dim">
+              {stepsDone}/{steps.length}
+            </span>
+          </h4>
+          {steps.map((s) => (
+            <div key={s.id} className={'step' + (s.done ? ' done' : '')}>
+              <i className={'badge' + (s.done ? ' good' : '')}>{s.done && <Icon id="check" size={11} />}</i>
+              <b>{s.title}</b>
+              {!s.done && <small>{s.hint}</small>}
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="threads">
+        {threads.map((t) => (
+          <div key={t.id} className={'thread s-' + t.state.replace(' ', '')}>
+            <span className="medal">
+              <ItemIcon id={t.sprite} size={54} />
+              {t.state === 'hecho' && (
+                <i className="badge good">
+                  <Icon id="check" size={11} />
+                </i>
+              )}
+            </span>
+            <div className="grow">
+              <div className="row">
+                <h4 className="grow">{t.title}</h4>
+                <span className={'chipst st-' + t.state.replace(' ', '')}>{STATE_LABEL[t.state]}</span>
+              </div>
+              <p>{t.text}</p>
+              {t.hint && (
+                <p className="hintline">
+                  <Icon id="flecha" size={11} /> {t.hint}
+                </p>
+              )}
+              {t.progress !== undefined && t.progress > 0 && t.state !== 'hecho' && <Bar v={t.progress} cls="amber" />}
+              {t.id === 'carta' && t.state === 'en curso' && hasLetter && (
+                <button className="btn small danger" style={{ marginTop: 6 }} onClick={() => (setMsg(burnLetter(sim) ?? ''), g.bump())}>
+                  <Icon id="aviso" size={12} /> Quemar la carta
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      {msg && <p className="quote" style={{ marginTop: 12 }}>{msg}</p>}
+    </Win>
+  );
+}
+
+/** Informe al bajar al metro: quiénes sois, qué lleváis y cómo se manda. */
+export function Briefing({ scenario, close }: { scenario: string; close: () => void }) {
+  const g = useGame();
+  const sim = g.sim;
+  const sc = SCENARIOS.find((s) => s.id === scenario);
+  return (
+    <Win title={sc?.name ?? 'Bajada al metro'} icon="play" width={720} cls="brief">
+      {(sc?.intro ?? []).map((p, i) => (
+        <p key={i} className={i === 0 ? 'quote' : ''}>
+          {p}
+        </p>
+      ))}
+      <div className="crew">
+        {sim.players.map((c) => (
+          <div key={c.id} className="crewman">
+            <Face c={c} size={64} playerColor={sim.state.playerColor} />
+            <b>{c.name.split(' ')[0]}</b>
+            <small>{c.eq.arma ? ITEMS[c.eq.arma.id].name : 'Desarmado'}</small>
+          </div>
+        ))}
+      </div>
+      <div className="help brief-keys">
+        <kbd>Clic izquierdo</kbd>
+        <span>Seleccionar a los tuyos (arrastra para elegir a varios)</span>
+        <kbd>Clic derecho</kbd>
+        <span>En el suelo, ir; sobre algo o alguien, menú de acciones</span>
+        <kbd>Espacio</kbd>
+        <span>Pausa: da órdenes con calma</span>
+        <kbd>W A S D · Q E · Rueda</kbd>
+        <span>Mover, girar y acercar la cámara</span>
+        <kbd>J</kbd>
+        <span>Hilos: qué se cuece en el metro y qué te falta por hacer</span>
+      </div>
+      <div className="row foot">
+        <span className="dim">La partida se guarda sola cada minuto. F5 guarda, F9 carga.</span>
+        <span className="sp" />
+        <button className="btn big" onClick={close} autoFocus>
+          <Icon id="play" size={16} /> Empezar
+        </button>
+      </div>
+    </Win>
+  );
+}
+
+/** Epílogo: la emisora ha captado la señal. El final es abierto y se puede seguir jugando. */
+export function Epilogue({ close, exit }: { close: () => void; exit: () => void }) {
+  const g = useGame();
+  const st = g.sim.state;
+  return (
+    <Win title="Aquí Múrmansk" icon="estrella" width={700} cls="brief">
+      <div className="talk">
+        <ItemIcon id="radioPiezas" size={96} />
+        <div className="grow">
+          <p className="quote">
+            Entre el ruido estático, una voz repite coordenadas y una frase en ruso: «Aquí Múrmansk. Seguimos vivos.» La señal se pierde a los pocos minutos. Nadie sabe si fue grabada hace años. Pero hay más supervivientes. Hay esperanza.
+          </p>
+        </div>
+      </div>
+      <div className="lore" style={{ marginTop: 6 }}>
+        <h3>El metro, {g.sim.dateText()}</h3>
+        {epilogue(g.sim).map((l, i) => (
+          <p key={i}>{l}</p>
+        ))}
+      </div>
+      <div className="startkit">
+        <span className="chipst" title="Días bajo tierra">
+          <Icon id="reloj" size={12} /> {g.sim.day} {g.sim.day === 1 ? 'día' : 'días'}
+        </span>
+        <span className="chipst" title="Enemigos abatidos">
+          <Icon id="calavera" size={12} /> {st.stats.kills}
+        </span>
+        <span className="chipst" title="Obras levantadas">
+          <Icon id="construir" size={12} /> {st.stats.built}
+        </span>
+        <Money n={st.stats.earned} />
+      </div>
+      <div className="row foot">
+        <span className="dim">Has llegado al final de la historia de la versión {VERSION}. El metro sigue ahí.</span>
+        <span className="sp" />
+        <button className="btn" onClick={exit}>
+          <Icon id="salir" size={14} /> Volver al menú
+        </button>
+        <button className="btn big" onClick={close}>
+          <Icon id="play" size={16} /> Seguir jugando
+        </button>
+      </div>
+    </Win>
+  );
+}
+
 export function CodexScreen({ close }: { close: () => void }) {
   return (
     <Win title="Crónica del metro" icon="cronica" onClose={close} width={780} cls="lore">
@@ -459,7 +621,7 @@ export function HelpBody() {
     ['F', 'Centrar la cámara en el seleccionado'],
     ['L · C · H', 'Linterna · Sigilo · Mantener posición'],
     ['X', 'Cancelar órdenes'],
-    ['B · I · M · G · K', 'Construir · Estudio · Mapa · Facciones · Crónica'],
+    ['B · I · M · G · K · J', 'Construir · Estudio · Mapa · Facciones · Crónica · Hilos'],
     ['R', 'Girar la obra antes de colocarla'],
     ['F5 / F9', 'Guardado y carga rápidos'],
   ];
@@ -548,6 +710,9 @@ export function PauseScreen({ close, exit, open }: { close: () => void; exit: ()
         <button className="btn big" onClick={() => setView('cargar')}>
           <Icon id="recoger" size={16} /> Cargar
         </button>
+        <button className="btn big" onClick={() => open('hilos')}>
+          <Icon id="estrella" size={16} /> Hilos
+        </button>
         <button className="btn big" onClick={() => open('registro')}>
           <Icon id="diario" size={16} /> Diario
         </button>
@@ -560,6 +725,7 @@ export function PauseScreen({ close, exit, open }: { close: () => void; exit: ()
         <button className="btn big danger" onClick={exit}>
           <Icon id="salir" size={16} /> Salir al menú
         </button>
+        <div className="dim version">{VERSION_LABEL}</div>
       </div>
     </Win>
   );

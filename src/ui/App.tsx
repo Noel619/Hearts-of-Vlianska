@@ -12,9 +12,10 @@ import { GameCtx, hex } from './core';
 import { Emblem } from './sprites/Emblem';
 import { Icon, ItemSprite, SpriteSheet } from './sprites/Sprite';
 import { ITEMS } from '../data/items';
-import { ContextMenuView, InspectPanel, LogView, Overlays, SelectionPanel, SquadBar, ThingPanel, TopBar, type Screen } from './Hud';
+import { ContextMenuView, InspectPanel, LogView, Overlays, SelectionPanel, SquadBar, ThingPanel, TopBar, Tracker, type Screen } from './Hud';
 import { PanelView } from './Panels';
-import { BuildScreen, CodexScreen, FactionsScreen, GameOver, HelpBody, LogScreen, MapScreen, PauseScreen, ResearchScreen, SettingsBody } from './Screens';
+import { Briefing, BuildScreen, CodexScreen, Epilogue, FactionsScreen, GameOver, HelpBody, LogScreen, MapScreen, PauseScreen, ResearchScreen, SettingsBody, ThreadsScreen } from './Screens';
+import { VERSION_LABEL } from '../version';
 import { Win } from './core';
 
 const COLORS = [0xd8c27a, 0xc86a4a, 0x7fb8c9, 0x9fc77a, 0xc9a0d8, 0xe0e0e0];
@@ -37,6 +38,8 @@ export function App() {
   const [screen, setScreen] = useState<Screen>(null);
   const [menuView, setMenuView] = useState<'main' | 'cronica' | 'ayuda' | 'cargar' | 'ajustes'>('main');
   const [error, setError] = useState<string | null>(null);
+  /** Comienzo cuyo informe de bajada está a la vista (null = ninguno). */
+  const [brief, setBrief] = useState<string | null>(null);
   const [quote] = useState(() => QUOTES[Math.floor(Math.random() * QUOTES.length)]);
   const [, force] = useState(0);
   const modeRef = useRef(mode);
@@ -118,7 +121,7 @@ export function App() {
     if (!game) return;
     game.onHotkey = (code) => {
       if (modeRef.current !== 'juego') return true;
-      const map: Record<string, Screen> = { KeyB: 'construir', KeyI: 'investigar', KeyM: 'mapa', KeyG: 'facciones', KeyK: 'cronica' };
+      const map: Record<string, Screen> = { KeyB: 'construir', KeyI: 'investigar', KeyM: 'mapa', KeyG: 'facciones', KeyK: 'cronica', KeyJ: 'hilos' };
       if (map[code]) {
         setScreen((s) => (s === map[code] ? null : map[code]));
         return true;
@@ -147,18 +150,22 @@ export function App() {
   // Pausa mientras hay una pantalla abierta, autoguardado y fin de partida
   useEffect(() => {
     if (!game || mode !== 'juego') return;
-    if (screen) game.paused = true;
-    else if (!game.panel) game.paused = false;
+    if (screen || brief) game.paused = true;
+    else if (!game.panel && !game.epilogue) game.paused = false;
     game.bump();
-  }, [screen, game, mode]);
+  }, [screen, brief, game, mode]);
   useEffect(() => {
     if (!game || mode !== 'juego') return;
     const id = setInterval(() => {
       if (game.sim.players.length) saveGame('auto', game.sim.state);
       force((n) => n + 1);
     }, 60000);
+    let shown = game.epilogue;
     const un = game.subscribe(() => {
-      if (game.sim.players.length === 0) force((n) => n + 1);
+      if (game.sim.players.length === 0 || game.epilogue !== shown) {
+        shown = game.epilogue;
+        force((n) => n + 1);
+      }
     });
     return () => {
       clearInterval(id);
@@ -169,6 +176,7 @@ export function App() {
   const exit = useCallback(() => {
     if (!game) return;
     setScreen(null);
+    setBrief(null);
     game.startNew({ scenario: 'nadie' });
     setMode('menu');
     setMenuView('main');
@@ -236,7 +244,7 @@ export function App() {
                 </button>
                 <div className="sp" />
                 <div className="dim" style={{ fontSize: 12 }}>
-                  Universo, historia y mapa de Vlianska: Noel619.
+                  <span className="vtag">{VERSION_LABEL}</span> Universo, historia y mapa de Vlianska: Noel619.
                 </div>
               </div>
               {menuView === 'cronica' && (
@@ -292,6 +300,7 @@ export function App() {
                 game.startNew({ scenario, name, color });
                 game.paused = true;
                 setScreen(null);
+                setBrief(scenario);
                 setMode('juego');
               }}
             />
@@ -301,6 +310,7 @@ export function App() {
               <TopBar open={setScreen} />
               <SquadBar />
               <SelectionPanel />
+              <Tracker open={setScreen} />
               <InspectPanel />
               <ThingPanel />
               <LogView />
@@ -312,6 +322,19 @@ export function App() {
               {screen === 'mapa' && <MapScreen close={() => setScreen(null)} />}
               {screen === 'facciones' && <FactionsScreen close={() => setScreen(null)} />}
               {screen === 'cronica' && <CodexScreen close={() => setScreen(null)} />}
+              {screen === 'hilos' && <ThreadsScreen close={() => setScreen(null)} />}
+              {brief && !dead && <Briefing scenario={brief} close={() => setBrief(null)} />}
+              {game.epilogue && !dead && (
+                <Epilogue
+                  close={() => {
+                    game.epilogue = false;
+                    game.paused = false;
+                    game.bump();
+                    force((n) => n + 1);
+                  }}
+                  exit={exit}
+                />
+              )}
               {screen === 'registro' && <LogScreen close={() => setScreen(null)} />}
               {screen === 'pausa' && <PauseScreen close={() => setScreen(null)} exit={exit} open={setScreen} />}
               {dead && <GameOver exit={exit} />}

@@ -2,6 +2,8 @@
 
 RPG de escuadra y supervivencia en mundo abierto, en 3D, ambientado en el metro de Vlianska.
 
+**Versión 0.1 (beta).** El juego se puede jugar de principio a fin: todos los hilos de la trama se pueden cerrar y la emisora de onda corta lleva al final abierto. Los cambios de cada versión están en [`CHANGELOG.md`](CHANGELOG.md).
+
 Enero de 2033. Veinte años después de las bombas, ocho facciones se reparten las dieciséis estaciones del metro. Tú no eres ninguna de ellas: empiezas con un puñado de supervivientes, un cuchillo y sesenta cartuchos, y nadie te espera ni te debe nada. Comercia, rebusca chatarra, caza lo que vive en los túneles, contrata gente en las cantinas y levanta tu propia estación donde nadie mande.
 
 Este repositorio contenía antes *Hearts of Vlianska* (gran estrategia en 2D). El juego nuevo parte de la misma historia, que se conserva íntegra en [`docs/historia/`](docs/historia/): crónica, facciones, líderes, estaciones, túneles, sucesos y tecnología.
@@ -13,7 +15,7 @@ Este repositorio contenía antes *Hearts of Vlianska* (gran estrategia en 2D). E
 - **Ocho facciones y sus figuras.** Reputación con cada una, patrullas, caravanas, bandas, recompensas, guardias que recuerdan los robos. Volkov, Bessmertny, Orlova, Morozov, el Tuerto Rybak, Baghdadi, Voronov y Lebedeva están en sus estaciones.
 - **Economía.** Cartuchos por moneda, tiendas con existencias y dinero limitados, precios distintos en cada estación, mercado negro, peajes («cinco túneles, cinco peajes»), médicos y gente de alquiler.
 - **Tu propia base.** Tiendas, barracones, bancales de hongos, corrales, colectores de agua, talleres, fragua, armero, laboratorio, generador, muros, portones y alambradas. Recetas, almacenes, energía, turnos de trabajo automáticos, asaltos a la base y un árbol de investigación con las técnicas de la historia.
-- **Hilos de la trama.** La carta perdida de Bessmertny, el embargo de Mertvaya y la Galería Olvidada, el derrumbe del Túnel Sur, las cabezas con precio y una emisora de onda corta que quizá alcance más allá de Vlianska.
+- **Hilos de la trama.** La carta perdida de Bessmertny, el embargo de Mertvaya y la Galería Olvidada, el derrumbe del Túnel Sur, las cabezas con precio, los almacenes blindados de Tenevskaya y una emisora de onda corta que quizá alcance más allá de Vlianska. La pantalla de hilos (`J`) dice en qué punto está cada uno y qué se puede hacer; quien empieza tiene unos primeros pasos a la vista.
 - **Armas que se empuñan de verdad.** Las manos tienen dedos y cierran el puño; fusiles, hachas y lanzas se sujetan a dos manos con cinemática inversa: la culata va al hombro al apuntar, el arma se lleva terciada al andar y se cuelga a la espalda o al cinto cuando las manos están ocupadas.
 - **Interfaz con sprites.** Cada objeto tiene su propio dibujo, cada personaje un retrato generado a partir de su aspecto, cada facción su emblema y cada obra una miniatura de su modelo 3D. Paneles de chapa remachada, muñeco de salud por partes del cuerpo e iconos propios para cada orden.
 - **Todo generado por código.** Geometría, texturas, personajes con esqueleto, animación, sprites, música, ambiente y efectos de sonido se sintetizan o se dibujan en el propio código: el repositorio no contiene ni un solo archivo de imagen, modelo o audio.
@@ -45,7 +47,7 @@ Hace falta un navegador con WebGL 2. La partida se guarda en el almacenamiento l
 | `F` | Centrar la cámara en el seleccionado |
 | `L` · `C` · `H` | Linterna · Sigilo · Mantener posición |
 | `X` | Cancelar órdenes |
-| `B` · `I` · `M` · `G` · `K` | Construir · Estudio · Mapa · Facciones · Crónica |
+| `B` · `I` · `M` · `G` · `K` · `J` | Construir · Estudio · Mapa · Facciones · Crónica · Hilos |
 | `R` | Girar la obra antes de colocarla |
 | `F5` / `F9` | Guardado y carga rápidos |
 

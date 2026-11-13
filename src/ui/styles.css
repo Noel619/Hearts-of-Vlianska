@@ -159,6 +159,7 @@ button {
   transition: background 0.12s;
 }
 .btn {
+  white-space: nowrap;
   padding: 6px 13px;
   font-size: 14px;
   display: inline-flex;
@@ -1969,4 +1970,195 @@ kbd {
   height: 0;
   box-shadow: none;
   border-top: 4px dashed currentColor;
+}
+
+/* --- Hilos, primeros pasos, informe y epílogo ---------------------------------- */
+.tracker {
+  position: absolute;
+  left: 232px;
+  top: 70px;
+  width: 372px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 8px 7px 0;
+  cursor: pointer;
+  background: linear-gradient(90deg, rgba(8, 8, 9, 0.92), rgba(8, 8, 9, 0.7));
+  border-left: 3px solid var(--amber);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%);
+}
+.tracker:hover {
+  background: linear-gradient(90deg, rgba(40, 30, 12, 0.95), rgba(8, 8, 9, 0.75));
+}
+.tracker .count {
+  align-self: center;
+  padding: 0 4px 0 10px;
+  font-family: var(--stencil);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--amber2);
+}
+.tracker b {
+  display: block;
+  font-family: var(--stencil);
+  font-size: 15px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--amber2);
+}
+.tracker small {
+  display: block;
+  font-size: 12px;
+  line-height: 1.3;
+  color: #c8c2b2;
+}
+.x.mini {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+.steps {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 18px;
+  margin-bottom: 14px;
+  padding: 10px 14px 12px;
+  background: linear-gradient(90deg, rgba(232, 163, 61, 0.13), transparent);
+  border-left: 3px solid var(--amber);
+}
+.steps h4 {
+  grid-column: 1 / -1;
+  margin: 0 0 4px;
+  font-family: var(--stencil);
+  font-size: 18px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--amber2);
+}
+.step {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  column-gap: 8px;
+  align-items: center;
+  font-family: var(--narrow);
+  font-size: 14.5px;
+}
+.step .badge {
+  position: static;
+}
+.step small {
+  grid-column: 2;
+  color: var(--dim);
+  font-family: var(--font);
+  font-size: 12px;
+  line-height: 1.3;
+}
+.step.done b {
+  color: var(--dim);
+  font-weight: normal;
+  text-decoration: line-through;
+}
+.threads {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.thread {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 9px 12px 10px 9px;
+  border-radius: 32px 4px 4px 4px;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.015));
+  border-left: 3px solid #4e525a;
+}
+.thread.s-encurso {
+  border-left-color: var(--amber);
+  background: linear-gradient(120deg, rgba(232, 163, 61, 0.16), rgba(255, 255, 255, 0.015));
+}
+.thread.s-hecho {
+  border-left-color: var(--good);
+  background: linear-gradient(120deg, rgba(127, 201, 122, 0.12), rgba(255, 255, 255, 0.015));
+}
+.thread h4 {
+  margin: 0;
+  font-family: var(--stencil);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--amber2);
+}
+.thread p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.38;
+  color: #cfc9ba;
+}
+.thread p.hintline {
+  color: var(--amber2);
+}
+.thread .bar {
+  margin-top: 7px;
+}
+.chipst.st-encurso {
+  color: var(--amber2);
+}
+.chipst.st-hecho {
+  color: var(--good);
+}
+.brief p {
+  margin: 0 0 9px;
+  line-height: 1.5;
+  font-size: 15px;
+}
+.crew {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 10px 0;
+  border-top: 1px dashed #3a3d44;
+  border-bottom: 1px dashed #3a3d44;
+}
+.crewman {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 92px;
+  text-align: center;
+}
+.crewman b {
+  margin-top: 4px;
+  font-family: var(--stencil);
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--amber2);
+}
+.crewman small {
+  font-size: 11px;
+  color: var(--dim);
+  line-height: 1.2;
+}
+.brief-keys {
+  font-size: 13.5px;
+  gap: 6px 14px;
+}
+.version {
+  margin-top: 4px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+}
+.vtag {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 8px;
+  font-family: var(--mono);
+  color: #17140d;
+  background: var(--amber);
+  clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
 }

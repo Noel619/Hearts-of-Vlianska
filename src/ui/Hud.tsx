@@ -11,12 +11,13 @@ import { dropItem, hasLamp, unequipSlot, useItem } from '../sim/actions';
 import { invWeight, maxCarry, totalHpFrac, weaponDef } from '../sim/chars';
 import { hostile, relation } from '../sim/combat';
 import { squadCap } from '../sim/events';
+import { firstSteps } from '../sim/hilos';
 import type { Char, Stance } from '../sim/types';
 import { Bar, BodyDoll, Face, ItemIcon, Money, charTitle, hex, itemTip, sideName, statusIcon, statusText, useGame, useTick, useTooltip } from './core';
 import { Emblem } from './sprites/Emblem';
 import { Icon, ItemSprite } from './sprites/Sprite';
 
-export type Screen = 'construir' | 'investigar' | 'mapa' | 'facciones' | 'cronica' | 'pausa' | 'registro' | null;
+export type Screen = 'construir' | 'investigar' | 'mapa' | 'facciones' | 'cronica' | 'hilos' | 'pausa' | 'registro' | null;
 
 const SPEEDS: [number, string][] = [
   [1, 'play'],
@@ -29,6 +30,7 @@ const KEYS: [Screen, string, string, string][] = [
   ['investigar', 'estudio', 'Estudio', 'I'],
   ['mapa', 'mapa', 'Mapa', 'M'],
   ['facciones', 'facciones', 'Facciones', 'G'],
+  ['hilos', 'estrella', 'Hilos', 'J'],
   ['cronica', 'cronica', 'Crónica', 'K'],
   ['pausa', 'menu', 'Menú', 'Esc'],
 ];
@@ -497,6 +499,11 @@ export function ThingPanel() {
                   <Icon id="hambre" size={12} /> Cosecha {Math.round(b.grow * 100)} %
                 </span>
               )}
+              {def.radio && (
+                <span className="chipst">
+                  <Icon id="ojo" size={12} /> {sim.state.flags.senal ? 'Señal captada' : `Barrido de frecuencias ${Math.round(b.craft * 100)} %`}
+                </span>
+              )}
             </div>
             {rec && (
               <div className="meter" style={{ marginTop: 6 }}>
@@ -584,6 +591,38 @@ export function ThingPanel() {
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Primeros pasos: el siguiente que queda por dar, a la vista hasta completarlos. */
+export function Tracker({ open }: { open: (s: Screen) => void }) {
+  const g = useGame();
+  useTick();
+  const steps = firstSteps(g.sim);
+  const done = steps.filter((s) => s.done).length;
+  const next = steps.find((s) => !s.done);
+  if (!next || g.sim.state.flags.tOculto) return null;
+  return (
+    <div className="tracker" onClick={() => open('hilos')} title="Abrir los hilos (J)">
+      <span className="count">
+        {done}/{steps.length}
+      </span>
+      <div className="grow">
+        <b>{next.title}</b>
+        <small>{next.hint}</small>
+      </div>
+      <button
+        className="x mini"
+        title="Ocultar los primeros pasos"
+        onClick={(e) => {
+          e.stopPropagation();
+          g.sim.state.flags.tOculto = 1;
+          g.bump();
+        }}
+      >
+        <Icon id="cerrar" size={9} />
+      </button>
     </div>
   );
 }
