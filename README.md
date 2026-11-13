@@ -14,7 +14,9 @@ Este repositorio contenía antes *Hearts of Vlianska* (gran estrategia en 2D). E
 - **Economía.** Cartuchos por moneda, tiendas con existencias y dinero limitados, precios distintos en cada estación, mercado negro, peajes («cinco túneles, cinco peajes»), médicos y gente de alquiler.
 - **Tu propia base.** Tiendas, barracones, bancales de hongos, corrales, colectores de agua, talleres, fragua, armero, laboratorio, generador, muros, portones y alambradas. Recetas, almacenes, energía, turnos de trabajo automáticos, asaltos a la base y un árbol de investigación con las técnicas de la historia.
 - **Hilos de la trama.** La carta perdida de Bessmertny, el embargo de Mertvaya y la Galería Olvidada, el derrumbe del Túnel Sur, las cabezas con precio y una emisora de onda corta que quizá alcance más allá de Vlianska.
-- **Todo generado por código.** Geometría, texturas, personajes con esqueleto, animación, música, ambiente y efectos de sonido se sintetizan al arrancar: el repositorio no contiene ni un solo archivo de imagen, modelo o audio.
+- **Armas que se empuñan de verdad.** Las manos tienen dedos y cierran el puño; fusiles, hachas y lanzas se sujetan a dos manos con cinemática inversa: la culata va al hombro al apuntar, el arma se lleva terciada al andar y se cuelga a la espalda o al cinto cuando las manos están ocupadas.
+- **Interfaz con sprites.** Cada objeto tiene su propio dibujo, cada personaje un retrato generado a partir de su aspecto, cada facción su emblema y cada obra una miniatura de su modelo 3D. Paneles de chapa remachada, muñeco de salud por partes del cuerpo e iconos propios para cada orden.
+- **Todo generado por código.** Geometría, texturas, personajes con esqueleto, animación, sprites, música, ambiente y efectos de sonido se sintetizan o se dibujan en el propio código: el repositorio no contiene ni un solo archivo de imagen, modelo o audio.
 
 ## Jugar
 
@@ -63,6 +65,7 @@ src/
   game/     une simulación y render: vistas, efectos, cámara, selección y órdenes
   audio/    música generativa, ambiente y efectos con Web Audio
   ui/       interfaz en React: HUD, inventario, comercio, diálogos, mapa y menús
+  ui/sprites/  sprites vectoriales: objetos, iconos, retratos y emblemas
   dev/      visor de desarrollo
 tests/      pruebas de la simulación y de la partida (Vitest)
 tools/      utilidades (plano 2D del trazado)
@@ -83,10 +86,12 @@ Con el servidor de desarrollo en marcha:
 - `/?view&at=TSE&d=50` recorre el mundo sin partida (`at` admite cualquier estación o cruce; `q=baja|media|alta`).
 - `/?view&kit` muestra el catálogo de piezas del atrezo (`kit=tienda,puesto` para elegir cuáles).
 - `/?view&chars` añade una fila de personajes de prueba.
+- `/?view&poses` es un banco de poses: una fila de personajes con cada arma para revisar cómo la sujetan (`poses=listo|apuntar|ataque|marcha|sigilo|varios`, `only=ak,hacha`, `t=0.4` para congelar un golpe).
+- `/?sprites` muestra el catálogo de sprites: objetos, iconos, emblemas y retratos.
 - `/?escenario=colonos&seed=7` salta directamente a una partida.
 
 ## Créditos
 
 Universo, historia y mapa de Vlianska: **Noel619**.
 
-Tipografías: Big Shoulders Stencil Display, PT Sans, PT Sans Narrow y PT Mono (SIL Open Font License). Iconos: Lucide (ISC). Motor gráfico: three.js (MIT).
+Tipografías: Big Shoulders Stencil Display, PT Sans, PT Sans Narrow y PT Mono (SIL Open Font License). Motor gráfico: three.js (MIT).

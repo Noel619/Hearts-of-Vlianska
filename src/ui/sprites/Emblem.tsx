@@ -83,7 +83,7 @@ export function sideEmblemColor(side: SideId, playerColor = '#d8c27a'): [string,
 export const Emblem = memo(function Emblem({ side, size = 40, playerColor }: { side: SideId; size?: number; playerColor?: string }) {
   const [c, dark] = sideEmblemColor(side, playerColor);
   const gl = GLYPHS[side] ?? GLYPHS.LIB;
-  const gid = `emb-${side}`;
+  const gid = `emb-${side}-${c.replace('#', '')}`;
   const html =
     `<defs><radialGradient id="${gid}" cx="38%" cy="30%" r="80%"><stop offset="0" stop-color="${c}"/><stop offset="0.6" stop-color="${c}"/><stop offset="1" stop-color="${dark}"/></radialGradient>` +
     `<linearGradient id="${gid}-m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4ecd2"/><stop offset="0.35" stop-color="#b09a62"/><stop offset="0.6" stop-color="#5e4e2a"/><stop offset="0.8" stop-color="#cdb878"/><stop offset="1" stop-color="#4a3c1e"/></linearGradient></defs>` +
