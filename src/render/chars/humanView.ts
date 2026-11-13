@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import type { Look } from '../../data/looks';
 import { cloneProbeMaterial, probeMaterial, setProbe } from '../materials';
+import { MeshBuilder } from '../geo';
 import { heldGeometry, heldGrip, type Grip } from '../kit/weapons';
 import { HumanAnimator, defaultAnimInput, type AnimInput } from './anim';
 import { HAND, HB, HUMAN_BONES, buildHumanoid } from './humanoid';
@@ -69,6 +70,19 @@ const Y_AXIS = new THREE.Vector3(0, 1, 0);
 /** Grosor de la prenda de arriba, para que lo enfundado no la atraviese. */
 const TOP_BULK: Partial<Record<Look['top'], number>> = { chaqueton: 0.032, abrigo: 0.024, cuero: 0.018 };
 
+let headLampGeo: THREE.BufferGeometry | null = null;
+/** Linterna frontal: una cajita con la lente encendida. */
+function headLamp(): THREE.BufferGeometry {
+  if (!headLampGeo) {
+    const b = new MeshBuilder({ fx: true });
+    b.color([0.03, 0.03, 0.03]).cube(0, -0.02, -0.012, 0.056, 0.04, 0.028);
+    b.color([1, 0.86, 0.55]).glow(5).cube(0, -0.014, 0.004, 0.034, 0.028, 0.008);
+    b.glow(0);
+    headLampGeo = b.toGeometry();
+  }
+  return headLampGeo;
+}
+
 /** Cuaternión a partir de tres ejes ortonormales (columnas x, y, z). */
 function basisQuat(x: THREE.Vector3, y: THREE.Vector3, z: THREE.Vector3, out: THREE.Quaternion) {
   m1.makeBasis(x, y, z);
@@ -107,6 +121,9 @@ export class HumanView {
   private grip: Grip | null = null;
   private backId: string | null = null;
   private back: THREE.Mesh | null = null;
+  private lampKind: 'frontal' | 'farol' | null = null;
+  private lamp: THREE.Mesh | null = null;
+  private lampOnBelt = false;
   /** Pesos suavizados de la cinemática inversa de cada brazo. */
   private ikMain = 0;
   private ikOff = 0;
@@ -191,6 +208,43 @@ export class HumanView {
     this.placeBack();
   }
 
+  /** Luz encendida a la vista: linterna en la frente o farol en la mano izquierda. */
+  setLamp(kind: 'frontal' | 'farol' | null) {
+    if (kind === this.lampKind) return;
+    this.lampKind = kind;
+    if (this.lamp) {
+      this.lamp.removeFromParent();
+      this.lamp = null;
+    }
+    if (!kind) return;
+    const geo = kind === 'frontal' ? headLamp() : heldGeometry('farol');
+    if (!geo) return;
+    const m = new THREE.Mesh(geo, this.material);
+    this.lamp = m;
+    if (kind === 'frontal') {
+      m.position.set(0, 0.185, 0.128);
+      this.bones[HB.head].add(m);
+    } else {
+      this.lampOnBelt = true;
+      this.placeLantern(false);
+    }
+  }
+
+  /** El farol cuelga de la mano izquierda, o del cinto si esa mano está ocupada. */
+  private placeLantern(belt: boolean) {
+    const m = this.lamp;
+    if (!m || belt === this.lampOnBelt) return;
+    this.lampOnBelt = belt;
+    m.quaternion.identity();
+    if (belt) {
+      m.position.set(0.21 + (TOP_BULK[this.look.top] ?? 0.012), -0.03, 0.05);
+      this.bones[HB.hips].add(m);
+    } else {
+      m.position.set(-GRIP_BAR.x, FIST_Y + 0.012, 0);
+      this.bones[HB.handL].add(m);
+    }
+  }
+
   private placeBack() {
     const m = this.back;
     if (!m || !this.backId) return;
@@ -252,9 +306,26 @@ export class HumanView {
     this.ikOff += (wantOff - this.ikOff) * k;
     inp.armed = !!this.weapon && inp.pose !== 'ko' && inp.pose !== 'muerto';
     inp.offHand = this.ikOff > 0.5 ? (g?.offMode === 'bajo' ? 0.9 : 1) : 0;
+    inp.lantern = false;
+    if (this.lamp && this.lampKind === 'farol') {
+      const belt = wantOff > 0 || inp.carrying || !armsFree || !upright || inp.pose !== 'normal';
+      this.placeLantern(belt);
+      if (!belt) {
+        inp.lantern = true;
+        inp.offHand = 1;
+      }
+    }
     this.animator.update(dt, inp);
-    if (this.ikMain < 0.01 && this.ikOff < 0.01) return;
-    this.solveArms(g!);
+    if (this.ikMain >= 0.01 || this.ikOff >= 0.01) this.solveArms(g!);
+    if (inp.lantern && this.lamp) {
+      // El farol cuelga a plomo de la mano, apunte adonde apunte el brazo
+      const hand = this.bones[HB.handL];
+      hand.updateWorldMatrix(true, false);
+      meshInv.copy(this.mesh.matrixWorld).invert();
+      m1.multiplyMatrices(meshInv, hand.matrixWorld);
+      m1.decompose(v1, q1, vScale);
+      this.lamp.quaternion.copy(q1).invert();
+    }
   }
 
   /** Lleva las manos al arma. Todo se calcula en el espacio del modelo (el de la malla). */

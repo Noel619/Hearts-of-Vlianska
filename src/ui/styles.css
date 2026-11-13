@@ -1817,3 +1817,156 @@ kbd {
   border-radius: 0;
   cursor: pointer;
 }
+
+/* --- Ficha de obras, almacenes y bultos ------------------------------------ */
+.thumb.sm {
+  width: 68px;
+  height: 68px;
+}
+.stacks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+  align-items: center;
+}
+.stacks .chip {
+  min-height: 28px;
+  border-radius: 14px;
+  padding: 1px 9px 1px 3px;
+}
+.inspect .meter span {
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* --- Mapa del metro ---------------------------------------------------------- */
+.mapbox {
+  position: relative;
+  margin: 0 auto;
+  cursor: crosshair;
+  box-shadow:
+    inset 0 0 0 1px #000,
+    0 0 0 1px #4e525a,
+    0 0 0 3px #050505;
+}
+.mapbox canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.mk {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.mk.sta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  filter: drop-shadow(0 2px 3px #000);
+}
+.mk.sta .emblem-spr {
+  opacity: 0.75;
+}
+.mk.sta.seen .emblem-spr {
+  opacity: 1;
+}
+.mk.sta b {
+  position: absolute;
+  top: 100%;
+  padding: 0 7px 1px;
+  font-family: var(--stencil);
+  font-weight: 700;
+  font-size: 13.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #8d8a80;
+  background: rgba(6, 7, 8, 0.82);
+  clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+}
+.mk.sta.v b {
+  top: 50%;
+  left: 100%;
+  transform: translateY(-50%);
+  margin-left: 3px;
+}
+.mk.sta.seen b {
+  color: #f1ead6;
+  background: rgba(20, 36, 60, 0.92);
+}
+.mk.block {
+  width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: #b3261e;
+  box-shadow: 0 0 0 1.5px #050505;
+}
+.mk.squad {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #0c1a0a;
+  background: #8dffa0;
+  box-shadow:
+    0 0 0 2px #050505,
+    0 0 12px rgba(141, 255, 160, 0.8);
+  animation: pulse 1.4s infinite alternate;
+  z-index: 2;
+}
+@keyframes pulse {
+  to {
+    box-shadow:
+      0 0 0 2px #050505,
+      0 0 20px 4px rgba(141, 255, 160, 0.9);
+  }
+}
+.mk.cam {
+  width: 34px;
+  height: 22px;
+  border: 1.5px solid var(--amber2);
+  box-shadow: 0 0 0 1px #000;
+}
+.mk.inl {
+  position: static;
+  transform: none;
+  display: inline-grid;
+  vertical-align: middle;
+  animation: none;
+  width: 16px;
+  height: 16px;
+}
+.maplegend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  margin-top: 12px;
+  font-family: var(--narrow);
+  font-size: 13.5px;
+  color: var(--dim);
+}
+.maplegend i {
+  display: inline-block;
+  vertical-align: middle;
+  width: 26px;
+  height: 5px;
+  margin-right: 4px;
+  box-shadow: 0 0 0 1.5px #050505;
+}
+.maplegend i.thin {
+  height: 2px;
+}
+.maplegend i.dash {
+  height: 0;
+  box-shadow: none;
+  border-top: 4px dashed currentColor;
+}

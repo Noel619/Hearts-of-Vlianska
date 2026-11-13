@@ -154,22 +154,33 @@ const BAR_VERT = /* glsl */ `
     vBar = iBar;
     vec4 mv = modelViewMatrix * vec4( iPos, 1.0 );
     float s = - mv.z * 0.018;
-    mv.xy += position.xy * vec2( 3.4, 0.36 ) * s;
+    mv.xy += position.xy * vec2( 3.6, 0.5 ) * s;
     gl_Position = projectionMatrix * mv;
   }
 `;
+// Barra inclinada y segmentada, como las de la interfaz: salud arriba y, debajo, una tira de sangre
 const BAR_FRAG = /* glsl */ `
   varying vec2 vUv;
   varying vec3 vBar;
   void main() {
-    vec3 bg = vec3( 0.03 );
-    vec3 c = vBar.y > 0.5 ? vec3( 0.25, 0.85, 0.35 ) : vBar.y < -0.5 ? vec3( 0.9, 0.22, 0.16 ) : vec3( 0.88, 0.84, 0.72 );
-    float edge = step( 0.06, vUv.x ) * step( vUv.x, 0.94 ) * step( 0.18, vUv.y ) * step( vUv.y, 0.82 );
-    float fill = step( vUv.x, 0.06 + 0.88 * vBar.x ) * edge;
-    // Franja de sangre bajo la de salud
-    vec3 col = mix( bg, c, fill );
-    if ( vUv.y < 0.34 && edge > 0.5 ) col = mix( bg, vec3( 0.75, 0.08, 0.08 ), step( vUv.x, 0.06 + 0.88 * vBar.z ) );
-    gl_FragColor = vec4( col, 0.9 );
+    float k = 0.05;
+    float x = vUv.x - ( vUv.y - 0.5 ) * k * 2.0;
+    if ( x < k || x > 1.0 - k ) discard;
+    float u = ( x - k ) / ( 1.0 - 2.0 * k );
+    float bx = min( u, 1.0 - u ) * 7.2;
+    float by = min( vUv.y, 1.0 - vUv.y );
+    vec3 c = vBar.y > 0.5 ? vec3( 0.42, 0.86, 0.4 ) : vBar.y < -0.5 ? vec3( 0.92, 0.26, 0.2 ) : vec3( 0.9, 0.84, 0.66 );
+    vec3 col = vec3( 0.012 );
+    if ( bx > 0.13 && by > 0.11 ) {
+      if ( vUv.y > 0.42 ) {
+        float lit = 0.72 + 0.4 * smoothstep( 0.42, 0.9, vUv.y );
+        col = mix( vec3( 0.07 ), c * lit, step( u, vBar.x ) );
+        col *= 1.0 - 0.6 * step( 0.9, fract( u * 8.0 ) );
+      } else if ( vUv.y < 0.33 ) {
+        col = mix( vec3( 0.07 ), vec3( 0.8, 0.1, 0.08 ), step( u, vBar.z ) );
+      }
+    }
+    gl_FragColor = vec4( col, 0.94 );
   }
 `;
 

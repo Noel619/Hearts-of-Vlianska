@@ -12,7 +12,7 @@ import { GameCtx, hex } from './core';
 import { Emblem } from './sprites/Emblem';
 import { Icon, ItemSprite, SpriteSheet } from './sprites/Sprite';
 import { ITEMS } from '../data/items';
-import { ContextMenuView, InspectPanel, LogView, Overlays, SelectionPanel, SquadBar, TopBar, type Screen } from './Hud';
+import { ContextMenuView, InspectPanel, LogView, Overlays, SelectionPanel, SquadBar, ThingPanel, TopBar, type Screen } from './Hud';
 import { PanelView } from './Panels';
 import { BuildScreen, CodexScreen, FactionsScreen, GameOver, HelpBody, LogScreen, MapScreen, PauseScreen, ResearchScreen, SettingsBody } from './Screens';
 import { Win } from './core';
@@ -302,6 +302,7 @@ export function App() {
               <SquadBar />
               <SelectionPanel />
               <InspectPanel />
+              <ThingPanel />
               <LogView />
               <Overlays />
               <ContextMenuView />

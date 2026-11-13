@@ -2,7 +2,8 @@
 // seleccionado, inspección, registro, menú contextual y ayudas en pantalla.
 
 import { useEffect, useRef, useState } from 'react';
-import { BUILDS } from '../data/edificios';
+import { BUILDS, RECIPES } from '../data/edificios';
+import { propThumb } from '../render/thumbs';
 import { ITEMS, type EquipSlot } from '../data/items';
 import { BODY_PARTS, SKILLS, SKILL_IDS, skillWord, type SkillId } from '../data/skills';
 import type { FactionId } from '../data/tipos';
@@ -408,6 +409,179 @@ export function InspectPanel() {
       {c.vendor && (
         <div className="amber row" style={{ marginTop: 5 }}>
           <Icon id="comerciar" size={14} /> Comercia. Clic derecho para hablar.
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Ficha de lo que hay bajo el ratón cuando no es una persona: obra, almacén, bulto o veta. */
+export function ThingPanel() {
+  const g = useGame();
+  useTick();
+  const sim = g.sim;
+  const h = g.hover;
+  if (!h || h.kind === 'char' || h.kind === 'ground' || g.inspect || g.panel || g.buildDef) return null;
+  const stacks = (items: { id: string; n: number }[], max = 12) => (
+    <div className="stacks">
+      {items.slice(0, max).map((st, i) => (
+        <span key={i + st.id} className="chip" title={ITEMS[st.id]?.name}>
+          <ItemSprite id={st.id} size={24} />
+          {st.n > 1 ? st.n : ''}
+        </span>
+      ))}
+      {items.length > max && <span className="dim">+{items.length - max}</span>}
+    </div>
+  );
+  if (h.kind === 'build') {
+    const b = sim.state.buildings.find((x) => x.id === h.id);
+    if (!b) return null;
+    const def = BUILDS[b.def];
+    const thumb = propThumb(g.gfx.renderer, def.prop, def.variant ?? 0);
+    const missing = def.cost.map(([id, n]) => [id, n - (b.got.find((q) => q.id === id)?.n ?? 0)] as [string, number]).filter(([, n]) => n > 0);
+    const rec = b.recipe ? RECIPES[b.recipe] : null;
+    return (
+      <div className="panel inspect">
+        <div className="row" style={{ gap: 10, alignItems: 'flex-start' }}>
+          <span className="thumb sm">{thumb && <img src={thumb} alt="" draggable={false} />}</span>
+          <div className="grow">
+            <h3>{def.name}</h3>
+            <div className="dim" style={{ lineHeight: 1.3 }}>
+              {def.desc}
+            </div>
+          </div>
+        </div>
+        {b.prog < 1 ? (
+          <>
+            <div className="meter" style={{ margin: '8px 0 5px' }}>
+              <Icon id="construir" size={13} />
+              <Bar v={b.prog} cls="amber" />
+              <span className="amber">{Math.round(b.prog * 100)} %</span>
+            </div>
+            {missing.length > 0 && (
+              <div className="row" style={{ flexWrap: 'wrap' }}>
+                <span className="bad">Falta:</span>
+                {missing.map(([id, n]) => (
+                  <span key={id} className="chip no" title={ITEMS[id]?.name}>
+                    <ItemSprite id={id} size={20} />
+                    {n}
+                  </span>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="meter" style={{ margin: '8px 0 5px' }} title="Estado de la estructura">
+              <Icon id="defensivo" size={13} />
+              <Bar v={b.hp / def.hp} />
+            </div>
+            <div className="row" style={{ flexWrap: 'wrap', gap: 4 }}>
+              {def.beds ? (
+                <span className="chipst">
+                  <Icon id="cama" size={12} /> {def.beds} {def.beds === 1 ? 'cama' : 'camas'}
+                </span>
+              ) : null}
+              {def.power && def.power > 0 ? (
+                <span className={'chipst' + (b.on ? '' : ' bad')}>
+                  <Icon id="energia" size={12} /> {b.on ? `Consume ${def.power}` : 'Sin energía'}
+                </span>
+              ) : null}
+              {def.power && def.power < 0 ? (
+                <span className={'chipst' + (b.on ? '' : ' bad')}>
+                  <Icon id="energia" size={12} /> {b.on ? `Da ${-def.power} de energía` : 'Parado: sin combustible'}
+                </span>
+              ) : null}
+              {def.farm && (
+                <span className="chipst">
+                  <Icon id="hambre" size={12} /> Cosecha {Math.round(b.grow * 100)} %
+                </span>
+              )}
+            </div>
+            {rec && (
+              <div className="meter" style={{ marginTop: 6 }}>
+                <ItemSprite id={rec.out[0]} size={22} />
+                <Bar v={b.craft} cls="amber" />
+                <span className="dim">{rec.name}</span>
+              </div>
+            )}
+            {b.store.length > 0 && stacks(b.store)}
+          </>
+        )}
+      </div>
+    );
+  }
+  if (h.kind === 'cont') {
+    const c = sim.container(h.id);
+    if (!c) return null;
+    return (
+      <div className="panel inspect">
+        <div className="row" style={{ gap: 10 }}>
+          <span className="face">
+            <Icon id={c.lock > 0 && !c.opened ? 'candado' : 'abrir'} size={26} />
+          </span>
+          <div className="grow">
+            <h3>{c.label}</h3>
+            {c.owner && c.owner !== 'JUG' ? (
+              <div className="row side">
+                <Emblem side={c.owner} size={18} />
+                <span className="bad">Tiene dueño: abrirlo es robar</span>
+              </div>
+            ) : (
+              <div className="dim">Sin dueño</div>
+            )}
+          </div>
+        </div>
+        <div className="row" style={{ marginTop: 7, flexWrap: 'wrap', gap: 4 }}>
+          {c.lock > 0 && !c.opened && (
+            <span className="chipst bad">
+              <Icon id="candado" size={12} /> Cerradura de nivel {Math.round(c.lock)}
+            </span>
+          )}
+          {c.opened && !c.items.length && <span className="chipst">Vacío</span>}
+        </div>
+        {c.opened && c.items.length > 0 && stacks(c.items)}
+      </div>
+    );
+  }
+  if (h.kind === 'drop') {
+    const d = sim.state.drops.find((x) => x.id === h.id);
+    if (!d) return null;
+    return (
+      <div className="panel inspect">
+        <h3>En el suelo</h3>
+        {stacks(d.items)}
+        <div className="dim" style={{ marginTop: 6 }}>
+          Clic derecho para recogerlo.
+        </div>
+      </div>
+    );
+  }
+  const n = sim.state.nodes.find((x) => x.id === h.id);
+  if (!n) return null;
+  const NODE: Record<string, [string, string, string]> = {
+    chatarra: ['Montón de chatarra', 'chatarra', 'Hierros y restos de vagones. Se desguaza para sacar chatarra.'],
+    salitre: ['Costras de salitre', 'salitre', 'Se rasca de la pared húmeda. Es la base de la pólvora.'],
+    derrumbe: ['Derrumbe', 'pico', 'Toneladas de escombro ciegan el túnel. Se puede excavar con la técnica adecuada.'],
+    muro: ['Tabique', 'pico', 'Alguien tapió esta galería. Se puede echar abajo.'],
+  };
+  const [name, sprite, desc] = NODE[n.kind] ?? NODE.chatarra;
+  return (
+    <div className="panel inspect">
+      <div className="row" style={{ gap: 10, alignItems: 'flex-start' }}>
+        <ItemIcon id={sprite} size={56} />
+        <div className="grow">
+          <h3>{name}</h3>
+          <div className="dim" style={{ lineHeight: 1.3 }}>
+            {desc}
+          </div>
+        </div>
+      </div>
+      {(n.kind === 'chatarra' || n.kind === 'salitre') && (
+        <div className="row" style={{ marginTop: 7 }}>
+          <span className="chipst">
+            <Icon id="caja" size={12} /> Quedan {Math.max(0, Math.round(n.amount))}
+          </span>
         </div>
       )}
     </div>

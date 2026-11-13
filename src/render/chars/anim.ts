@@ -53,10 +53,12 @@ export interface AnimInput {
   armed: boolean;
   /** Cierre de la mano izquierda (0 relajada … 1 puño), cuando apoya en el arma. */
   offHand: number;
+  /** Lleva un farol en la mano izquierda. */
+  lantern: boolean;
 }
 
 export function defaultAnimInput(seed = 1): AnimInput {
-  return { speed: 0, sneak: false, limp: 0, hold: 'nada', aim: 0, pose: 'normal', work: 'nada', carrying: false, attack: null, attackT: 0, sinceFire: 9, sinceHit: 9, hitSide: 0, sinceBlock: 9, seed, armed: false, offHand: 0 };
+  return { speed: 0, sneak: false, limp: 0, hold: 'nada', aim: 0, pose: 'normal', work: 'nada', carrying: false, attack: null, attackT: 0, sinceFire: 9, sinceHit: 9, hitSide: 0, sinceBlock: 9, seed, armed: false, offHand: 0, lantern: false };
 }
 
 const NB = 19;
@@ -310,6 +312,11 @@ export class HumanAnimator {
       p.mix(B.forearmR, 0.9, -1.0);
       p.mix(B.upperArmL, 0.9, -0.92 + sway, -0.62, 0.05);
       p.mix(B.forearmL, 0.9, -0.92);
+    }
+    // Farol en la mano izquierda: por delante y algo separado del cuerpo
+    if (s.lantern) {
+      p.mix(B.upperArmL, 0.9, -0.42 + sway, 0, 0.16);
+      p.mix(B.forearmL, 0.9, -0.62);
     }
     // Retroceso del disparo
     this.recoil = s.sinceFire < 0.4 ? Math.exp(-s.sinceFire * 16) : 0;

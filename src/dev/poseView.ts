@@ -25,6 +25,7 @@ interface Case {
   pose?: AnimInput['pose'];
   work?: AnimInput['work'];
   back?: string;
+  lamp?: 'frontal' | 'farol';
   look?: Partial<Look>;
 }
 
@@ -83,7 +84,11 @@ function casesFor(preset: string): Case[] {
       out.push({ weapon: 'ak', hold: 'fusil', pose: 'arrodillado', aim: 1 });
       out.push({ weapon: null, hold: 'nada', back: 'cerrojo' });
       out.push({ weapon: null, hold: 'nada', back: 'hacha' });
-      out.push({ weapon: 'farol', hold: 'nada' });
+      out.push({ weapon: null, hold: 'nada', lamp: 'farol' });
+      out.push({ weapon: 'machete', hold: 'una', lamp: 'farol' });
+      out.push({ weapon: 'ak', hold: 'fusil', lamp: 'farol' });
+      out.push({ weapon: 'cerrojo', hold: 'fusil', lamp: 'frontal', aim: 1 });
+      out.push({ weapon: 'pistola', hold: 'pistola', back: 'cuchillo' });
       break;
     default:
       guns(0);
@@ -138,6 +143,7 @@ export async function startPoses(root: HTMLElement, params: URLSearchParams) {
     inp.work = c.work ?? 'nada';
     v.setWeapon(c.weapon);
     v.setBack(c.back ?? null);
+    v.setLamp(c.lamp ?? null);
     gfx.scene.add(v.group);
     field.sample(x, 1.2, 0, 0, 1, 0, false, out);
     v.setProbe(out[0], out[1], out[2], out[3], out[4], out[5]);

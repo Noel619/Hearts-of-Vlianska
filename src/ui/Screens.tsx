@@ -194,96 +194,81 @@ export function MapScreen({ close }: { close: () => void }) {
   const sim = g.sim;
   const layout = g.shared.world.layout;
   const b = layout.bounds;
-  const W = 1040;
+  const W = 1200;
   const H = Math.round((W * (b.maxZ - b.minZ)) / (b.maxX - b.minX));
   const sx = (x: number) => ((x - b.minX) / (b.maxX - b.minX)) * W;
   const sz = (z: number) => ((z - b.minZ) / (b.maxZ - b.minZ)) * H;
+  const px = (x: number) => `${((x - b.minX) / (b.maxX - b.minX)) * 100}%`;
+  const pz = (z: number) => `${((z - b.minZ) / (b.maxZ - b.minZ)) * 100}%`;
   useEffect(() => {
     const cv = ref.current;
     if (!cv) return;
     const ctx = cv.getContext('2d')!;
-    ctx.fillStyle = '#0c0d0f';
+    // Papel de plano viejo
+    const bg = ctx.createRadialGradient(W / 2, H / 2, H * 0.1, W / 2, H / 2, W * 0.7);
+    bg.addColorStop(0, '#1c1e22');
+    bg.addColorStop(1, '#0b0c0e');
+    ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
-    // Río Vlia (en superficie)
-    ctx.strokeStyle = 'rgba(60,100,150,0.35)';
-    ctx.lineWidth = 9;
+    ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 40) {
+      ctx.beginPath();
+      ctx.moveTo(x + 0.5, 0);
+      ctx.lineTo(x + 0.5, H);
+      ctx.stroke();
+    }
+    for (let y = 0; y < H; y += 40) {
+      ctx.beginPath();
+      ctx.moveTo(0, y + 0.5);
+      ctx.lineTo(W, y + 0.5);
+      ctx.stroke();
+    }
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    // Río Vlia (en superficie)
     for (const r of layout.rivers) {
+      ctx.strokeStyle = 'rgba(70,120,180,0.2)';
+      ctx.lineWidth = 22;
       ctx.beginPath();
       r.forEach((p, i) => (i ? ctx.lineTo(sx(p.x), sz(p.z)) : ctx.moveTo(sx(p.x), sz(p.z))));
       ctx.stroke();
+      ctx.strokeStyle = 'rgba(90,150,210,0.3)';
+      ctx.lineWidth = 9;
+      ctx.stroke();
     }
     const blocked = sim.world.graph.blockedLinks;
-    for (const l of layout.links) {
-      ctx.strokeStyle = l.def.line ? LINE_COLOR[l.def.line] : TERRAIN_COLOR[l.terrain];
-      ctx.lineWidth = l.terrain === 'linea' ? 4 : l.terrain === 'estrecho' || l.terrain.startsWith('aux') ? 1.5 : 2.5;
-      ctx.setLineDash(blocked.has(l.index) ? [3, 5] : l.terrain === 'peligroso' || l.terrain === 'auxiliarPeligroso' ? [7, 3] : []);
+    const path = (l: (typeof layout.links)[number]) => {
       ctx.beginPath();
       l.pts.forEach((p, i) => (i ? ctx.lineTo(sx(p.x), sz(p.z)) : ctx.moveTo(sx(p.x), sz(p.z))));
-      ctx.stroke();
+    };
+    // Túneles: primero el borde oscuro, luego el color
+    for (const pass of [0, 1]) {
+      for (const l of layout.links) {
+        const main = l.terrain === 'linea';
+        const thin = l.terrain === 'estrecho' || l.terrain.startsWith('aux');
+        const w = main ? 6 : thin ? 2 : 3.4;
+        ctx.setLineDash(pass && blocked.has(l.index) ? [3, 7] : pass && (l.terrain === 'peligroso' || l.terrain === 'auxiliarPeligroso') ? [9, 5] : []);
+        ctx.strokeStyle = pass ? (l.def.line ? LINE_COLOR[l.def.line] : TERRAIN_COLOR[l.terrain]) : '#050505';
+        ctx.lineWidth = pass ? w : w + 3.4;
+        path(l);
+        ctx.stroke();
+      }
     }
     ctx.setLineDash([]);
-    for (const n of sim.state.nodes) {
-      if (n.kind !== 'derrumbe' && n.kind !== 'muro') continue;
-      ctx.fillStyle = '#e0624f';
-      ctx.font = 'bold 13px PT Sans';
-      ctx.textAlign = 'center';
-      ctx.fillText('✕', sx(n.x), sz(n.z) + 4);
-    }
-    for (const f of layout.stations) {
-      const st = sim.state.stations[f.id];
-      const owner = st?.owner;
-      const col = owner && owner !== 'JUG' && owner !== 'LIB' && owner !== 'MUT' ? FACTION_LORE[owner as FactionId].color : owner === 'JUG' ? hex(sim.state.playerColor) : '#55585e';
-      ctx.save();
-      ctx.translate(sx(f.x), sz(f.z));
-      ctx.rotate(f.rot);
-      const hl = Math.max(9, (f.hl / (b.maxX - b.minX)) * W);
-      ctx.fillStyle = col;
-      ctx.strokeStyle = '#000';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.roundRect(-hl, -6, hl * 2, 12, 4);
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
-      ctx.font = '600 13px "PT Sans Narrow", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillStyle = st?.visited ? '#efe6cc' : '#8d8a80';
-      ctx.strokeStyle = '#000';
-      ctx.lineWidth = 3;
-      const y = sz(f.z) + (Math.abs(Math.sin(f.rot)) > 0.7 ? 0 : -12);
-      const x = sx(f.x) + (Math.abs(Math.sin(f.rot)) > 0.7 ? 14 : 0);
-      ctx.textAlign = Math.abs(Math.sin(f.rot)) > 0.7 ? 'left' : 'center';
-      ctx.strokeText(f.def.shortName, x, y);
-      ctx.fillText(f.def.shortName, x, y);
-    }
     // Obras de la base
     ctx.fillStyle = hex(sim.state.playerColor);
-    for (const bd of sim.state.buildings) ctx.fillRect(sx(bd.x) - 1.5, sz(bd.z) - 1.5, 3, 3);
-    // La escuadra
-    for (const c of sim.players) {
-      ctx.beginPath();
-      ctx.arc(sx(c.x), sz(c.z), 4, 0, 7);
-      ctx.fillStyle = '#8dffa0';
-      ctx.fill();
-      ctx.strokeStyle = '#000';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    }
-    // Cámara
-    const f = g.rig.focus;
-    ctx.strokeStyle = '#ffc56b';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(sx(f.x) - 12, sz(f.z) - 8, 24, 16);
+    for (const bd of sim.state.buildings) ctx.fillRect(sx(bd.x) - 2, sz(bd.z) - 2, 4, 4);
   });
+  const f = g.rig.focus;
+  const squad = sim.players;
+  const cxm = squad.length ? squad.reduce((a, c) => a + c.x, 0) / squad.length : 0;
+  const czm = squad.length ? squad.reduce((a, c) => a + c.z, 0) / squad.length : 0;
   return (
     <Win title="Metro de Vlianska" icon="mapa" onClose={close}>
-      <canvas
-        ref={ref}
-        width={W}
-        height={H}
-        style={{ display: 'block', maxWidth: '100%', maxHeight: 'calc(100vh - 200px)', width: 'auto', height: 'auto', margin: '0 auto', cursor: 'crosshair', border: '1px solid var(--line)' }}
+      <div
+        className="mapbox"
+        style={{ width: `min(${W}px, calc(100vw - 80px), calc((100vh - 230px) * ${W / H}))`, aspectRatio: `${W} / ${H}` }}
         onClick={(e) => {
           const r = e.currentTarget.getBoundingClientRect();
           const x = b.minX + ((e.clientX - r.left) / r.width) * (b.maxX - b.minX);
@@ -291,28 +276,63 @@ export function MapScreen({ close }: { close: () => void }) {
           g.rig.jump(x, z);
           close();
         }}
-      />
-      <div className="row dim" style={{ marginTop: 8, flexWrap: 'wrap', gap: 14 }}>
+      >
+        <canvas ref={ref} width={W} height={H} />
+        {sim.state.nodes
+          .filter((n) => n.kind === 'derrumbe' || n.kind === 'muro')
+          .map((n) => (
+            <span key={n.id} className="mk block" style={{ left: px(n.x), top: pz(n.z) }} title={n.kind === 'derrumbe' ? 'Derrumbe' : 'Tabique'}>
+              <Icon id="cerrar" size={11} />
+            </span>
+          ))}
+        {layout.stations.map((st) => {
+          const state = sim.state.stations[st.id];
+          const owner = state?.owner ?? 'LIB';
+          const vertical = Math.abs(Math.sin(st.rot)) > 0.7;
+          return (
+            <span key={st.id} className={'mk sta' + (state?.visited ? ' seen' : '') + (vertical ? ' v' : '')} style={{ left: px(st.x), top: pz(st.z) }}>
+              <Emblem side={owner} size={30} playerColor={hex(sim.state.playerColor)} />
+              <b>{st.def.shortName}</b>
+            </span>
+          );
+        })}
+        <span className="mk cam" style={{ left: px(f.x), top: pz(f.z) }} />
+        {squad.length > 0 && (
+          <span className="mk squad" style={{ left: px(cxm), top: pz(czm) }} title={sim.state.playerName}>
+            <Icon id="escuadra" size={13} />
+          </span>
+        )}
+      </div>
+      <div className="maplegend">
         <span>
-          <b style={{ color: LINE_COLOR.verde }}>━</b> Línea Verde
+          <i style={{ background: LINE_COLOR.verde }} /> Línea Verde
         </span>
         <span>
-          <b style={{ color: LINE_COLOR.roja }}>━</b> Línea Roja
+          <i style={{ background: LINE_COLOR.roja }} /> Línea Roja
         </span>
         <span>
-          <b style={{ color: LINE_COLOR.azul }}>━</b> Línea Azul
+          <i style={{ background: LINE_COLOR.azul }} /> Línea Azul
         </span>
         <span>
-          <b style={{ color: TERRAIN_COLOR.peligroso }}>╍</b> Túnel peligroso
+          <i className="dash" style={{ color: TERRAIN_COLOR.peligroso }} /> Túnel peligroso
         </span>
         <span>
-          <b style={{ color: TERRAIN_COLOR.auxiliar }}>─</b> Auxiliar
+          <i className="thin" style={{ background: TERRAIN_COLOR.auxiliar }} /> Auxiliar
         </span>
         <span>
-          <b className="bad">✕</b> Derrumbe o muro
+          <span className="mk block inl">
+            <Icon id="cerrar" size={9} />
+          </span>{' '}
+          Derrumbe o tabique
+        </span>
+        <span>
+          <span className="mk squad inl">
+            <Icon id="escuadra" size={10} />
+          </span>{' '}
+          Tu escuadra
         </span>
         <span className="sp" />
-        <span>Haz clic para llevar la cámara</span>
+        <span className="dim">Haz clic para llevar la cámara</span>
       </div>
     </Win>
   );

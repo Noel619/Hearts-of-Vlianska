@@ -12,11 +12,12 @@ import { HUMAN_BONES } from '../render/chars/humanoid';
 import { HumanView } from '../render/chars/humanView';
 import { makeSkeleton } from '../render/chars/skin';
 import { MeshBuilder } from '../render/geo';
-import { drawProp, propGeometry } from '../render/kit/core';
+import { propGeometry } from '../render/kit/core';
+import { drawHeld, hasHeld, heldGrip } from '../render/kit/weapons';
 import { cloneProbeMaterial, probeMaterial, setProbe } from '../render/materials';
 import { effectiveLook, limpSide, weaponItem } from '../sim/chars';
 import type { Sim } from '../sim/sim';
-import type { Building, Char } from '../sim/types';
+import type { Building, Char, Drop } from '../sim/types';
 
 const RANGE = 150;
 const out = new Float32Array(6);
@@ -156,6 +157,9 @@ export class CharViews {
         const inHand = up ? (tool ?? drawn) : null;
         h.setWeapon(inHand);
         h.setBack(up && w?.model && inHand !== w.model ? w.model : null);
+        // La luz encendida se ve: linterna en la frente o farol en la mano
+        const lampId = c.lamp && up ? (c.eq.luz?.id ?? c.inv.find((q) => ITEMS[q.id]?.light)?.id ?? null) : null;
+        h.setLamp(lampId === 'farol' ? 'farol' : lampId ? 'frontal' : null);
         const inp = h.input;
         inp.speed = c.speed;
         inp.sneak = c.sneak;
@@ -331,14 +335,7 @@ export class ThingViews {
       if (Math.hypot(d.x - fx, d.z - fz) > R) continue;
       const key = 'd' + d.id;
       seen.add(key);
-      if (!this.views.get(key)) {
-        const geo = geoFor('saco', (b) => {
-          b.color([0.34, 0.28, 0.18]);
-          b.sphere(0, 0.16, 0, 0.26, 0.17, 0.22, 8, 5);
-          b.color([0.2, 0.16, 0.1]).cyl(0, 0.3, 0, 0.05, 0.08, 0.08, 6);
-        });
-        this.add(key, 'suelto', geo, d.x, nav.heightAt(d.x, d.z), d.z, (hashStr(key) % 628) / 100, 0.4);
-      }
+      if (!this.views.get(key)) this.add(key, 'suelto', dropGeometry(d), d.x, nav.heightAt(d.x, d.z), d.z, (hashStr(key) % 628) / 100, 0.4);
     }
     for (const n of sim.state.nodes) {
       if (Math.hypot(n.x - fx, n.z - fz) > R) continue;
@@ -430,11 +427,56 @@ export class ThingViews {
   }
 }
 
-export function itemModelGeometry(id: string): THREE.BufferGeometry | null {
-  const def = ITEMS[id];
-  if (!def) return null;
-  void drawProp;
-  return null;
+/**
+ * Lo que se ve en el suelo cuando alguien suelta cosas: el arma o la herramienta
+ * tirada tal cual, una caja de munición, un botiquín… y un saco para el resto.
+ */
+function dropGeometry(d: Drop): THREE.BufferGeometry {
+  let model: string | null = null;
+  let best = -1;
+  let ammo = false;
+  let med = false;
+  let other = false;
+  for (const s of d.items) {
+    const def = ITEMS[s.id];
+    if (!def) continue;
+    if (def.model && hasHeld(def.model) && (def.weapon || def.tool || def.light)) {
+      if (def.price > best) {
+        best = def.price;
+        model = def.model;
+      }
+    } else if (def.kind === 'municion') ammo = true;
+    else if (def.kind === 'medicina') med = true;
+    else other = true;
+  }
+  const key = `suelto:${model ?? ''}:${ammo ? 1 : 0}${med ? 1 : 0}${other || (!model && !ammo && !med) ? 1 : 0}`;
+  return geoFor(key, (b) => {
+    const sack = other || (!model && !ammo && !med);
+    if (sack) {
+      b.color([0.34, 0.28, 0.18]);
+      b.sphere(model ? -0.32 : 0, 0.16, model ? 0.1 : 0, 0.26, 0.17, 0.22, 8, 5);
+      b.color([0.2, 0.16, 0.1]).cyl(model ? -0.32 : 0, 0.3, model ? 0.1 : 0, 0.05, 0.08, 0.08, 6);
+    }
+    if (model) {
+      // Tumbada de costado sobre el suelo
+      const gun = !!heldGrip(model)?.gun;
+      b.push().translate(0.12, 0.035, -0.1);
+      if (gun) b.rotateZ(Math.PI / 2);
+      else b.rotateX(Math.PI / 2).rotateY(Math.PI / 2);
+      drawHeld(b, model);
+      b.pop();
+    }
+    if (ammo) {
+      // Caja de munición
+      b.color([0.22, 0.27, 0.16]).cube(0.3, 0, 0.26, 0.3, 0.16, 0.16);
+      b.color([0.16, 0.2, 0.12]).cube(0.3, 0.16, 0.26, 0.31, 0.03, 0.17);
+      b.color([0.72, 0.58, 0.2]).cube(0.3, 0.06, 0.345, 0.12, 0.05, 0.006);
+    }
+    if (med) {
+      b.color([0.86, 0.84, 0.78]).cube(-0.05, 0, 0.34, 0.26, 0.14, 0.18);
+      b.color([0.62, 0.1, 0.08]).cube(-0.05, 0.14, 0.34, 0.1, 0.006, 0.035).cube(-0.05, 0.14, 0.34, 0.035, 0.006, 0.1);
+    }
+  });
 }
 
 export type { Building };
