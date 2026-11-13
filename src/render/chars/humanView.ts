@@ -316,7 +316,11 @@ export class HumanView {
       }
     }
     this.animator.update(dt, inp);
-    if (this.ikMain >= 0.01 || this.ikOff >= 0.01) this.solveArms(g!);
+    if (!g || !this.weapon) {
+      // Sin arma en la mano no hay nada que seguir: los brazos vuelven a la animación
+      this.ikMain = 0;
+      this.ikOff = 0;
+    } else if (this.ikMain >= 0.01 || this.ikOff >= 0.01) this.solveArms(g);
     if (inp.lantern && this.lamp) {
       // El farol cuelga a plomo de la mano, apunte adonde apunte el brazo
       const hand = this.bones[HB.handL];
