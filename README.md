@@ -11,6 +11,9 @@ Este repositorio contenía antes *Hearts of Vlianska* (gran estrategia en 2D). E
 ## Qué hay dentro
 
 - **El metro entero, de una pieza.** Las 16 estaciones y los 24 cruces del plano original, unidos por más de nueve kilómetros de túneles que se recorren a pie y sin pantallas de carga. Cada estación es un asentamiento distinto: el Gran Mercado de Tsentral'naya alrededor del edificio quemado del gobierno, los pozos de aire frío de Kholodnogo Vozduha, las escaleras mecánicas de Severnyy hacia la superficie, las granjas de Rassvetnaya, el manantial esmeralda de Izumrudnaya, el trono del Tuerto en Vhlainska… y Tenevskaya, a oscuras, con sus almacenes intactos.
+- **Estaciones con forma.** Naves de tres bóvedas con pilones macizos y viviendas con cortina en los arcos, naves de columnas o de bóveda única, y salas que se abren en sus muros: el hospital de Nadezhdy, la nave de los hornos de Industrialnaya, el caravasar y la capilla de Staraya, la Sala del Consejo y la escuela de Stalingradskaya, los pozos redondos de Kholodnogo Vozduha, las cuevas de la Hermandad, el arsenal blindado de la Junta… Los vestíbulos llevan a túneles de escaleras mecánicas con balaustradas y farolas; unas suben a la superficie y otras acaban en puertas herméticas selladas desde 2013.
+- **Cada estación organizada como un pueblo.** Cuerpo de guardia y almacenes junto a las bocas, barrio de chabolas, tiendas y lavaderos hacia los extremos, la calle del mercado bajo guirnaldas en el centro, con su comedor, su escenario y su escuela; y hasta sesenta vecinos que comen, trabajan, rezan, cenan junto al fuego y duermen de noche.
+- **La superficie.** Por las escaleras de Severnyy, la rampa de carga de Industrialnaya y la escalera del pozo de Kholodnogo Vozduha se sube al barrio norte de Vlianska: la plaza y la estación de ferrocarril, la avenida con sus trolebuses varados y las barricadas de 2013, bloques de viviendas con sus patios, la fábrica, la playa de vías, parques y ruinas, bajo la nieve, con luz de día, noche y sombras. El aire de arriba exige máscara antigás y filtros; a cambio, hay pisos, maleteros, farmacias y cajas militares que nadie ha tocado en veinte años, y fieras anidando en las ruinas.
 - **Escuadra, no héroe.** Hasta doce personas (veinte con estructura de mando) a las que das órdenes en tiempo real con pausa. Veintidós habilidades que suben con el uso (el atletismo, corriendo; la fuerza, también cargando peso); siete partes del cuerpo con su propia salud; heridas que sangran hasta que alguien las venda; inconscientes a los que se puede cargar, curar, saquear o rematar. Se puede cambiar el nombre a cualquiera y despedir a quien sobre.
 - **Caer tiene consecuencias.** Los saqueadores despojan a los caídos; las facciones encierran en sus calabozos a quien tiene la cabeza a precio; Vhlainska y el Califato encadenan esclavos y el Levantamiento manda a reeducarse a sus granjas. Los presos cumplen condena, salen bajo fianza, fuerzan los grilletes cuando nadie mira o esperan a que un compañero los rescate. Las fieras arrastran a los inconscientes a su nido y se los comen, y con una buena recompensa por vuestras cabezas salen cazarrecompensas.
 - **Heridas que dejan marca.** Brazos y piernas que se pierden para siempre, muñones que hay que vendar, prótesis que se compran o se fabrican y cojeras crónicas que solo arreglan en el quirófano de Nadezhdy.
@@ -77,7 +80,7 @@ Siete maneras de bajar al metro, de «Nadie» (tres refugiados en Tsentral'naya)
 src/
   core/     matemáticas y números aleatorios con semilla
   data/     historia, facciones, figuras, mapa, objetos, habilidades, obras y comienzos
-  world/    trazado del metro, rejilla de navegación, luces y decoración (puro, sin render)
+  world/    trazado del metro y de la superficie, arquitectura de las estaciones, rejilla de navegación, luces y decoración (puro, sin render)
   sim/      simulación: personajes, combate, IA, población, obras, comercio y sucesos
   render/   motor gráfico sobre three.js: mallas del mundo, kit de atrezo, personajes
   game/     une simulación y render: vistas, efectos, cámara, selección y órdenes
@@ -113,7 +116,7 @@ npx tsx tools/balance.ts larga 30   # una partida de 30 días con base y asaltos
 
 Con el servidor de desarrollo en marcha:
 
-- `/?view&at=TSE&d=50` recorre el mundo sin partida (`at` admite cualquier estación o cruce; `q=baja|media|alta`).
+- `/?view&at=TSE&d=50` recorre el mundo sin partida (`at` admite cualquier estación o cruce; `q=baja|media|alta`). Con `cam=x,z,dist,giro,inclinación` se va a cualquier punto, también a la superficie (por ejemplo `cam=-790,-860,55,0.6,0.9`), y `hora=` elige la hora de la luz de arriba.
 - `/?view&kit` muestra el catálogo de piezas del atrezo (`kit=tienda,puesto` para elegir cuáles).
 - `/?view&chars` añade una fila de personajes de prueba.
 - `/?view&poses` es un banco de poses: una fila de personajes con cada arma para revisar cómo la sujetan y cómo se mueven (`poses=listo|apuntar|ataque|marcha|correr|sigilo|reposo|caida|giro|varios|modelos`, `only=ak,hacha`, `pick=0,3`, `t=0.4` para congelar un golpe, `move` para que avancen de verdad y `freeze` para avanzar fotograma a fotograma con `__vl.step`).

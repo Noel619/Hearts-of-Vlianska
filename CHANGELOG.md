@@ -41,11 +41,6 @@ Caer tiene consecuencias, las heridas dejan marca, el equipo se gasta y las base
 - **Escuadras propias.** «+ Nueva escuadra» separa a los seleccionados en un grupo que va por su cuenta; pestañas para verlas y cambiar de una a otra, y selector de escuadra en la ficha.
 - **La comida se estropea.** Hongos frescos, carne y guisos se pudren en pocos días; lo seco, lo ahumado, las latas y el samogón aguantan. Se come primero lo que está a punto de pasarse. La **despensa** (técnica «Conservación de alimentos») la hace durar el triple, y la **carne ahumada** (en la hoguera o la cocina) aguanta semanas. La comida podrida no se come, pero los cerdos del corral sí.
 
-### El metro
-
-- **Estaciones con forma**: naves de pilones o de columnas, salas anejas (calabozos, jaulas, hospitales, talleres, consejos…), vestíbulos y escaleras mecánicas.
-- **La superficie**: las escaleras de Severnyy, la rampa de Industrialnaya y el pozo de Kholodnogo Vozduha suben a un barrio en ruinas con su luz del día, su noche, su niebla y su nieve, y con botín que nadie ha bajado en veinte años. El aire de arriba pide máscara.
-
 ### Desarrollo
 
 - Pruebas nuevas de la derrota, el equipo y las bases (`tests/derrota.test.ts`, `tests/equipo.test.ts`, `tests/bases.test.ts`) y mallas con todas las combinaciones de miembros perdidos y prótesis.
@@ -53,7 +48,7 @@ Caer tiene consecuencias, las heridas dejan marca, el equipo se gasta y las base
 
 ## 0.3 beta
 
-Animaciones y modelos 3D nuevos para las personas y para las bestias de los túneles.
+Animaciones y modelos 3D nuevos para las personas y para las bestias de los túneles, estaciones con forma propia y, por fin, una salida al exterior.
 
 ### Movimiento
 
@@ -79,6 +74,29 @@ Animaciones y modelos 3D nuevos para las personas y para las bestias de los tún
 - **Marcha.** Pasan del paso al trote y al galope con las patas plantadas; al galopar el espinazo se dobla y se estira, en las curvas el cuerpo se arquea y la cola sigue el movimiento como una ola. En reposo olfatean el suelo y miran alrededor; en alerta se agachan con la cabeza baja mirando a la presa.
 - **Ataque y muerte.** Se agachan, saltan con las zarpas por delante y muerden; al recibir se encogen hacia un lado; al morir ceden las patas, caen de costado y patalean un momento.
 - **Glubinnik y sheptun nuevos.** El glubinnik es una mole encorvada con joroba de placas, boca ancha llena de dientes y brazos larguísimos con tres garras, y camina pesado, bamboleándose. El sheptun es alto, negro y consumido, con costillas, boca abierta, dedos como agujas y jirones, y acecha agazapado sacudiendo la cabeza a tirones.
+
+### Estaciones con forma
+
+- **Arquitectura propia en cada estación** (`src/world/arch.ts`): naves de tres bóvedas con pilones macizos (Industrialnaya, Stalingradskaya, Tenevskaya), naves de columnas o de bóveda única, y salas que se abren en los muros con su uso: hospital y quirófano en Nadezhdy, el gobierno de la República del Norte, la nave de los hornos y los talleres de la Fábrica, casamatas y calabozos en Rubezh, los pozos de aire redondos de Kholodnogo Vozduha con sus ventiladores, el caravasar, la aduana y la capilla de Staraya, la Sede de la Unión, la comisaría y correos en Tsentral'naya, la Sala del Consejo, la escuela y la biblioteca de Stalingradskaya, la sala de oración y los baños de Izumrudnaya, la Sala de la Conferencia de Zvezdnaya, las cuevas de la Hermandad en Vhlainska, la galería de las granjas de Rassvetnaya, el arsenal blindado de la Junta…
+- **Vestíbulos y escaleras mecánicas** de verdad: carriles con peldaños, balaustradas de madera y farolas de bronce. Las de Severnyy, la rampa de carga de Industrialnaya y la escalera del pozo de Kholodnogo Vozduha suben a la superficie; las de Nadezhdy, Staraya, Tsentral'naya, Rassvetnaya, Zvezdnaya y Mostovaya acaban en puertas herméticas selladas.
+- Viviendas con cortina en los arcos entre pilones; en las estaciones de andén central, las salas laterales se abren a nivel de vía con una escalera del andén justo enfrente.
+- Cada sala tiene su suelo (baldosa, hormigón o tablones), sus muros (azulejo, ladrillo, hormigón, roca o dovelas), su luz y su mobiliario, con piezas nuevas: torniquetes, taquilla, perchas de máscaras, cortinas, chabolas, pupitres y pizarra, duchas de descontaminación, lavaderos, caja fuerte, bombas de achique, cabrestante, taquillas metálicas, mesas largas, archivadores…
+- Los muros siguen la altura del suelo (las escaleras suben de verdad: la rejilla de alturas pasa a 16 bits) y sus remates se recortan donde se encuentran dos muros (pilones y tabiques sin solapes).
+
+### Estaciones organizadas y llenas de gente
+
+- Cada andén se reparte con sentido: cuerpo de guardia y almacenes junto a las bocas, barrio de viviendas hacia los extremos y la calle del mercado en el centro, con guirnaldas de bombillas sobre el pasillo.
+- Bloques nuevos de vida diaria: chabolas con tendedero, comedor público, escenario con guitarrista y público, lavaderos y escuela de andén. Las estaciones militares, Vhlainska e Izumrudnaya tienen su propio relleno.
+- Hasta sesenta vecinos por estación según su población (antes 26) y rutina de día y de noche: se duerme en camas y viviendas, se cena junto al fuego al caer la tarde y alguno echa la siesta.
+
+### La superficie
+
+- **El barrio norte de Vlianska** (`src/world/surface.ts`): la plaza y la estación de ferrocarril de Severnyy, el Prospekt Severnyy con trolebuses y autobuses varados y las barricadas de 2013, calles en cuadrícula, manzanas de bloques de paneles y de ladrillo con patios, columpios y garajes, la Fábrica con sus chimeneas y su grúa, la playa de vías con vagones congelados, la plaza de las torres de ventilación, parques y ruinas.
+- Edificios con fachadas y ventanas, derrumbes que muerden la silueta y escombros a sus pies; los que tapan la vista entre la cámara y lo que miras se rebajan a una planta.
+- Al subir, el metro se oculta y llegan la luz del día con sombras, la noche, la niebla y la nieve que cae; la cámara sigue la altura del suelo.
+- **El aire de arriba quema**: es una bolsa de gas en toda la superficie (y en la mitad alta de las escaleras). Hace falta máscara antigás con filtros.
+- Botín propio de la superficie (pisos, maleteros, quioscos, farmacias y cajas militares), chatarra, nidos de fieras y la guardia de stalkers en las salidas.
+- Rutas por las calles unidas a las salidas (más caras que los túneles, para que nadie suba sin querer) y el barrio dibujado en el mapa con sus zonas.
 
 ### Arreglos
 

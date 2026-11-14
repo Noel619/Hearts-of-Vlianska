@@ -328,7 +328,9 @@ export const BLOCKS: Record<string, BlockDef> = {
         const k = kinds[i] ?? kinds[0];
         if (S.put('puesto', x, 0.95, 0, -1, { variant: STALL_VARIANT[k] ?? 4 })) {
           S.spot('vendedor', x, 2.2, 0, -1, k);
+          // Clientes regateando delante del mostrador
           S.spot('ocio', x + 0.45, -0.55, 0, 1);
+          S.spot('ocio', x - 0.6, -0.7, 0.3, 1);
         }
       });
       if (!two && S.W >= 5.6) {
@@ -694,6 +696,81 @@ export const BLOCKS: Record<string, BlockDef> = {
       S.put('huesos', 0, S.D - 2.2, 0, -1, { variant: 2 });
       S.put('picas', -S.W / 2 + 0.5, 0.6, 0, -1, { variant: 1 });
       S.spot('guardia', 0.4, S.D - 2.6, 0, 1);
+    },
+  },
+  // --- Vida diaria ------------------------------------------------------------------
+  chabolas: {
+    minD: 3.3,
+    minW: 4.0,
+    fn: (S) => {
+      // Chabolas de contrachapado y puertas de vagón con su tendedero delante
+      const n = clamp(Math.floor((S.W - 0.2) / 3.6), 1, 3);
+      const tt = Math.max(1.5, S.D - 1.45);
+      for (let i = 0; i < n; i++) S.put('chabola', (i - (n - 1) / 2) * 3.6, tt, 0, -1, { variant: (S.index + i) % 4 });
+      const front = tt - 1.45;
+      if (front >= 0.8) {
+        if (S.W >= 5) S.put('tendedero', 0.3, Math.max(0.5, front - 0.4), 0, -1);
+        S.seat(-S.W / 2 + 0.6, Math.max(0.45, front - 0.45), 1, 0);
+        S.spot('ocio', 0.9, Math.max(0.4, front - 0.3), -1, 0.2);
+        S.put('barril', S.W / 2 - 0.45, Math.max(0.45, front - 0.4), 0, -1);
+      } else {
+        S.spot('ocio', 0.6, -0.4, 0, 1);
+      }
+    },
+  },
+  comedor: {
+    minD: 3.6,
+    minW: 5.4,
+    fn: (S) => {
+      // Comedor público: mesa larga con bancos, la olla del rancho y quien sirve
+      const t = Math.min(S.D - 1.1, 1.9);
+      if (S.put('mesaLarga', -0.6, t, 0, -1)) {
+        for (const k of [-1.1, 0, 1.1]) {
+          S.spot('asiento', -0.6 + k, t - 0.75, 0, 1, 'banco');
+          S.spot('asiento', -0.3 + k, t + 0.75, 0, -1, 'banco');
+        }
+        S.put('colgante', -0.6, t, 0, -1);
+      }
+      if (S.put('olla', S.W / 2 - 1.0, S.D - 0.9, 0, -1)) S.spot('trabajo', S.W / 2 - 1.0, S.D - 2.0, 0, 1, 'cocina');
+      S.spot('vendedor', S.W / 2 - 1.9, S.D - 0.6, 0, -1, 'comida');
+      S.put('barriles', -S.W / 2 + 0.9, S.D - 0.6, 0, -1);
+    },
+  },
+  escenario: {
+    minD: 4.6,
+    minW: 6.0,
+    fn: (S) => {
+      // Tarima con telón: un guitarrista toca y la gente se sienta delante
+      if (!S.put('escenario', 0, S.D - 1.45, 0, -1)) return;
+      S.spot('asiento', 0.6, S.D - 3.1, 0, -1, 'guitarra');
+      for (const x of [-2.2, -1.1, 1.3, 2.4]) S.spot('asiento', x, Math.max(0.5, S.D - 4.4 + Math.abs(x) * 0.15), 0, 1, 'suelo');
+      S.spot('ocio', -0.4, 0.4, 0, 1);
+      S.spot('ocio', 1.8, 0.6, -0.3, 1);
+      S.put('guirnalda', 0, 0.3, 0, -1);
+    },
+  },
+  lavadero: {
+    minD: 3.0,
+    minW: 4.6,
+    fn: (S) => {
+      // Pilas de lavar, cubos y la ropa tendida
+      const xs = S.W >= 6.4 ? [-1.6, 1.0] : [-0.6];
+      for (const x of xs) if (S.put('lavadero', x, S.D - 0.6, 0, -1)) S.spot('trabajo', x, S.D - 1.45, 0, 1, 'operar');
+      S.put('tendedero', 0, Math.max(0.6, S.D - 2.4), 0, -1);
+      S.put('deposito', S.W / 2 - 0.9, S.D - 0.95, 0, -1, { variant: 0 });
+      S.spot('ocio', -S.W / 2 + 0.8, 0.5, 1, 0.3);
+    },
+  },
+  escuelita: {
+    minD: 3.6,
+    minW: 5.0,
+    fn: (S) => {
+      // Escuela de andén: pizarra, pupitres y la maestra
+      S.put('pizarra', 0, S.D - 0.45, 0, -1);
+      S.spot('trabajo', 1.5, S.D - 1.2, 0, -1, 'escribir');
+      for (let t = S.D - 2.2; t >= 0.7; t -= 1.45) {
+        for (const x of [-1.4, 1.4]) if (Math.abs(x) < S.W / 2 - 0.7 && S.put('pupitre', x, t, 0, 1)) S.spot('asiento', x, t - 0.42, 0, 1);
+      }
     },
   },
 };

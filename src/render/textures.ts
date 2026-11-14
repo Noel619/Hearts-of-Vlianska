@@ -599,12 +599,13 @@ function trackBed(seed: number): SurfaceTex {
 /** Nieve: ondulaciones suaves, brillo granulado y algún pisotón sucio. Cubre 6 x 6 m. */
 function snow(seed: number): SurfaceTex {
   return synth(512, 512, (u, v, t) => {
-    const big = pfbm(u, v, 2, 4, seed);
-    const mid = pfbm(u, v, 6, 3, seed + 3);
+    // Nieve casi lisa: la variación grande la pone el suelo (ruido por vértice), aquí solo grano
+    const big = pfbm(u, v, 1, 3, seed);
+    const mid = pfbm(u, v, 5, 3, seed + 3);
     const fine = pfbm(u, v, 80, 2, seed + 7);
-    const dirt = smoothstep(0.58, 0.85, pfbm(u, v, 2, 4, seed + 11)) * 0.5;
-    const spark = hash2(Math.floor(u * 512), Math.floor(v * 512), seed + 13) > 0.998 ? 0.2 : 0;
-    const c = 0.72 + (big - 0.5) * 0.12 + (mid - 0.5) * 0.05 + (fine - 0.5) * 0.04 - dirt * 0.16 + spark;
+    const dirt = 0;
+    const spark = hash2(Math.floor(u * 512), Math.floor(v * 512), seed + 13) > 0.998 ? 0.18 : 0;
+    const c = 0.72 + (big - 0.5) * 0.04 + (mid - 0.5) * 0.025 + (fine - 0.5) * 0.04 + spark;
     t.r = c * 0.97;
     t.g = c * 0.99;
     t.b = c * 1.04;
@@ -616,16 +617,16 @@ function snow(seed: number): SurfaceTex {
 /** Asfalto agrietado con nieve en las grietas y placas de hielo. Cubre 4 x 4 m. */
 function asphalt(seed: number): SurfaceTex {
   return synth(512, 512, (u, v, t) => {
-    const big = pfbm(u, v, 3, 4, seed);
+    const big = pfbm(u, v, 1, 3, seed);
     const grain = hash2(Math.floor(u * 512), Math.floor(v * 512), seed + 1);
     const crackN = pfbm(u, v, 5, 4, seed + 21);
     const crack = 1 - smoothstep(0.0, 0.004, Math.abs(crackN - 0.5));
     const ice = smoothstep(0.66, 0.8, pfbm(u, v, 2, 3, seed + 31));
     const dust = smoothstep(0.55, 0.85, pfbm(u, v, 2, 3, seed + 41));
-    let c = 0.24 + (big - 0.5) * 0.06 + (grain - 0.5) * 0.05;
-    c = lerp(c, 0.5, crack * 0.45);
-    c = lerp(c, 0.5, dust * 0.4);
-    c = lerp(c, 0.36, ice * 0.4);
+    let c = 0.24 + (big - 0.5) * 0.03 + (grain - 0.5) * 0.05;
+    c = lerp(c, 0.42, crack * 0.3);
+    c = lerp(c, 0.42, dust * 0.2);
+    c = lerp(c, 0.34, ice * 0.25);
     t.r = c * 0.98;
     t.g = c * 1.0;
     t.b = c * 1.05;
