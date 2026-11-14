@@ -1,5 +1,6 @@
 // Visor de desarrollo: construye el mundo y permite recorrerlo con la cámara.
 // Se abre con ?view en la dirección. Parámetros: at=ID, cam=x,z,dist,yaw,pitch, q=baja|media|alta.
+// ?view&kit, ?view&poses y ?view&criaturas abren los bancos de piezas, poses y criaturas.
 
 import * as THREE from 'three';
 import { CameraRig } from '../render/camera';
@@ -17,11 +18,13 @@ import { LightField } from '../world/lights';
 import { addCharTest } from './charTest';
 import { startKit } from './kitView';
 import { startPoses } from './poseView';
+import { startCreatures } from './creatureView';
 
 export async function startViewer(root: HTMLElement) {
   const params = new URLSearchParams(location.search);
   if (params.has('kit')) return startKit(root, params);
   if (params.has('poses')) return startPoses(root, params);
+  if (params.has('criaturas')) return startCreatures(root, params);
   const canvas = document.createElement('canvas');
   canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block';
   root.appendChild(canvas);

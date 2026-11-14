@@ -6,11 +6,9 @@ import { CREATURES } from '../data/criaturas';
 import { BUILDS } from '../data/edificios';
 import { ITEMS } from '../data/items';
 import { angleDiff, hashStr } from '../core/math';
-import { HumanAnimator, defaultAnimInput, type AnimInput } from '../render/chars/anim';
-import { QUAD_BONES, QuadAnimator, buildBrute, buildQuadruped, type QuadInput } from '../render/chars/creatures';
-import { HUMAN_BONES } from '../render/chars/humanoid';
+import type { AnimInput } from '../render/chars/anim';
+import { CreatureView } from '../render/chars/creatures';
 import { HumanView } from '../render/chars/humanView';
-import { makeSkeleton } from '../render/chars/skin';
 import { MeshBuilder } from '../render/geo';
 import { propGeometry } from '../render/kit/core';
 import { drawHeld, hasHeld, heldGrip } from '../render/kit/weapons';
@@ -26,8 +24,7 @@ interface CharView {
   group: THREE.Group;
   kind: 'humano' | 'cuadrupedo' | 'bipedo';
   human?: HumanView;
-  quad?: { anim: QuadAnimator; input: QuadInput; mat: THREE.MeshStandardMaterial };
-  brute?: { anim: HumanAnimator; input: AnimInput; mat: THREE.MeshStandardMaterial };
+  creature?: CreatureView;
   sig: string;
   probe: Float32Array;
   y: number;
@@ -52,9 +49,6 @@ interface CharView {
   /** Distancia recorrida en este fotograma (m). */
   moved: number;
 }
-
-const creatureGeo = new Map<string, THREE.BufferGeometry>();
-let creatureMat: THREE.MeshStandardMaterial | null = null;
 
 const WORK_TOOL: Record<string, string> = { martillo: 'martillo', pico: 'pico', guitarra: 'guitarra', cargarCaja: 'cajaCarga' };
 
@@ -101,33 +95,9 @@ export class CharViews {
       g.add(v.human.group);
     } else {
       const def = CREATURES[c.kind];
-      if (!creatureMat) creatureMat = probeMaterial({ roughness: 0.75 });
-      const mat = cloneProbeMaterial(creatureMat);
-      let geo = creatureGeo.get(c.kind);
-      if (def.shape === 'cuadrupedo') {
-        if (!geo) creatureGeo.set(c.kind, (geo = buildQuadruped(def)));
-        const { bones, skeleton, root } = makeSkeleton(QUAD_BONES);
-        const mesh = new THREE.SkinnedMesh(geo, mat);
-        mesh.add(root);
-        mesh.bind(skeleton);
-        mesh.frustumCulled = false;
-        mesh.castShadow = true;
-        g.add(mesh);
-        v.kind = 'cuadrupedo';
-        v.quad = { anim: new QuadAnimator(bones, c.id), input: { speed: 0, dist: -1, turn: 0, attackT: 0, attacking: false, sinceHit: 9, hitSide: 0, dead: false, alert: 0, seed: c.id }, mat };
-      } else {
-        if (!geo) creatureGeo.set(c.kind, (geo = buildBrute(def)));
-        const { bones, skeleton, root } = makeSkeleton(HUMAN_BONES);
-        const mesh = new THREE.SkinnedMesh(geo, mat);
-        mesh.add(root);
-        mesh.bind(skeleton);
-        mesh.frustumCulled = false;
-        mesh.castShadow = true;
-        g.add(mesh);
-        v.kind = 'bipedo';
-        v.brute = { anim: new HumanAnimator(bones, c.id), input: { ...defaultAnimInput(c.id), style: c.kind === 'glubinnik' ? 'bruto' : 'acechador' }, mat };
-      }
-      g.scale.setScalar(def.scale);
+      v.creature = new CreatureView(def, c.id);
+      v.kind = def.shape;
+      g.add(v.creature.group);
     }
     this.group.add(g);
     this.views.set(c.id, v);
@@ -138,8 +108,7 @@ export class CharViews {
     const v = this.views.get(id);
     if (!v) return;
     v.human?.dispose();
-    v.quad?.mat.dispose();
-    v.brute?.mat.dispose();
+    v.creature?.dispose();
     v.group.removeFromParent();
     this.views.delete(id);
   }
@@ -230,38 +199,37 @@ export class CharViews {
         h.setProbe(p[0], p[1], p[2], p[3], p[4], p[5]);
         // Lejos de la cámara se anima a media frecuencia
         if (d < 70 || (this.frame + c.id) % 2 === 0) h.update(d < 70 ? dt : dt * 2);
-      } else if (v.quad) {
-        const q = v.quad;
-        const def = CREATURES[c.kind];
-        q.input.speed = v.gs / def.scale;
-        q.input.dist = v.moved / def.scale;
-        q.input.turn = v.turn;
-        q.input.attacking = c.atkT >= 0;
-        q.input.attackT = Math.max(0, c.atkT);
-        q.input.sinceHit = c.sinceHit;
-        q.input.hitSide = c.hitSide;
-        q.input.dead = c.st !== 'ok';
-        q.input.alert = c.target ? 1 : 0;
-        v.group.position.set(v.x, v.y, v.z);
-        v.group.rotation.y = Math.PI / 2 - v.face;
-        setProbe(q.mat, p[0], p[1], p[2], p[3], p[4], p[5]);
-        q.anim.update(dt, q.input);
-      } else if (v.brute) {
-        const b = v.brute;
-        const inp = b.input;
-        const def = CREATURES[c.kind];
-        this.motion(v, inp, def.scale);
-        inp.pose = c.st === 'muerto' ? 'muerto' : c.st === 'ko' ? 'ko' : 'normal';
-        inp.attack = c.atkT >= 0 ? (c.id % 2 ? 'golpe' : 'tajo') : null;
-        inp.attackT = Math.max(0, c.atkT);
-        inp.sinceHit = c.sinceHit;
-        inp.hitSide = c.hitSide;
-        inp.sneak = c.kind === 'sheptun' && v.gs < 1;
-        this.lookAt(v, c, inp, 1.62 * def.scale);
-        v.group.position.set(v.x, v.y, v.z);
-        v.group.rotation.y = Math.PI / 2 - v.face;
-        setProbe(b.mat, p[0], p[1], p[2], p[3], p[4], p[5]);
-        b.anim.update(dt, inp);
+      } else if (v.creature) {
+        const cv = v.creature;
+        const def = cv.def;
+        if (cv.quad) {
+          const q = cv.qin;
+          q.speed = v.gs / def.scale;
+          q.dist = v.moved / def.scale;
+          q.turn = v.turn;
+          q.attacking = c.atkT >= 0;
+          q.attackT = Math.max(0, c.atkT);
+          q.sinceHit = c.sinceHit;
+          q.hitSide = c.hitSide;
+          q.dead = c.st !== 'ok';
+          // Mira a su presa
+          const t = c.target && c.st === 'ok' ? this.sim.char(c.target) : undefined;
+          q.alert = t ? 1 : 0;
+          q.look = t ? -angleDiff(v.face, Math.atan2((this.views.get(t.id)?.z ?? t.z) - v.z, (this.views.get(t.id)?.x ?? t.x) - v.x)) : null;
+        } else {
+          const inp = cv.bin;
+          this.motion(v, inp, def.scale);
+          inp.pose = c.st === 'muerto' ? 'muerto' : c.st === 'ko' ? 'ko' : 'normal';
+          inp.attack = c.atkT >= 0 ? (c.id % 2 ? 'golpe' : 'tajo') : null;
+          inp.attackT = Math.max(0, c.atkT);
+          inp.sinceHit = c.sinceHit;
+          inp.hitSide = c.hitSide;
+          inp.sneak = c.kind === 'sheptun' && v.gs < 1;
+          this.lookAt(v, c, inp, 1.62 * def.scale);
+        }
+        cv.place(v.x, v.y, v.z, v.face);
+        cv.setProbe(p[0], p[1], p[2], p[3], p[4], p[5]);
+        if (d < 70 || (this.frame + c.id) % 2 === 0) cv.update(d < 70 ? dt : dt * 2);
       }
     }
     for (const id of this.views.keys()) if (!seen.has(id)) this.destroy(id);
