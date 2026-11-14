@@ -3,6 +3,7 @@
 // (esquivar obstáculos) se resuelve con la rejilla de navegación.
 
 import { type Layout, stationToWorld } from './layout';
+import { annexCentre, annexPoint } from './arch';
 import type { NavGrid } from './grid';
 
 export interface WayNode {
@@ -135,6 +136,25 @@ export class RouteGraph {
         for (let i = 0; i <= n; i++) for (const rv of rows) P(p.u0 + 1.2 + ((len - 2.4) * i) / n, p.v0 + wid * rv);
       }
       for (const d of f.decks) P((d.u0 + d.u1) / 2, (d.v0 + d.v1) / 2);
+      // Salas anejas: a ambos lados de cada puerta, por dentro y a lo largo de las escaleras
+      for (const a of f.annexes) {
+        for (const d of a.doors) {
+          const du = (d.u0 + d.u1) / 2;
+          const dv = (d.v0 + d.v1) / 2;
+          const half = (Math.abs(a.du) * (d.u1 - d.u0) + Math.abs(a.dv) * (d.v1 - d.v0)) / 2;
+          P(du - a.du * (half + 1.2), dv - a.dv * (half + 1.2));
+          P(du + a.du * (half + 1.2), dv + a.dv * (half + 1.2));
+        }
+        if (a.rise) {
+          for (let t = 2; t < a.depth - 1.5; t += 6) P(...annexPoint(a, t, 0));
+          P(...annexPoint(a, a.depth - 1.4, 0));
+        } else {
+          const [cu, cv] = annexCentre(a);
+          P(cu, cv);
+          if (a.width > 13) for (const sgn of [-1, 1]) P(...annexPoint(a, a.depth * 0.5, sgn * a.width * 0.28));
+          if (a.depth > 13) P(...annexPoint(a, a.depth * 0.8, 0));
+        }
+      }
       for (const lane of f.lanes) {
         const len = lane.u1 - lane.u0;
         const n = Math.max(1, Math.round(len / 18));

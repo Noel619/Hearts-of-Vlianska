@@ -11,6 +11,7 @@ import { propMaterial, solidMaterial } from './materials';
 import './kit/basics';
 import './kit/settlement';
 import './kit/landmarks';
+import './kit/interiors';
 
 const TILE = 96;
 

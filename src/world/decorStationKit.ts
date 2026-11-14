@@ -101,6 +101,16 @@ export interface Band {
   kind: 'main' | 'side';
 }
 
+/** Marco arbitrario de un hueco: origen y ejes x (a lo ancho) y t (hacia el fondo) en coordenadas locales. */
+export interface SlotFrame {
+  ou: number;
+  ov: number;
+  xu: number;
+  xv: number;
+  tu: number;
+  tv: number;
+}
+
 /** Hueco de una banda: coordenadas x (a lo largo) y t (fondo desde el pasillo). */
 export class SlotCtx {
   readonly rng: Rng;
@@ -117,32 +127,46 @@ export class SlotCtx {
     readonly W: number,
     readonly D: number,
     readonly index: number,
+    readonly frame: SlotFrame | null = null,
+    mirror?: 1 | -1,
   ) {
     this.rng = st.rng;
-    this.mir = st.rng.chance(0.5) ? 1 : -1;
+    this.mir = mirror ?? (st.rng.chance(0.5) ? 1 : -1);
     this.tint = st.tint;
     this.emblem = st.emblem;
   }
 
   uv(x: number, t: number): [number, number] {
+    const F = this.frame;
+    if (F) return [F.ou + x * this.mir * F.xu + t * F.tu, F.ov + x * this.mir * F.xv + t * F.tv];
     return [this.uc + x * this.mir, this.band.v0 + this.band.dv * t];
+  }
+
+  /** Dirección local (du, dv) de un vector (dx, dt) del hueco. */
+  dir(dx: number, dt: number): [number, number] {
+    const F = this.frame;
+    if (F) return [dx * this.mir * F.xu + dt * F.tu, dx * this.mir * F.xv + dt * F.tv];
+    return [dx * this.mir, dt * this.band.dv];
   }
 
   /** Pieza con su +Z local hacia (dx, dt); (0, -1) mira al pasillo. */
   put(type: string, x: number, t: number, dx: number, dt: number, o: PutOptions = {}) {
     const [u, v] = this.uv(x, t);
-    return this.st.put(type, u, v, dx * this.mir, dt * this.band.dv, o);
+    const [du, dv] = this.dir(dx, dt);
+    return this.st.put(type, u, v, du, dv, o);
   }
 
   putX(type: string, x: number, t: number, dx: number, dt: number, o: PutOptions = {}) {
     const [u, v] = this.uv(x, t);
-    return this.st.putX(type, u, v, dx * this.mir, dt * this.band.dv, o);
+    const [du, dv] = this.dir(dx, dt);
+    return this.st.putX(type, u, v, du, dv, o);
   }
 
   spot(kind: SpotKind, x: number, t: number, dx: number, dt: number, data?: string, extra?: Extra) {
     const [u, v] = this.uv(x, t);
     const ex = this.side ? { ...extra, side: this.side } : extra;
-    return this.st.spot(kind, u, v, dx * this.mir, dt * this.band.dv, data, ex);
+    const [du, dv] = this.dir(dx, dt);
+    return this.st.spot(kind, u, v, du, dv, data, ex);
   }
 
   /** Un sitio donde sentarse mirando hacia (dx, dt). */

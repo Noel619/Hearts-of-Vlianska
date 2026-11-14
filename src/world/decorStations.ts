@@ -4,6 +4,7 @@
 import type { FactionId } from '../data/tipos';
 import { DecorCtx } from './decorCore';
 import { BLOCKS, SlotCtx, St, type Band } from './decorStationKit';
+import { decorateAnnexes } from './decorAnnex';
 import type { LRect, Port, StationFrame } from './layout';
 
 // ---------------------------------------------------------------------------
@@ -31,7 +32,7 @@ const PROGRAMS: Record<string, Program> = {
     fill: ['tiendas', 'barracon', 'hoguera', 'tiendas', 'dormitorio', 'almacen'],
   },
   UBE: {
-    must: ['hospital:nor_sidorov@0', 'hospital@0.14', 'hospital@-0.14', 'mando:lebedeva@-0.4', 'puesto:medico@0.3', 'puesto:comida@0.4', 'puesto:bazar@0.5', 'puesto:ropa@-0.6', 'bar@0.7', 'cocina@-0.7', 'plaza:estatua@0.2', 'cuartel@0.95', 'cuartel@-0.95', 'granja@-0.8', 'taller@0.85', 'radio@-0.5'],
+    must: ['hospital@0.1', 'puesto:medico@0.3', 'puesto:comida@0.4', 'puesto:bazar@0.5', 'puesto:ropa@-0.6', 'bar@0.7', 'cocina@-0.7', 'plaza:estatua@0.2', 'cuartel@0.95', 'cuartel@-0.95', 'granja@-0.8', 'taller@0.85', 'radio@-0.5'],
     fill: ['tiendas', 'hoguera', 'barracon', 'tiendas', 'dormitorio', 'almacen'],
   },
   IND: {
@@ -43,17 +44,14 @@ const PROGRAMS: Record<string, Program> = {
     fill: ['tiendas', 'almacen', 'hoguera', 'barracon'],
   },
   KHO: {
-    must: ['mitin:sdr_popova@0', 'mando:bessmertny@-0.14', 'cuartel@-0.92', 'cuartel@0.92', 'armeria@-0.75', 'puesto:comida@0.2', 'puesto:ropa@0.26', 'puesto:armas@0.34', 'puesto:bazar@0.46', 'bar@0.6', 'cocina@-0.55', 'hospital@-0.65', 'plaza:estatua@0.14', 'taller@0.75', 'granja@-0.3', 'radio@-0.22'],
+    must: ['mitin:sdr_popova@0', 'cuartel@-0.92', 'cuartel@0.92', 'armeria@-0.75', 'puesto:comida@0.2', 'puesto:ropa@0.26', 'puesto:armas@0.34', 'puesto:bazar@0.46', 'bar@0.6', 'cocina@-0.55', 'hospital@-0.65', 'plaza:estatua@0.14', 'taller@0.75', 'granja@-0.3', 'radio@-0.22'],
     fill: ['tiendas', 'barracon', 'hoguera', 'tiendas', 'almacen', 'dormitorio'],
   },
   STA: {
     must: [
-      's/mando:orlova@0',
-      'm/figura:sta_fedorova:caravana@0',
       's/cuartel:sta_markov@-0.5',
       's/brigada@0.5',
       's/brigada@0.7',
-      's/santuario:sta_lazarev@-0.75',
       'm/puesto:comida@-0.8',
       'm/puesto:bazar@-0.6',
       'm/puesto:armas@-0.45',
@@ -78,9 +76,6 @@ const PROGRAMS: Record<string, Program> = {
   },
   TSE: {
     must: [
-      's/mando:volkov@0',
-      'p/comisaria:uni_gromov@-0.3',
-      'n/correos@0.3',
       'm/figura:uni_ivanova:bazar@-0.2',
       'm/puesto:comida@-0.7',
       'm/puesto:bazar@-0.55',
@@ -108,7 +103,7 @@ const PROGRAMS: Record<string, Program> = {
     fillSide: ['tiendas', 'barracon', 'tiendas', 'dormitorio', 'almacen', 'hoguera'],
   },
   VHL: {
-    must: ['trono:rybak@0', 'figura:vhl_lisa:negro@0.3', 'guarida@0.12', 'bar@-0.3', 'jaulas@0.5', 'santuario:vhl_monje@-0.8', 'hoguera@-0.55', 'hoguera@0.75', 'taller:armas@-0.95', 'almacen@0.95'],
+    must: ['figura:vhl_lisa:negro@0.3', 'bar@-0.3', 'santuario:vhl_monje@-0.8', 'hoguera@-0.55', 'hoguera@0.75', 'taller:armas@-0.95', 'almacen@0.95'],
     fill: ['barracon', 'tiendas', 'hoguera', 'almacen', 'dormitorio'],
     lamp: 'bidon',
   },
@@ -136,25 +131,25 @@ const PROGRAMS: Record<string, Program> = {
     fillPos: ['granja', 'granja', 'corral'],
   },
   STL: {
-    must: ['asamblea:morozov@0', 'mitin:lev_belov@0.2', 'figura:lev_smirnov@-0.2', 'puesto:libros@-0.33', 'cocina@0.35', 'puesto:comida@0.5', 'puesto:ropa@0.6', 'puesto:bazar@-0.5', 'cuartel@-0.92', 'cuartel@0.92', 'armeria@-0.75', 'hospital@0.75', 'taller:armas@-0.62', 'bar@0.45', 'plaza:estatua@0.1', 'granja@-0.45', 'radio@0.28'],
+    must: ['mitin:lev_belov@0.2', 'puesto:libros@-0.33', 'cocina@0.35', 'puesto:comida@0.5', 'puesto:ropa@0.6', 'puesto:bazar@-0.5', 'cuartel@-0.92', 'cuartel@0.92', 'armeria@-0.75', 'hospital@0.75', 'taller:armas@-0.62', 'bar@0.45', 'plaza:estatua@0.1', 'granja@-0.45', 'radio@0.28'],
     fill: ['tiendas', 'barracon', 'hoguera', 'tiendas', 'dormitorio', 'almacen'],
   },
   VYS: {
-    must: ['cuartel@0.9', 'cuartel@0.7', 'armeria@0.55', 'cuartel@0.4', 'mando@0.2', 'hospital@0', 'cocina@-0.2', 'puesto:comida@-0.4', 'puesto:armas@-0.5', 'bar@-0.6', 'almacen@0.1', 'plaza@-0.3'],
+    must: ['cuartel@0.9', 'armeria@0.55', 'cuartel@0.4', 'hospital@0', 'cocina@-0.2', 'puesto:comida@-0.4', 'puesto:armas@-0.5', 'bar@-0.6', 'almacen@0.1', 'plaza@-0.3'],
     fill: ['tiendas', 'hoguera', 'barracon', 'almacen'],
     lamp: 'poca',
   },
   MER: {
-    must: ['mando:baghdadi:cal_harbi@-0.35', 'mezquita:karimov@0.35', 'figura:cal_aliyev:negro@0.6', 'puesto:comida@0.5', 'cocina@0.2', 'cuartel@-0.8', 'granja@0.8', 'corral@0.92', 'hospital@-0.6'],
+    must: ['mando:baghdadi:cal_harbi@-0.35', 'figura:cal_aliyev:negro@0.6', 'puesto:comida@0.5', 'cocina@0.2', 'cuartel@-0.8', 'granja@0.8', 'corral@0.92', 'hospital@-0.6'],
     fill: ['tiendas', 'hoguera', 'dormitorio', 'almacen'],
     lamp: 'poca',
   },
   ZVE: {
-    must: ['conferencia:uni_kuznetsov:yefimova@0', 'puesto:comida@-0.4', 'puesto:ropa@-0.3', 'puesto:bazar@0.3', 'puesto:libros@0.4', 'bar@0.55', 'plaza:estatua@-0.15', 'cuartel@0.92', 'cuartel@-0.92', 'hospital@-0.6', 'cocina@0.2', 'taller@0.7', 'granja@-0.75'],
+    must: ['plaza:estatua@0', 'puesto:comida@-0.4', 'puesto:ropa@-0.3', 'puesto:bazar@0.3', 'puesto:libros@0.4', 'bar@0.55', 'cuartel@0.92', 'cuartel@-0.92', 'hospital@-0.6', 'cocina@0.2', 'taller@0.7', 'granja@-0.75'],
     fill: ['tiendas', 'barracon', 'hoguera', 'tiendas', 'almacen', 'dormitorio'],
   },
   MOS: {
-    must: ['fundicion@0', 'taller:chatarrero@0.2', 'taller:armas@-0.2', 'cuartel@0.9', 'armeria@0.75', 'cuartel@0.6', 'puesto:comida@-0.4', 'puesto:armas@-0.5', 'bar@-0.6', 'cocina@-0.3', 'almacen@0.4', 'hospital@0.5'],
+    must: ['taller:chatarrero@0.2', 'taller:armas@-0.2', 'cuartel@0.9', 'armeria@0.75', 'cuartel@0.6', 'puesto:comida@-0.4', 'puesto:armas@-0.5', 'bar@-0.6', 'cocina@-0.3', 'almacen@0.4', 'hospital@0.5'],
     fill: ['tiendas', 'barracon', 'hoguera', 'almacen'],
   },
   CHE: {
@@ -229,7 +224,10 @@ function makeBands(st: St): BandX[] {
   if (f.plan.kind === 'isla') {
     const P = f.platforms[0];
     st.reserve(P.u0, P.u1, -AISLE, AISLE);
-    for (const dv of [1, -1] as const) add(P, dv * AISLE, dv, P.v1 - 3.25, 'main');
+    // En las naves de pilones, la vida pública ocupa la nave central; los arcos son viviendas
+    const inner = f.pylons.length ? Math.min(...f.pylons.map((p) => Math.min(Math.abs(p.v0), Math.abs(p.v1)))) : 0;
+    const D = inner ? inner - 0.25 - AISLE : P.v1 - 3.25;
+    for (const dv of [1, -1] as const) add(P, dv * AISLE, dv, D, 'main');
   } else if (f.plan.kind === 'doble') {
     const C = f.platforms[0];
     st.reserve(C.u0, C.u1, -AISLE, AISLE);
@@ -370,15 +368,20 @@ function structure(st: St) {
     clear.push([(d.u0 + d.u1) / 2, d.v0]);
     clear.push([(d.u0 + d.u1) / 2, d.v1]);
   }
-  for (const p of f.platforms) {
-    const len = p.u1 - p.u0;
-    const n = Math.max(2, Math.round(len / 9));
-    for (let i = 0; i < n; i++) {
-      const u = p.u0 + (len * (i + 0.5)) / n;
-      for (const v of [p.v0 + 1.1, p.v1 - 1.1]) {
-        if (Math.abs(v) > f.hw - 1.6) continue; // pegado al muro: sin pilar
-        if (clear.some(([cu, cv]) => Math.abs(cu - u) < 1.9 && Math.abs(cv - v) < 4)) continue;
-        st.put('pilar', u, v, 1, 0, { variant, tint: st.tint });
+  if (f.plan.kind === 'isla') {
+    // Las columnas de la nave las fija la arquitectura (los pilones ya son roca)
+    for (const [u, v] of f.columns) st.put('pilar', u, v, 1, 0, { variant, tint: st.tint, aisle: true });
+  } else if (f.arch.hall !== 'boveda') {
+    for (const p of f.platforms) {
+      const len = p.u1 - p.u0;
+      const n = Math.max(2, Math.round(len / 9));
+      for (let i = 0; i < n; i++) {
+        const u = p.u0 + (len * (i + 0.5)) / n;
+        for (const v of [p.v0 + 1.1, p.v1 - 1.1]) {
+          if (Math.abs(v) > f.hw - 1.6) continue; // pegado al muro: sin pilar
+          if (clear.some(([cu, cv]) => Math.abs(cu - u) < 1.9 && Math.abs(cv - v) < 4)) continue;
+          st.put('pilar', u, v, 1, 0, { variant, tint: st.tint });
+        }
       }
     }
   }
@@ -390,6 +393,39 @@ function structure(st: St) {
     ] as [number, boolean][]) {
       if (!closed) continue;
       for (const tv of lane.tracks) st.putX('tope', u + (u < 0 ? 1.6 : -1.6), tv, 1, 0, { aisle: true });
+    }
+  }
+}
+
+/** Viviendas en los arcos entre pilones: cortina hacia la nave, cama, baúl y estufa. */
+function archHomes(st: St) {
+  const f = st.f;
+  if (!f.pylons.length) return;
+  const P = f.platforms[0];
+  const pv = P.v1;
+  let k = 0;
+  for (const s of [-1, 1]) {
+    // Pasillo libre junto al borde del andén
+    st.reserve(P.u0, P.u1, Math.min(s * (pv - 1.2), s * pv), Math.max(s * (pv - 1.2), s * pv));
+    const row = f.pylons.filter((p) => Math.sign(p.v0 + p.v1) === s).sort((a, b) => a.u0 - b.u0);
+    for (let i = 1; i < row.length; i++) {
+      const a0 = row[i - 1].u1;
+      const a1 = row[i].u0;
+      if (a1 - a0 > 4.5) continue;
+      const uc = (a0 + a1) / 2;
+      // Los arcos con escalera a la vía son de paso
+      if (f.ramps.some((r) => r.kind === 'escalera' && Math.sign(r.v0 + r.v1) === s && Math.abs((r.u0 + r.u1) / 2 - uc) < 1.6)) continue;
+      const inner = s > 0 ? row[i].v0 : row[i].v1;
+      k++;
+      st.putX('cortina', uc, inner + s * 0.15, 1, 0, { variant: k % 4 });
+      const vb = inner + s * 0.85;
+      if (st.putX('cama', uc - 0.5, vb, 1, 0, { variant: k % 2 })) st.spot('cama', uc - 0.5, vb, 0, s);
+      const vo = inner + s * 2.0;
+      if (k % 3 === 0) st.put('estufa', uc + 1.0, vo, 0, -s);
+      else st.put('caja', uc + 1.1, vo, 0, -s, { variant: k % 4 });
+      if (k % 2 === 0) st.spot('asiento', uc - 0.6, vo + s * 0.15, 0, -s, 'suelo');
+      else st.put('maleta', uc - 0.9, vo, 0, -s, { variant: k % 3 });
+      if (k % 4 === 1) st.put('velas', uc + 0.8, vb + s * 0.1, 0, -s);
     }
   }
 }
@@ -518,57 +554,31 @@ function platformWall(st: St, end: 'A' | 'B') {
 
 const SPECIALS: Record<string, (st: St) => void> = {
   SEV: (st) => {
-    // Las escaleras mecánicas hacia la superficie y la base de los stalkers
+    // La cabecera es la antesala del vestíbulo: control de stalkers y equipo a la vista
     const h = st.f.heads[0];
-    const uc = h.u0 + 6.2;
-    st.putX('escaleraMecanica', uc, 0, -1, 0, { aisle: true, tint: st.tint });
-    st.spot('guardia', h.u1 - 0.5, -2.7, 1, 0, 'stalker');
-    st.spot('guardia', h.u1 - 0.5, 2.7, 1, 0, 'stalker');
-    // Stalkers (lado +v): literas, armero y la jefa
-    st.putX('litera', h.u0 + 1.0, 8.2, 0, 1);
-    st.putX('litera', h.u0 + 1.0, 10.8, 0, 1);
-    st.put('arsenal', h.u0 + 4.6, st.f.hw - 0.75, 0, -1, { variant: 0, tint: st.tint });
-    st.put('arsenal', h.u0 + 8.0, st.f.hw - 0.75, 0, -1, { variant: 1, tint: st.tint });
-    if (st.put('mesa', h.u0 + 6.2, 9.4, 0, -1, { variant: 1 })) {
-      st.put('taburete', h.u0 + 5.1, 9.4, 1, 0);
-      st.spot('asiento', h.u0 + 5.1, 9.4, 1, 0);
-      st.put('taburete', h.u0 + 7.3, 9.4, -1, 0);
-      st.spot('asiento', h.u0 + 7.3, 9.4, -1, 0);
+    st.spot('guardia', h.u0 + 2.2, -6.5, 1, 0, 'stalker');
+    st.spot('guardia', h.u0 + 2.2, 6.5, 1, 0, 'stalker');
+    st.put('bandera', h.u0 + 1.0, 8.6, 1, 0, { tint: st.tint, variant: st.emblem });
+    st.put('cajas', h.u0 + 4.5, st.f.hw - 1.2, 0, -1);
+    st.put('barriles', h.u0 + 4.5, -st.f.hw + 1.1, 0, 1);
+    if (st.put('mesa', h.u1 - 2.0, 9.0, -1, 0, { variant: 0 })) {
+      st.put('taburete', h.u1 - 3.0, 9.0, 1, 0);
+      st.spot('asiento', h.u1 - 3.0, 9.0, 1, 0);
     }
-    st.spot('figura', h.u0 + 6.2, 7.9, 0.6, -1, 'nor_arkhipova');
-    st.spot('guardia', h.u0 + 9.6, 7.6, 1, -0.2, 'stalker');
-    st.put('cajas', h.u0 + 11.2, st.f.hw - 1.1, 0, -1);
-    st.put('bandera', h.u1 - 0.6, 6.0, 1, 0, { tint: st.tint, variant: st.emblem });
-    // Descontaminación (lado -v)
-    st.put('deposito', h.u0 + 2.2, -11.6, 0, 1, { variant: 0 });
-    st.putX('biombo', h.u0 + 5.2, -8.4, 1, 0);
-    st.putX('biombo', h.u0 + 7.4, -8.4, 1, 0);
-    st.put('armario', h.u0 + 0.75, -7.6, 1, 0);
-    st.putX('camilla', h.u0 + 6.2, -10.6, 1, 0, { variant: 1 });
-    st.put('barriles', h.u0 + 10.4, st.f.hw * -1 + 1.0, 0, 1);
     st.put('foco', h.u1 - 1.4, -6.6, -1, 0.5);
-    st.spot('medico', h.u0 + 8.6, -9.8, 1, 0.3, 'medico');
-    st.spot('trabajo', h.u0 + 4.2, -10.4, -1, 0, 'operar');
   },
   IND: (st) => {
-    // La nave de los hornos: la Fábrica del Metro
+    // La cabecera es el patio de carga de la Fábrica: vías muertas, palés y carretillas
     const h = st.f.heads[0];
     for (const s of [-1, 1]) {
-      if (st.put('horno', h.u0 + 2.7, s * 7, 1, 0)) {
-        st.spot('trabajo', h.u0 + 6.9, s * 7, -1, 0, 'operar');
-        st.spot('trabajo', h.u0 + 6.2, s * 4.4, -0.8, s * 0.6, 'martillo');
-      }
-      st.putX('cinta', h.u0 + 10.0, s * 9.6, 1, 0);
-      st.putX('railes', h.u0 + 3.2, s * (st.f.hw - 1.0), 1, 0);
-      st.put('chatarra', h.u0 + 8.4, s * (st.f.hw - 1.7), 1, 0);
-      st.put('generador', h.u0 + 11.4, s * (st.f.hw - 1.0), 0, -s);
+      st.putX('railes', h.u0 + 4.5, s * (st.f.hw - 1.0), 1, 0);
+      st.put('palet', h.u1 - 3.0, s * 9.5, 1, 0);
+      st.put('cajas', h.u1 - 5.5, s * 11.5, 1, 0);
       st.put('farola', h.u1 - 0.6, s * 3.6, 1, 0, { aisle: true });
     }
-    if (st.put('fragua', h.u0 + 1.3, 0, 1, 0)) st.spot('trabajo', h.u0 + 2.9, 0.2, -1, 0, 'martillo');
-    st.put('bobina', h.u0 + 5.6, 1.6, 1, 0);
-    st.put('palet', h.u0 + 8.8, -1.4, 1, 0);
-    // El magnate vigila su nave
-    st.spot('figura', h.u1 - 1.6, 1.2, -1, 0, 'zhdanov');
+    st.put('carretilla', h.u1 - 4.0, -4.5, 1, 0.2);
+    st.put('bobina', h.u1 - 7.0, 6.0, 1, 0);
+    st.spot('trabajo', h.u1 - 4.8, -5.6, 1, 0, 'operar');
     st.spot('guardia', h.u1 - 1.0, -1.4, 1, 0, 'elite');
     st.spot('guardia', h.u1 - 1.0, 3.6, 1, 0, 'elite');
   },
@@ -588,25 +598,6 @@ const SPECIALS: Record<string, (st: St) => void> = {
     }
     st.put('deposito', h.u0 + 1.6, st.f.hw - 1.6, 0, -1, { variant: 0 });
     st.put('deposito', h.u0 + 1.6, -st.f.hw + 1.6, 0, 1, { variant: 0 });
-  },
-  KHO: (st) => {
-    // Los pozos de aire frío
-    const P = st.f.platforms[0];
-    const mid = (P.u0 + P.u1) / 2;
-    const half = (P.u1 - P.u0) / 2;
-    for (const s of [-1, 1]) {
-      const v = s * 5.3;
-      // Prueba varios sitios: los pasillos de las escaleras mandan
-      for (const k of [0.44, 0.5, 0.38, 0.56, 0.32]) {
-        const u = mid + s * half * k;
-        if (!st.free(u, v, 3.5, 3.5) || !st.put('pozoAire', u, v, 0, -s)) continue;
-        st.block(u - 4.4, u + 4.4, Math.min(v - 4, v + 4), Math.max(v - 4, v + 4));
-        st.put('bidonFuego', u + 4.9, s * 2.2, 0, -s, { aisle: true });
-        st.spot('ocio', u + 4.9, s * 3.4, 0, -s, 'fuego');
-        st.spot('ocio', u + 6.0, s * 2.3, -1, 0, 'fuego');
-        break;
-      }
-    }
   },
   TSE: (st) => {
     // El edificio del gobierno ruso, en mitad del andén central
@@ -648,26 +639,17 @@ const SPECIALS: Record<string, (st: St) => void> = {
     }
   },
   CHE: (st) => {
-    // La cabecera es el cuartel general de la junta y su arsenal
+    // La cabecera es la última línea de la Junta ante su arsenal
     const h = st.f.heads[0];
     for (const v of [-9.2, -4.9, 4.9, 9.2]) st.put('muroHormigon', h.u0 + 0.7, v, -1, 0, { variant: Math.abs(v) < 6 ? 1 : 0, tint: st.tint });
     st.spot('guardia', h.u0 + 1.7, -1.5, -1, 0, 'elite');
     st.spot('guardia', h.u0 + 1.7, 1.5, -1, 0, 'elite');
-    for (const v of [-9.6, -6.2, 6.2, 9.6]) st.put('arsenal', h.u1 - 0.75, v, -1, 0, { variant: Math.abs(v) > 8 ? 1 : 0, tint: st.tint });
-    st.spot('botin', h.u1 - 2.2, -7.9, -1, 0, 'arsenal');
-    st.spot('botin', h.u1 - 2.2, 7.9, -1, 0, 'arsenal');
-    st.put('alfombra', h.u1 - 5.4, 0, -1, 0, { variant: 0 });
-    st.put('mesa', h.u1 - 3.6, 0, -1, 0, { variant: 1 });
-    st.spot('lider', h.u1 - 2.6, 0, -1, 0, 'voronov');
-    st.put('bandera', h.u1 - 0.7, -1.7, -1, 0, { tint: st.tint, variant: st.emblem });
-    st.put('bandera', h.u1 - 0.7, 1.7, -1, 0, { tint: st.tint, variant: st.emblem });
-    st.put('radio', h.u1 - 0.9, 12.0, -1, 0);
-    st.spot('trabajo', h.u1 - 1.9, 12.0, 1, 0, 'operar');
-    st.spot('figura', h.u0 + 5.0, -4.6, -1, 0.3, 'dragunov');
-    st.spot('guardia', h.u1 - 3.4, -3.2, -1, 0, 'oficial');
+    st.put('bandera', h.u1 - 0.7, -3.4, -1, 0, { tint: st.tint, variant: st.emblem });
+    st.put('bandera', h.u1 - 0.7, 3.4, -1, 0, { tint: st.tint, variant: st.emblem });
     st.put('torreVigia', h.u0 + 2.6, 11.4, -1, 0, { tint: st.tint });
     st.put('farola', h.u0 + 4.4, 3.4, 1, 0);
     st.put('farola', h.u1 - 4.6, -6.0, 1, 0);
+    st.spot('guardia', h.u1 - 3.4, -6.2, -1, 0, 'oficial');
   },
 };
 
@@ -677,13 +659,7 @@ function tenevskaya(st: St) {
   const P = f.platforms[0];
   const rng = st.rng;
   const mid = (P.u0 + P.u1) / 2;
-  // Los almacenes de la defensa civil, al fondo del andén
-  for (const v of [-4.2, 0, 4.2]) {
-    const p = st.w(P.u1 - 3.6, v);
-    st.spot('botin', P.u1 - 3.6, v, -1, 0, 'almacen');
-    st.ctx.reserveCircle(p.x, p.z, 1.2);
-    st.put('estanteria', P.u1 - 0.9, v, -1, 0, { aisle: true });
-  }
+  // Los almacenes de la defensa civil están tras su puerta blindada (sala aneja)
   st.put('cajas', P.u1 - 6.0, -2.4, -1, 0, { aisle: true });
   st.put('cajas', P.u1 - 6.3, 2.6, -1, 0, { aisle: true });
   // El nido del que nadie vuelve
@@ -723,11 +699,13 @@ export function decorateStation(ctx: DecorCtx, f: StationFrame) {
   const bands = makeBands(st);
   structure(st);
   ports(st);
+  decorateAnnexes(st);
   if (f.id === 'TEN') {
     tenevskaya(st);
     return;
   }
   SPECIALS[f.id]?.(st);
+  archHomes(st);
   const prog = PROGRAMS[f.id];
   if (prog) layoutBands(st, bands, prog);
   if (f.id === 'SEV') wagons(st, [1], 0);

@@ -10,6 +10,7 @@ import type { Terrain } from '../data/tipos';
 import { DEG, clamp, distToSegment, hash2, hermite, lerp, noise2, resample, type V2, vdist } from '../core/math';
 import { Rng, seedFrom } from '../core/rng';
 import { CELL, F_WALK, F_WATER, FloatGrid, NavGrid } from './grid';
+import { STATION_ARCH, annexFloorAt, insideAnnex, resolveAnnexes, type Annex, type StationArch } from './arch';
 import {
   COLLAPSE_NODES,
   NODE_ROOMS,
@@ -99,6 +100,14 @@ export interface StationFrame {
   /** Vías dentro de la estación (polilíneas en el mundo). */
   tracks: V2[][];
   region: number;
+  /** Arquitectura: tipo de nave y salas anejas. */
+  arch: StationArch;
+  annexes: Annex[];
+  /** Pilones macizos (se tallan en la roca) y columnas (atrezo), en coordenadas locales. */
+  pylons: LRect[];
+  columns: [number, number][];
+  /** Radio que abarca la nave y todas sus salas. */
+  reach: number;
 }
 
 export interface Alcove {
@@ -180,7 +189,16 @@ export function stationToLocal(f: StationFrame, x: number, z: number): [number, 
 }
 export function insideStation(f: StationFrame, x: number, z: number, margin = 0): boolean {
   const [u, v] = stationToLocal(f, x, z);
-  return Math.abs(u) <= f.hl + margin && Math.abs(v) <= f.hw + margin;
+  if (Math.abs(u) <= f.hl + margin && Math.abs(v) <= f.hw + margin) return true;
+  for (const a of f.annexes) if (insideAnnex(a, u, v, margin)) return true;
+  return false;
+}
+
+/** Sala aneja que contiene un punto del mundo, o null. */
+export function annexAt(f: StationFrame, x: number, z: number, margin = 0): Annex | null {
+  const [u, v] = stationToLocal(f, x, z);
+  for (const a of f.annexes) if (insideAnnex(a, u, v, margin)) return a;
+  return null;
 }
 
 function buildFrame(def: StationDef, region: number): StationFrame {
@@ -210,8 +228,18 @@ function buildFrame(def: StationDef, region: number): StationFrame {
     ports: [],
     tracks: [],
     region,
+    arch: STATION_ARCH[def.id] ?? { hall: 'columnas', annexes: [] },
+    annexes: [],
+    pylons: [],
+    columns: [],
+    reach: Math.hypot(plan.length / 2, plan.width / 2),
   };
   const { hl, hw } = f;
+  // Junto a los muros laterales de un andén central están las vías; en los extremos ciegos, la cabecera
+  const hallFloor = (w: 'L' | 'R' | 'A' | 'B') =>
+    w === 'A' ? (plan.throatA === 0 ? PLATFORM_H : 0) : w === 'B' ? (plan.throatB === 0 ? PLATFORM_H : 0) : plan.kind === 'isla' ? 0 : PLATFORM_H;
+  f.annexes = resolveAnnexes(f.arch, { u0: -hl, u1: hl, v0: -hw, v1: hw }, hallFloor);
+  for (const a of f.annexes) for (const [cu, cv] of [[a.u0, a.v0], [a.u1, a.v0], [a.u0, a.v1], [a.u1, a.v1]]) f.reach = Math.max(f.reach, Math.hypot(cu, cv));
   const closedA = plan.throatA === 0;
   const closedB = plan.throatB === 0;
   // Extremos de andén
@@ -242,9 +270,74 @@ function buildFrame(def: StationDef, region: number): StationFrame {
     for (const s of [-1, 1]) f.lanes.push({ v: s * (hw - LANE_W / 2), width: LANE_W, u0: laneU0, u1: laneU1, tracks: [s * (hw - LANE_W / 2)] });
     if (!closedA) for (const s of [-1, 1]) rampAt(pA, s * pv * 0.5, 'u+');
     if (!closedB) for (const s of [-1, 1]) rampAt(pB, s * pv * 0.5, 'u-');
+    // Las salas de los muros laterales se abren a nivel de vía; una escalera del andén baja justo enfrente
+    const decked: [number, number][] = [];
+    for (const a of f.annexes) {
+      if (a.parent || (a.wall !== 'L' && a.wall !== 'R') || !a.doors.length) continue;
+      decked.push([a.doorU, a.wall === 'R' ? 1 : -1]);
+    }
+    const nearDeck = (u: number, s: number, r: number) => decked.some(([du, ds]) => ds === s && Math.abs(du - u) < r);
     const n = Math.max(2, Math.round((pB - pA) / 34));
-    sideStairs(pv, 'v-', n, 0);
-    sideStairs(-pv, 'v+', n, 0.25);
+    const span = pB - pA;
+    const hall = f.arch.hall;
+    for (const s of [-1, 1]) {
+      const phase = s > 0 ? 0 : 0.25;
+      const want: number[] = [];
+      for (let i = 0; i < n; i++) want.push(pA + (span * (i + 0.5 + phase)) / n);
+      const dir: 'v+' | 'v-' = s > 0 ? 'v-' : 'v+';
+      if (hall === 'pilones') {
+        // Nave de tres bóvedas: una fila de pilones macizos a cada lado y arcos entre ellos
+        const strip = f.arch.strip ?? 2.6;
+        const PT = 1.7;
+        const PL = 4.2;
+        const ARC = 3.4;
+        const PER = PL + ARC;
+        const a0 = pA + 4.5;
+        const a1 = pB - 4.5;
+        const cnt = Math.floor((a1 - a0 + ARC) / PER);
+        const start = (a0 + a1) / 2 - (cnt * PER - ARC) / 2;
+        const vIn = s * (pv - strip - PT);
+        const vOut = s * (pv - strip);
+        const row: LRect[] = [];
+        for (let i = 0; i < cnt; i++) {
+          const uc = start + i * PER + PL / 2;
+          if (nearDeck(uc, s, PL / 2 + 2.1)) continue;
+          row.push({ u0: uc - PL / 2, u1: uc + PL / 2, v0: Math.min(vIn, vOut), v1: Math.max(vIn, vOut) });
+        }
+        f.pylons.push(...row);
+        // Escaleras a la vía: en los arcos más cercanos a su sitio, nunca junto a una pasarela
+        const arches: number[] = [];
+        for (let i = 1; i < row.length; i++) {
+          const c = (row[i - 1].u1 + row[i].u0) / 2;
+          if (row[i].u0 - row[i - 1].u1 < ARC + 1 && !nearDeck(c, s, 4)) arches.push(c);
+        }
+        const used = new Set<number>();
+        for (const u of want) {
+          let best = -1;
+          for (let i = 0; i < arches.length; i++) if (!used.has(i) && (best < 0 || Math.abs(arches[i] - u) < Math.abs(arches[best] - u))) best = i;
+          if (best < 0) continue;
+          used.add(best);
+          rampAt(arches[best], s * pv, dir, 'escalera', 1.1, 2.3);
+        }
+        for (const [du, ds] of decked) if (ds === s) rampAt(du, s * pv, dir, 'escalera', 1.1, 2.3);
+      } else {
+        for (const u of want) if (!nearDeck(u, s, 6)) rampAt(u, s * pv, dir, 'escalera', 1.1, 2.3);
+        for (const [du, ds] of decked) if (ds === s) rampAt(du, s * pv, dir, 'escalera', 1.1, 2.3);
+        if (hall === 'columnas') {
+          // Dos filas de columnas junto al borde del andén: el centro queda para la vida de la estación
+          const vc = s * (pv - 1.1);
+          const step = 7.2;
+          const cnt = Math.floor((pB - pA - 8) / step);
+          const st0 = (pA + pB) / 2 - ((cnt - 1) * step) / 2;
+          for (let i = 0; i < cnt; i++) {
+            const u = st0 + i * step;
+            if (nearDeck(u, s, 2.6)) continue;
+            if (f.ramps.some((r) => r.kind === 'escalera' && Math.sign(r.v0 + r.v1) === s && Math.abs((r.u0 + r.u1) / 2 - u) < 2.0)) continue;
+            f.columns.push([u, vc]);
+          }
+        }
+      }
+    }
   } else if (plan.kind === 'lateral') {
     const lw = hasDouble ? 9.8 : LANE_W_DOUBLE;
     f.lanes.push({ v: 0, width: lw, u0: laneU0, u1: laneU1, tracks: hasDouble ? [-TRACK_OFFSET, TRACK_OFFSET] : [0] });
@@ -546,7 +639,7 @@ export function buildLayout(): Layout {
     maxX = Math.max(maxX, x + r);
     maxZ = Math.max(maxZ, z + r);
   };
-  for (const f of stations) grow(f.x, f.z, Math.hypot(f.hl, f.hw) + 4);
+  for (const f of stations) grow(f.x, f.z, f.reach + 4);
   for (const n of nodes) grow(n.x, n.z, n.room.r + 8);
   for (const l of links) for (const p of l.pts) grow(p.x, p.z, 14);
   minX = Math.floor(minX - 10);
@@ -638,6 +731,56 @@ export function buildLayout(): Layout {
     else stampBox(n.x, n.z, n.rot, n.room.r, n.room.w ?? n.room.r, 1.6, n.region, n.room.rough ?? 0);
   }
   for (const f of stations) stampBox(f.x, f.z, f.rot, f.hl, f.hw, 0.5, f.region);
+  // Salas anejas, vestíbulos y túneles de escaleras (forman parte de la estación)
+  const localBox = (f: StationFrame, r: LRect, rad: number, rough = 0) => {
+    const c = stationToWorld(f, (r.u0 + r.u1) / 2, (r.v0 + r.v1) / 2);
+    stampBox(c.x, c.z, f.rot, (r.u1 - r.u0) / 2, (r.v1 - r.v0) / 2, rad, f.region, rough);
+  };
+  for (const f of stations) {
+    for (const a of f.annexes) {
+      if (a.shape === 'round') {
+        const c = stationToWorld(f, (a.u0 + a.u1) / 2, (a.v0 + a.v1) / 2);
+        stampCircle(c.x, c.z, Math.min(a.u1 - a.u0, a.v1 - a.v0) / 2, f.region);
+      } else localBox(f, a, 0.4, a.shape === 'cave' ? 0.9 : 0);
+      for (const d of a.doors) {
+        // La puerta entra un poco más en las salas redondas y en las cuevas
+        const deep = a.shape === 'box' ? 0 : 1.4;
+        const r = { ...d };
+        if (a.du > 0) r.u1 += deep;
+        else if (a.du < 0) r.u0 -= deep;
+        else if (a.dv > 0) r.v1 += deep;
+        else r.v0 -= deep;
+        localBox(f, r, 0.15);
+      }
+    }
+  }
+  // Pilones: se tallan en la nave como roca maciza
+  const carveBox = (cx: number, cz: number, rot: number, hl: number, hw: number, r: number) => {
+    const c = Math.cos(rot);
+    const s = Math.sin(rot);
+    const ext = Math.hypot(hl, hw) + 3;
+    const x0 = Math.max(0, Math.floor((cx - ext - minX) / SDF_CELL));
+    const x1 = Math.min(gw - 1, Math.ceil((cx + ext - minX) / SDF_CELL));
+    const z0 = Math.max(0, Math.floor((cz - ext - minZ) / SDF_CELL));
+    const z1 = Math.min(gh - 1, Math.ceil((cz + ext - minZ) / SDF_CELL));
+    for (let j = z0; j <= z1; j++) {
+      for (let i = x0; i <= x1; i++) {
+        const dx = minX + i * SDF_CELL - cx;
+        const dz = minZ + j * SDF_CELL - cz;
+        const qx = Math.abs(dx * c + dz * s) - hl + r;
+        const qz = Math.abs(-dx * s + dz * c) - hw + r;
+        const d = Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0) - r;
+        const k = j * gw + i;
+        if (-d > sdf.data[k]) sdf.data[k] = -d;
+      }
+    }
+  };
+  for (const f of stations) {
+    for (const p of f.pylons) {
+      const c = stationToWorld(f, (p.u0 + p.u1) / 2, (p.v0 + p.v1) / 2);
+      carveBox(c.x, c.z, f.rot, (p.u1 - p.u0) / 2, (p.v1 - p.v0) / 2, 0.22);
+    }
+  }
 
   // Evita ceros exactos (aristas alineadas con la rejilla)
   for (let i = 0; i < sdf.data.length; i++) if (Math.abs(sdf.data[i]) < 1e-4) sdf.data[i] = -1e-4;
@@ -772,7 +915,7 @@ function buildStationTracks(f: StationFrame, links: LinkGeom[]) {
 
 function stampStationHeights(f: StationFrame, nav: NavGrid) {
   const H = Math.round(PLATFORM_H * 10);
-  const ext = Math.hypot(f.hl, f.hw) + 6;
+  const ext = f.reach + 6;
   const x0 = Math.max(0, nav.cx(f.x - ext));
   const x1 = Math.min(nav.w - 1, nav.cx(f.x + ext));
   const z0 = Math.max(0, nav.cz(f.z - ext));
@@ -783,7 +926,16 @@ function stampStationHeights(f: StationFrame, nav: NavGrid) {
       const i = cz * nav.w + cx;
       if (!(nav.flags[i] & F_WALK)) continue;
       const [u, v] = stationToLocal(f, nav.wx(cx), nav.wz(cz));
-      if (Math.abs(u) > f.hl + 1 || Math.abs(v) > f.hw + 1) continue;
+      if (Math.abs(u) > f.hl + 1 || Math.abs(v) > f.hw + 1) {
+        // Fuera de la nave: salas, puertas y escaleras
+        let ha: number | null = null;
+        for (const a of f.annexes) {
+          for (const d of a.doors) if (inRect(d, u, v)) ha = Math.round(a.y0 * 10);
+          if (insideAnnex(a, u, v, 0.9)) ha = Math.round(annexFloorAt(a, u, v) * 10);
+        }
+        if (ha !== null) nav.height[i] = ha;
+        continue;
+      }
       let h = 0;
       for (const p of f.platforms) if (inRect(p, u, v)) h = H;
       for (const p of f.heads) if (inRect(p, u, v)) h = H;
@@ -797,6 +949,8 @@ function stampStationHeights(f: StationFrame, nav: NavGrid) {
         else t = (r.v1 - v) / (r.v1 - r.v0);
         h = Math.round(H * clamp(t, 0, 1));
       }
+      // Umbrales de las puertas que se abren en los muros de la nave
+      for (const a of f.annexes) for (const d of a.doors) if (inRect(d, u, v) && !a.parent) h = Math.round(a.y0 * 10);
       nav.height[i] = h;
     }
   }

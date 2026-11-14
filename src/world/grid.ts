@@ -78,8 +78,8 @@ export interface PathOptions {
 
 export class NavGrid {
   readonly flags: Uint8Array;
-  /** Altura del suelo en decímetros. */
-  readonly height: Int8Array;
+  /** Altura del suelo en decímetros (16 bits: las escaleras suben hasta la superficie). */
+  readonly height: Int16Array;
   /** Versión: cambia cuando se modifican obstáculos (invalida caminos). */
   version = 1;
 
@@ -100,7 +100,7 @@ export class NavGrid {
     readonly h: number,
   ) {
     this.flags = new Uint8Array(w * h);
-    this.height = new Int8Array(w * h);
+    this.height = new Int16Array(w * h);
     const n = NavGrid.MAXW * NavGrid.MAXW;
     this.stamp = new Uint32Array(n);
     this.gScore = new Float32Array(n);
@@ -239,8 +239,8 @@ export class NavGrid {
     const x1 = this.cx(x + ext);
     const z0 = this.cz(z - extZ);
     const z1 = this.cz(z + extZ);
-    let hmin = 127;
-    let hmax = -128;
+    let hmin = 32767;
+    let hmax = -32768;
     for (let cz = z0; cz <= z1; cz++) {
       for (let cx = x0; cx <= x1; cx++) {
         const dx = this.wx(cx) - x;

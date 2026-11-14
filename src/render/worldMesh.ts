@@ -11,6 +11,9 @@ import { stationToLocal, stationToWorld } from '../world/layout';
 import type { LightField } from '../world/lights';
 import { PLATFORM_H } from '../world/plans';
 import { MeshBuilder, lin, mixc, scalec, type RGB } from './geo';
+import { annexCells, annexFloorKind, annexWallKind, annexYAt, buildAnnexStairs, ridgeDepth, type AnnexWallKind } from './annexMesh';
+import { annexAt, stationToLocal as toLocal } from '../world/layout';
+import { annexFloorAt, type Annex } from '../world/arch';
 import { floorMaterial, solidMaterial, worldMaterial } from './materials';
 import type { TextureSet } from './textures';
 
@@ -200,6 +203,30 @@ function buildWallStyles(layout: Layout): WallStyle[] {
   return styles;
 }
 
+/** Muro de una sala aneja según su uso (los de «station» repiten el de la nave). */
+function annexStyle(f: StationFrame, kind: AnnexWallKind, hall: WallStyle): WallStyle {
+  const look = LOOKS[f.id];
+  const H = look.height - 0.4;
+  const dado = scalec(mixc(facLin(f.def.owner), [0.12, 0.12, 0.12], 0.45), 0.9);
+  const P = PLATFORM_H;
+  switch (kind) {
+    case 'tiles':
+      return { mat: 'w_tiles', strips: vertWall(H, 1.0, [0.95, 0.96, 0.93], lin(0x6f8a86), 1.4 + P, lin(0x4f5f5c)), uScale: 1.2, vScale: 1.2, stub: 0.45 };
+    case 'green':
+      return { mat: 'w_tiles', strips: vertWall(H, 1.0, lin(0x6fcfa6), lin(0x2c6a52), 1.3 + P, lin(0xd8c890)), uScale: 1.2, vScale: 1.2, stub: 0.45 };
+    case 'concrete':
+      return { mat: 'w_concrete', strips: vertWall(H, 1.0, [0.82, 0.8, 0.76], scalec(dado, 0.8), 1.2 + P), uScale: 4, vScale: 4, stub: 0.45 };
+    case 'brick':
+      return { mat: 'w_brick', strips: vertWall(H, 1.0, [0.9, 0.82, 0.74], null, 0), uScale: 1, vScale: 1, stub: 0.45 };
+    case 'rock':
+      return { mat: 'w_rock', strips: caveWall(H, [0.9, 0.86, 0.8]), uScale: 3, vScale: 3, stub: 0.5 };
+    case 'tubbing':
+      return { mat: 'w_tubbing', strips: tubeWall(4.4, 2.0 + P, 4.2 + P, 1.0, [0.86, 0.84, 0.8]), uScale: 2, vScale: 2, stub: 0.45 };
+    default:
+      return hall;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Construcción
 // ---------------------------------------------------------------------------
@@ -229,13 +256,15 @@ export async function buildWorldMesh(layout: Layout, field: LightField, tex: Tex
     s_planks: worldMaterial(tex.planks),
     trackbed: worldMaterial(tex.trackBed, { alphaTest: 0.5, polygonOffset: 1 }),
     steel: solidMaterial({ metalness: 0.7, roughness: 0.42, grunge: false }),
+    solid: solidMaterial({ roughness: 0.8 }),
+    floorRoom: floorMaterial(tex.floorTiles, tex.concrete, tex.planks, FLOOR_CLIP),
   };
   const builders = new Map<string, MeshBuilder>();
   const B = (x: number, z: number, mat: string): MeshBuilder => {
     const key = `${Math.floor(x / TILE)},${Math.floor(z / TILE)}|${mat}`;
     let b = builders.get(key);
     if (!b) {
-      b = new MeshBuilder({ uv: mat !== 'steel', wall: mat.startsWith('w_'), splat: mat === 'floor', fx: mat === 'steel' });
+      b = new MeshBuilder({ uv: mat !== 'steel' && mat !== 'solid', wall: mat.startsWith('w_'), splat: mat === 'floor' || mat === 'floorRoom', fx: mat === 'steel' || mat === 'solid' });
       b.ao = 0;
       builders.set(key, b);
     }
@@ -250,6 +279,7 @@ export async function buildWorldMesh(layout: Layout, field: LightField, tex: Tex
   for (const f of layout.stations) buildStationSlabs(layout, f, B);
   await progress('Vías', 0.3);
   buildTracks(layout, B);
+  buildAnnexStairs(layout, (x, z, m) => B(x, z, m === 'steel' ? 'solid' : m));
 
   // Horneado de luz y creación de mallas
   const out = new Float32Array(6);
@@ -349,6 +379,9 @@ function buildFloors(layout: Layout, B: (x: number, z: number, mat: string) => M
     }
     return false;
   };
+  // Salas anejas: suelo propio y a su altura
+  const rooms = annexCells(layout);
+  let cellRoom = -1;
   const vmaps = new Map<MeshBuilder, Map<number, number>>();
   const vert = (b: MeshBuilder, gi: number, gj: number): number => {
     let vm = vmaps.get(b);
@@ -363,7 +396,24 @@ function buildFloors(layout: Layout, B: (x: number, z: number, mat: string) => M
     const ao = lerp(0.5, 1, smoothstep(0, 2.4, -d));
     const tone = 0.86 + noise2(x * 0.045, z * 0.045, 3) * 0.28;
     b.color([tone, tone, tone * 0.98], ao);
-    id = b.v(x, 0, z, 0, 1, 0, x / 3, z / 3);
+    let y = 0;
+    if (cellRoom >= 0) {
+      const r = rooms.list[cellRoom];
+      y = annexYAt(r.f, r.a, x, z);
+      const kind = annexFloorKind(r.a.use);
+      if (kind >= 0) {
+        // Suelo de sala: una sola textura (baldosa, hormigón o tablones) con algo de suciedad en los bordes
+        id = b.v(x, y + 0.004, z, 0, 1, 0, x / 2.4, z / 2.4);
+        const s = b.splat!;
+        s[id * 4] = kind === 0 ? 1 : 0;
+        s[id * 4 + 1] = kind === 1 ? 1 : 0;
+        s[id * 4 + 2] = kind === 2 ? 1 : 0;
+        s[id * 4 + 3] = d;
+        vm.set(k, id);
+        return id;
+      }
+    }
+    id = b.v(x, y, z, 0, 1, 0, x / 3, z / 3);
     // Mezcla de texturas (promedio 3x3 para suavizar los cambios de región)
     let dirt = 0;
     let cnt = 0;
@@ -396,8 +446,9 @@ function buildFloors(layout: Layout, B: (x: number, z: number, mat: string) => M
       if (m > FLOOR_CLIP + 0.1) continue;
       const cx = ox + i + 0.5;
       const cz = oz + j + 0.5;
-      if (covered(cx, cz)) continue;
-      const b = B(cx, cz, 'floor');
+      cellRoom = rooms.cell[k];
+      if (cellRoom < 0 && covered(cx, cz)) continue;
+      const b = B(cx, cz, cellRoom >= 0 && annexFloorKind(rooms.list[cellRoom].a.use) >= 0 ? 'floorRoom' : 'floor');
       const a = vert(b, i, j);
       const b1 = vert(b, i + 1, j);
       const c = vert(b, i + 1, j + 1);
@@ -414,7 +465,46 @@ function buildFloors(layout: Layout, B: (x: number, z: number, mat: string) => M
 function buildWalls(layout: Layout, B: (x: number, z: number, mat: string) => MeshBuilder) {
   const styles = buildWallStyles(layout);
   const { nav } = layout;
+  const roomStyles = new Map<string, WallStyle>();
+  const roomStyle = (f: StationFrame, a: Annex): WallStyle => {
+    const key = f.id + ':' + a.id;
+    let st = roomStyles.get(key);
+    if (!st) roomStyles.set(key, (st = annexStyle(f, annexWallKind(f, a.use), styles[f.region])));
+    return st;
+  };
   for (const c of layout.contours) {
+    // Por vértice: estilo (el de la sala si da a una), base del muro (escaleras) y tope de la tapa
+    const vStyle: WallStyle[] = new Array(c.count);
+    const vBase = new Float32Array(c.count);
+    const vStub = new Float32Array(c.count);
+    const vRidge = new Float32Array(c.count);
+    for (let i = 0; i < c.count; i++) {
+      const x = c.data[i * 4];
+      const z = c.data[i * 4 + 1];
+      const nx = c.data[i * 4 + 2];
+      const nz = c.data[i * 4 + 3];
+      let st = styles[c.owner[i]] ?? styles[1];
+      let base = 0;
+      let stub = -1;
+      const reg = layout.regions[c.owner[i]];
+      if (reg?.kind === 'station') {
+        const f = layout.stationById[reg.ref];
+        const ix = x - nx * 0.9;
+        const iz = z - nz * 0.9;
+        const [u, v] = toLocal(f, ix, iz);
+        const a = Math.abs(u) <= f.hl && Math.abs(v) <= f.hw ? null : annexAt(f, ix, iz, 0.4);
+        if (a) {
+          st = roomStyle(f, a);
+          const fl = annexFloorAt(a, u, v);
+          base = Math.max(0, fl - PLATFORM_H);
+          stub = fl + st.stub;
+        }
+      }
+      vStyle[i] = st;
+      vBase[i] = base;
+      vStub[i] = stub;
+      vRidge[i] = ridgeDepth(layout, x, z, nx, nz, 4);
+    }
     // Longitud acumulada para las UV
     const cum = new Float32Array(c.count + 1);
     for (let i = 0; i < c.count; i++) {
@@ -423,7 +513,7 @@ function buildWalls(layout: Layout, B: (x: number, z: number, mat: string) => Me
     }
     for (let i = 0; i < c.count; i++) {
       const j = (i + 1) % c.count;
-      const st = styles[c.owner[i]] ?? styles[1];
+      const st = vStyle[i];
       const ax = c.data[i * 4];
       const az = c.data[i * 4 + 1];
       const bx = c.data[j * 4];
@@ -450,8 +540,12 @@ function buildWalls(layout: Layout, B: (x: number, z: number, mat: string) => Me
       // Zócalo más alto junto a los andenes
       const hA = nav.heightAt(ax - anx * 1.0, az - anz * 1.0);
       const hB = nav.heightAt(bx - bnx * 1.0, bz - bnz * 1.0);
-      const stubA = st.stub + (hA > 0.6 ? PLATFORM_H : 0);
-      const stubB = st.stub + (hB > 0.6 ? PLATFORM_H : 0);
+      const stubA = vStub[i] >= 0 ? vStub[i] : st.stub + (hA > 0.6 ? PLATFORM_H : 0);
+      const stubB = vStub[j] >= 0 ? vStub[j] : st.stub + (hB > 0.6 ? PLATFORM_H : 0);
+      const baseA = vBase[i];
+      const baseB = vBase[j];
+      const rA = vRidge[i];
+      const rB = vRidge[j];
       const u0 = cum[i] / st.uScale;
       const u1 = cum[i + 1] / st.uScale;
       for (const strip of st.strips) {
@@ -471,9 +565,11 @@ function buildWalls(layout: Layout, B: (x: number, z: number, mat: string) => Me
           const vv = vAcc / st.vScale;
           b.color(p.c);
           b.wallNormal(anx, anz, stubA);
-          const ia = b.v(ax + anx * p.d, p.y, az + anz * p.d, anx * n2x, n2y, anz * n2x, u0, vv);
+          const dA = Math.min(p.d, rA);
+          const dB = Math.min(p.d, rB);
+          const ia = b.v(ax + anx * dA, p.y + baseA, az + anz * dA, anx * n2x, n2y, anz * n2x, u0, vv);
           b.wallNormal(bnx, bnz, stubB);
-          const ib = b.v(bx + bnx * p.d, p.y, bz + bnz * p.d, bnx * n2x, n2y, bnz * n2x, u1, vv);
+          const ib = b.v(bx + bnx * dB, p.y + baseB, bz + bnz * dB, bnx * n2x, n2y, bnz * n2x, u1, vv);
           if (k > 0) b.quadIdx(prevA, prevB, ib, ia);
           prevA = ia;
           prevB = ib;
