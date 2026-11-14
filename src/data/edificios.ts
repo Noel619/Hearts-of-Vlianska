@@ -52,7 +52,8 @@ export interface BuildDef {
   /** Despensa: multiplica lo que tarda en estropearse la comida guardada (menos es mejor). */
   cold?: number;
   /** Arma fija que dispara sola mientras alguien la sirve. */
-  turret?: { range: number; rof: number; spread: number; pierce: number; arc: number; noise: number };
+  /** Nido de tiro: alcance, cadencia, arco de tiro y ruido; dispara las balas del arma montada (`gun`). */
+  turret?: { range: number; rof: number; arc: number; noise: number; gun: string };
 }
 
 const B: BuildDef[] = [
@@ -103,7 +104,7 @@ const B: BuildDef[] = [
     prop: 'nidoMG',
     store: 25,
     skill: 'punteria',
-    turret: { range: 46, rof: 0.13, spread: 0.05, pierce: 34, arc: 2.4, noise: 90 },
+    turret: { range: 46, rof: 0.13, arc: 2.4, noise: 90, gun: 'ametralladora' },
   },
   // --- Luz
   { id: 'bidonJ', name: 'Bidón de fuego', desc: 'Luz y calor sin cables.', cat: 'Luz', hx: 0.42, hz: 0.42, cost: [['chatarra', 4], ['tablones', 2]], work: 12, hp: 60, prop: 'bidonFuego', light: { color: 0xff8a3c, intensity: 1.0, radius: 12, y: 1.15, flicker: 1, kind: 'fire' } },

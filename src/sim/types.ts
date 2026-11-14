@@ -133,6 +133,8 @@ export interface Char {
   bleed: number;
   /** Herida abierta por parte: sangra y no cura hasta que se venda. */
   wound: number[];
+  /** Hemorragia interna (pulmón, hígado, corazón…): una venda no la corta; solo un botiquín, poco a poco, o un médico. */
+  inner?: number;
   hunger: number;
   st: CharState;
   koT: number;

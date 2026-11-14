@@ -655,7 +655,7 @@ export class Game {
         if (c.captive) {
           actions.push({ label: 'Forzar sus grilletes', hint: 'Si os ven, es un delito', run: one({ t: 'liberar', id: c.id }), danger: true });
         } else if (c.st === 'ok') {
-          if (needsCare(c) || totalHpFrac(c) < 0.95) actions.push({ label: 'Curar', run: one({ t: 'curar', id: c.id }) });
+          if (needsCare(c, true) || totalHpFrac(c) < 0.95) actions.push({ label: 'Curar', run: one({ t: 'curar', id: c.id }) });
           actions.push({ label: 'Seguir', run: all({ t: 'seguir', id: c.id }) });
         } else {
           actions.push({ label: 'Primeros auxilios', run: one({ t: 'curar', id: c.id }) });
@@ -666,7 +666,7 @@ export class Game {
         if (hs) actions.push({ label: 'Atacar', run: all({ t: 'atacar', id: c.id }), danger: true });
         else {
           if (c.kind === 'humano') actions.push({ label: c.vendor ? 'Hablar y comerciar' : 'Hablar', run: one({ t: 'hablar', id: c.id }) });
-          if (needsCare(c)) actions.push({ label: 'Curar', run: one({ t: 'curar', id: c.id }) });
+          if (needsCare(c, true)) actions.push({ label: 'Curar', run: one({ t: 'curar', id: c.id }) });
           actions.push({ label: 'Atacar', hint: 'Es un crimen', run: all({ t: 'atacar', id: c.id }), danger: true });
         }
       } else {

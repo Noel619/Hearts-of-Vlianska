@@ -2,7 +2,7 @@
 
 ## 0.5 beta
 
-Llega el primer suceso de la historia: el Asedio de Mertvaya.
+Llega el primer suceso de la historia, el Asedio de Mertvaya, y los tiroteos pasan a regirse por balística real: se deciden en segundos, como en la realidad.
 
 ### Primer suceso: el Asedio de Mertvaya
 
@@ -25,10 +25,41 @@ Llega el primer suceso de la historia: el Asedio de Mertvaya.
 - **Si resiste**, la brigada se retira dejando atrás a sus muertos y el cerco sigue.
 - En una partida guardada antes del suceso, los diez días empiezan a contar al cargarla.
 
+### Balística real
+
+- **Cada arma dispara su cartucho real**, con su masa, su calibre y su velocidad en boca. La energía es ½·m·v².
+
+  | Arma | Cartucho | Energía en boca |
+  |---|---|---|
+  | Makárov y subfusil | 9×18 mm | unos 300 J |
+  | Kaláshnikov | 7,62×39 mm | unos 2.000 J |
+  | Fusil del túnel | 7,62×39 mm, cañón corto | menos que el Kaláshnikov |
+  | Carabina militar | 5,45×39 mm | |
+  | Fusil de cerrojo y ametralladora | 7,62×54 mm R | más de 3.000 J |
+  | Recortada | nueve perdigones de posta | |
+  | Fusil neumático | bolas de rodamiento de 12,7 mm | |
+
+  En las distancias de un túnel el aire frena poco una bala, y algo más la posta.
+- **Dónde entra la bala.** El tirador apunta al pecho. Su error de puntería y la dispersión del arma deciden si acierta y en qué parte del cuerpo: cabeza, pecho, vientre, brazos o piernas. El error crece con poca pericia, con poca luz, si el blanco corre o si al tirador le acaban de dar. Quien va agachado ofrece menos blanco, y una pistola se apunta peor que un fusil al hombro.
+- **Lo que hiere es la energía que la bala suelta dentro**, y eso depende de lo que tarda en frenarse o en voltear. La 5,45 vuelca a los pocos centímetros y lo cede casi todo; la 7,62 blindada atraviesa un brazo sin apenas frenarse. Un balazo de fusil en el cuerpo tumba en el acto; uno de pistola, casi nunca, aunque sangra.
+- **Órganos.**
+  - Cabeza: tres de cada cuatro tiros llegan al cerebro y matan. Una bola de aire comprimido apenas atraviesa el cráneo.
+  - Pecho: el corazón o la aorta desangran en segundos, un tiro en la columna tumba y los pulmones sangran por dentro.
+  - Vientre: sangran por dentro el hígado, el bazo o un vaso grande.
+  - Brazos y piernas: una arteria abierta sangra a chorro y un hueso roto deja el miembro inútil.
+- **Hemorragia interna.** Una venda no la corta: la frena poco a poco un botiquín y la cura un médico. Una arteria de brazo o pierna sí se corta con una venda bien apretada, si se hace a tiempo.
+- **Blindaje de verdad.** Cada pieza absorbe una energía fija por milímetro cuadrado de sección de la bala. Si la bala no lleva bastante, se queda en la pieza, aunque el golpe deja moratones o costillas rotas. Si la atraviesa, sigue con la energía que le queda y deformada.
+  - Una chapa de vagón para la pistola, el subfusil y la posta; los fusiles la atraviesan perdiendo parte de su fuerza.
+  - El casco soviético para una bala de Makárov, pero no una de 7,62.
+  - Las fichas de cada arma dicen su cartucho, su velocidad y su energía; las de cada armadura, qué balas para y cuánta fuerza les quita a las que la atraviesan.
+- **El nido de ametralladora**, montado en su trípode tras los sacos, apunta mucho mejor que a pulso.
+- **Duración de los tiroteos.** Entre dos con fusil a 20 m, un duelo dura ahora un segundo o dos (antes, medio minuto); entre dos escuadras de cuatro, unos siete segundos.
+
 ### Desarrollo
 
 - Las figuras de la historia que mueren, por la causa que sea, ya no reaparecen.
 - Pruebas del suceso (`tests/asedio.test.ts`): el calendario, cada forma de impedirlo, la marcha, la batalla vista y sin ver, la conquista y el rechazo.
+- Pruebas de balística (`tests/balistica.test.ts`): energía de cada cartucho, frenado en el aire, blindaje, letalidad por zona, hemorragias, curas y duración de un tiroteo.
 
 ## 0.4 beta
 

@@ -1,5 +1,6 @@
 // Equilibrio: curva de asaltos, armas de fuego a quemarropa y comercio.
 import { beforeAll, describe, expect, it } from 'vitest';
+import { CARTRIDGES, energy } from '../src/data/balistica';
 import { ITEMS } from '../src/data/items';
 import { addItem, makeHuman } from '../src/sim/chars';
 import { defenders, fighterWeight, RAID_LEADER, RAID_MAX, raidGrade, raidStrength, sellItem, sellPrice } from '../src/sim/events';
@@ -82,9 +83,11 @@ describe('armas de fuego', () => {
   });
 
   it('las armas más caras rinden más', () => {
+    // Julios por segundo que escupe cada arma
     const dps = (id: string) => {
-      const w = ITEMS[id].weapon!;
-      return (w.pierce * (w.ranged!.pellets ?? 1)) / w.ranged!.rof;
+      const r = ITEMS[id].weapon!.ranged!;
+      const k = CARTRIDGES[r.cart];
+      return (energy(k, r.v0) * k.pellets) / r.rof;
     };
     // Nada barato rinde más que el Kaláshnikov, y la carabina es la más certera
     for (const id of ['pistola', 'fusilTunel', 'cerrojo', 'neumatico']) expect(dps(id)).toBeLessThan(dps('ak'));
