@@ -2,7 +2,7 @@
 
 RPG de escuadra y supervivencia en mundo abierto, en 3D, ambientado en el metro de Vlianska.
 
-**Versión 0.2 (beta).** El juego se puede jugar de principio a fin: todos los hilos de la trama se pueden cerrar y la emisora de onda corta lleva al final abierto. Los cambios de cada versión están en [`CHANGELOG.md`](CHANGELOG.md).
+**Versión 0.3 (beta).** El juego se puede jugar de principio a fin: todos los hilos de la trama se pueden cerrar y la emisora de onda corta lleva al final abierto. Los cambios de cada versión están en [`CHANGELOG.md`](CHANGELOG.md).
 
 Enero de 2033. Veinte años después de las bombas, ocho facciones se reparten las dieciséis estaciones del metro. Tú no eres ninguna de ellas: empiezas con un puñado de supervivientes, un cuchillo y sesenta cartuchos, y nadie te espera ni te debe nada. Comercia, rebusca chatarra, caza lo que vive en los túneles, contrata gente en las cantinas y levanta tu propia estación donde nadie mande.
 
@@ -11,6 +11,9 @@ Este repositorio contenía antes *Hearts of Vlianska* (gran estrategia en 2D). E
 ## Qué hay dentro
 
 - **El metro entero, de una pieza.** Las 16 estaciones y los 24 cruces del plano original, unidos por más de nueve kilómetros de túneles que se recorren a pie y sin pantallas de carga. Cada estación es un asentamiento distinto: el Gran Mercado de Tsentral'naya alrededor del edificio quemado del gobierno, los pozos de aire frío de Kholodnogo Vozduha, las escaleras mecánicas de Severnyy hacia la superficie, las granjas de Rassvetnaya, el manantial esmeralda de Izumrudnaya, el trono del Tuerto en Vhlainska… y Tenevskaya, a oscuras, con sus almacenes intactos.
+- **Estaciones con forma.** Naves de tres bóvedas con pilones macizos y viviendas con cortina en los arcos, naves de columnas o de bóveda única, y salas que se abren en sus muros: el hospital de Nadezhdy, la nave de los hornos de Industrialnaya, el caravasar y la capilla de Staraya, la Sala del Consejo y la escuela de Stalingradskaya, los pozos redondos de Kholodnogo Vozduha, las cuevas de la Hermandad, el arsenal blindado de la Junta… Los vestíbulos llevan a túneles de escaleras mecánicas con balaustradas y farolas; unas suben a la superficie y otras acaban en puertas herméticas selladas desde 2013.
+- **Cada estación organizada como un pueblo.** Cuerpo de guardia y almacenes junto a las bocas, barrio de chabolas, tiendas y lavaderos hacia los extremos, la calle del mercado bajo guirnaldas en el centro, con su comedor, su escenario y su escuela; y hasta sesenta vecinos que comen, trabajan, rezan, cenan junto al fuego y duermen de noche.
+- **La superficie.** Por las escaleras de Severnyy, la rampa de carga de Industrialnaya y la escalera del pozo de Kholodnogo Vozduha se sube al barrio norte de Vlianska: la plaza y la estación de ferrocarril, la avenida con sus trolebuses varados y las barricadas de 2013, bloques de viviendas con sus patios, la fábrica, la playa de vías, parques y ruinas, bajo la nieve, con luz de día, noche y sombras. El aire de arriba exige máscara antigás y filtros; a cambio, hay pisos, maleteros, farmacias y cajas militares que nadie ha tocado en veinte años, y fieras anidando en las ruinas.
 - **Escuadra, no héroe.** Hasta doce personas (veinte con estructura de mando) a las que das órdenes en tiempo real con pausa. Veintidós habilidades que suben con el uso (el atletismo, corriendo; la fuerza, también cargando peso); siete partes del cuerpo con su propia salud; heridas que sangran hasta que alguien las venda; inconscientes a los que se puede cargar, curar, saquear o rematar. Se puede cambiar el nombre a cualquiera y despedir a quien sobre.
 - **Gas en los túneles.** Cinco bolsas de gas en los túneles y salas más peligrosos, marcadas en el mapa. Sin máscara quema el pecho, hace toser y delata; quien cae dentro se asfixia si nadie lo saca. La máscara antigás lo deja fuera mientras aguanta el filtro; el respirador, solo el gas ligero. El equipo pesado estorba al sigilo y a la esquiva.
 - **Ocho facciones y sus figuras.** Reputación con cada una, patrullas, caravanas, bandas, recompensas, guardias que recuerdan los robos. Volkov, Bessmertny, Orlova, Morozov, el Tuerto Rybak, Baghdadi, Voronov y Lebedeva están en sus estaciones.
@@ -71,7 +74,7 @@ Siete maneras de bajar al metro, de «Nadie» (tres refugiados en Tsentral'naya)
 src/
   core/     matemáticas y números aleatorios con semilla
   data/     historia, facciones, figuras, mapa, objetos, habilidades, obras y comienzos
-  world/    trazado del metro, rejilla de navegación, luces y decoración (puro, sin render)
+  world/    trazado del metro y de la superficie, arquitectura de las estaciones, rejilla de navegación, luces y decoración (puro, sin render)
   sim/      simulación: personajes, combate, IA, población, obras, comercio y sucesos
   render/   motor gráfico sobre three.js: mallas del mundo, kit de atrezo, personajes
   game/     une simulación y render: vistas, efectos, cámara, selección y órdenes
@@ -107,7 +110,7 @@ npx tsx tools/balance.ts larga 30   # una partida de 30 días con base y asaltos
 
 Con el servidor de desarrollo en marcha:
 
-- `/?view&at=TSE&d=50` recorre el mundo sin partida (`at` admite cualquier estación o cruce; `q=baja|media|alta`).
+- `/?view&at=TSE&d=50` recorre el mundo sin partida (`at` admite cualquier estación o cruce; `q=baja|media|alta`). Con `cam=x,z,dist,giro,inclinación` se va a cualquier punto, también a la superficie (por ejemplo `cam=-790,-860,55,0.6,0.9`), y `hora=` elige la hora de la luz de arriba.
 - `/?view&kit` muestra el catálogo de piezas del atrezo (`kit=tienda,puesto` para elegir cuáles).
 - `/?view&chars` añade una fila de personajes de prueba.
 - `/?view&poses` es un banco de poses: una fila de personajes con cada arma para revisar cómo la sujetan (`poses=listo|apuntar|ataque|marcha|sigilo|varios`, `only=ak,hacha`, `t=0.4` para congelar un golpe).

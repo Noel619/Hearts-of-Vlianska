@@ -1,5 +1,32 @@
 # Cambios
 
+## 0.3 beta
+
+Las estaciones dejan de ser rectángulos genéricos y el metro tiene, por fin, una salida al exterior.
+
+### Estaciones con forma
+
+- **Arquitectura propia en cada estación** (`src/world/arch.ts`): naves de tres bóvedas con pilones macizos (Industrialnaya, Stalingradskaya, Tenevskaya), naves de columnas o de bóveda única, y salas que se abren en los muros con su uso: hospital y quirófano en Nadezhdy, el gobierno de la República del Norte, la nave de los hornos y los talleres de la Fábrica, casamatas y calabozos en Rubezh, los pozos de aire redondos de Kholodnogo Vozduha con sus ventiladores, el caravasar, la aduana y la capilla de Staraya, la Sede de la Unión, la comisaría y correos en Tsentral'naya, la Sala del Consejo, la escuela y la biblioteca de Stalingradskaya, la sala de oración y los baños de Izumrudnaya, la Sala de la Conferencia de Zvezdnaya, las cuevas de la Hermandad en Vhlainska, la galería de las granjas de Rassvetnaya, el arsenal blindado de la Junta…
+- **Vestíbulos y escaleras mecánicas** de verdad: carriles con peldaños, balaustradas de madera y farolas de bronce. Las de Severnyy, la rampa de carga de Industrialnaya y la escalera del pozo de Kholodnogo Vozduha suben a la superficie; las de Nadezhdy, Staraya, Tsentral'naya, Rassvetnaya, Zvezdnaya y Mostovaya acaban en puertas herméticas selladas.
+- Viviendas con cortina en los arcos entre pilones; en las estaciones de andén central, las salas laterales se abren a nivel de vía con una escalera del andén justo enfrente.
+- Cada sala tiene su suelo (baldosa, hormigón o tablones), sus muros (azulejo, ladrillo, hormigón, roca o dovelas), su luz y su mobiliario, con piezas nuevas: torniquetes, taquilla, perchas de máscaras, cortinas, chabolas, pupitres y pizarra, duchas de descontaminación, lavaderos, caja fuerte, bombas de achique, cabrestante, taquillas metálicas, mesas largas, archivadores…
+- Los muros siguen la altura del suelo (las escaleras suben de verdad: la rejilla de alturas pasa a 16 bits) y sus remates se recortan donde se encuentran dos muros (pilones y tabiques sin solapes).
+
+### Estaciones organizadas y llenas de gente
+
+- Cada andén se reparte con sentido: cuerpo de guardia y almacenes junto a las bocas, barrio de viviendas hacia los extremos y la calle del mercado en el centro, con guirnaldas de bombillas sobre el pasillo.
+- Bloques nuevos de vida diaria: chabolas con tendedero, comedor público, escenario con guitarrista y público, lavaderos y escuela de andén. Las estaciones militares, Vhlainska e Izumrudnaya tienen su propio relleno.
+- Hasta sesenta vecinos por estación según su población (antes 26) y rutina de día y de noche: se duerme en camas y viviendas, se cena junto al fuego al caer la tarde y alguno echa la siesta.
+
+### La superficie
+
+- **El barrio norte de Vlianska** (`src/world/surface.ts`): la plaza y la estación de ferrocarril de Severnyy, el Prospekt Severnyy con trolebuses y autobuses varados y las barricadas de 2013, calles en cuadrícula, manzanas de bloques de paneles y de ladrillo con patios, columpios y garajes, la Fábrica con sus chimeneas y su grúa, la playa de vías con vagones congelados, la plaza de las torres de ventilación, parques y ruinas.
+- Edificios con fachadas y ventanas, derrumbes que muerden la silueta y escombros a sus pies; los que tapan la vista entre la cámara y lo que miras se rebajan a una planta.
+- Al subir, el metro se oculta y llegan la luz del día con sombras, la noche, la niebla y la nieve que cae; la cámara sigue la altura del suelo.
+- **El aire de arriba quema**: es una bolsa de gas en toda la superficie (y en la mitad alta de las escaleras). Hace falta máscara antigás con filtros.
+- Botín propio de la superficie (pisos, maleteros, quioscos, farmacias y cajas militares), chatarra, nidos de fieras y la guardia de stalkers en las salidas.
+- Rutas por las calles unidas a las salidas (más caras que los túneles, para que nadie suba sin querer) y el barrio dibujado en el mapa con sus zonas.
+
 ## 0.2 beta
 
 Completa lo que la 0.1 dejaba a medias y equilibra la partida larga con datos medidos (`tools/balance.ts`).

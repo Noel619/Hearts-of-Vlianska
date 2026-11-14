@@ -233,6 +233,8 @@ interface Slot {
 }
 
 const AISLE = 1.4;
+/** Fondo del carril de vía junto a los muros laterales de un andén central. */
+const LANE_DEPTH = 5.2;
 const SIDE_AISLE = 1.9;
 
 function makeBands(st: St): BandX[] {
@@ -286,6 +288,16 @@ function makeBands(st: St): BandX[] {
     cross((r.u0 + r.u1) / 2, Math.sign(r.v0 + r.v1), 1.3);
   }
   for (const d of f.decks) cross((d.u0 + d.u1) / 2, Math.sign(d.v0 + d.v1), 1.8);
+  // Delante de cada puerta de sala que da a un andén lateral, paso libre
+  for (const a of f.annexes) {
+    if (a.parent || (a.wall !== 'L' && a.wall !== 'R') || !a.doors.length || f.plan.kind === 'isla') continue;
+    const s = a.wall === 'R' ? 1 : -1;
+    const d = a.doors[0];
+    for (const b of bands) {
+      if (b.dv !== s || (f.plan.kind === 'doble' && b.kind !== 'side')) continue;
+      b.gaps.push([d.u0 - 1.2, d.u1 + 1.2]);
+    }
+  }
   return bands;
 }
 
@@ -633,7 +645,7 @@ const SPECIALS: Record<string, (st: St) => void> = {
     let k = 0;
     for (let u = h.u0 + 1.6; u < h.u1 - 1.2; u += 2.1) {
       for (let v = -11.2; v <= 11.3; v += 3.7) {
-        if (Math.abs(v) < 0.2 && k % 2) continue;
+        if (Math.abs(v) < 6.5) continue;
         if (st.putX('bancal', u, v, 0, 1)) {
           if (k % 3 === 0) st.put('lamparaSodio', u, v, 1, 0);
           if (k % 5 === 2) st.spot('trabajo', u + 1.0, v, -1, 0, 'cultivo');
@@ -741,6 +753,20 @@ function tenevskaya(st: St) {
 
 export function decorateStation(ctx: DecorCtx, f: StationFrame) {
   const st = new St(ctx, f);
+  // Pasillos de acceso a las salas desde la nave
+  for (const a of f.annexes) {
+    if (a.parent) continue;
+    for (const d of a.doors) {
+      if (a.wall === 'L' || a.wall === 'R') {
+        const s = a.wall === 'R' ? 1 : -1;
+        const deep = f.plan.kind === 'isla' ? LANE_DEPTH : 4.5;
+        st.reserve(d.u0 - 0.5, d.u1 + 0.5, s * (f.hw - deep), s * f.hw);
+      } else {
+        const s = a.wall === 'B' ? 1 : -1;
+        st.reserve(s * (f.hl - 7), s * f.hl, d.v0 - 0.5, d.v1 + 0.5);
+      }
+    }
+  }
   const bands = makeBands(st);
   structure(st);
   ports(st);

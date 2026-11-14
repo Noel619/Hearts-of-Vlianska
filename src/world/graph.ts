@@ -175,7 +175,7 @@ export class RouteGraph {
         cand.sort((p, q) => p[0] - q[0]);
         let made = 0;
         for (const [d, j] of cand) {
-          if (made >= 7) break;
+          if (made >= 9) break;
           const b = this.nodes[j];
           if (nav.walkLine(a.x, a.z, b.x, b.z, true)) {
             this.connect(local[i], j);
@@ -199,12 +199,62 @@ export class RouteGraph {
           }
         }
       }
+      // Que ningún rincón de la estación quede aislado: une componentes por el par más cercano con camino
+      this.joinComponents(local);
     }
     this.buildSurface();
     const n = this.nodes.length;
     this.dist = new Float32Array(n);
     this.prev = new Int32Array(n);
     this.done = new Uint8Array(n);
+  }
+
+  /** Une las componentes de un conjunto de puntos (las aristas ya creadas cuentan) hasta dejar una sola. */
+  private joinComponents(ids: number[]) {
+    if (ids.length < 2) return;
+    const set = new Set(ids);
+    for (let guard = 0; guard < 24; guard++) {
+      // Componentes dentro del conjunto
+      const comp = new Map<number, number>();
+      let nc = 0;
+      for (const id of ids) {
+        if (comp.has(id)) continue;
+        const stack = [id];
+        comp.set(id, nc);
+        while (stack.length) {
+          const c = stack.pop()!;
+          for (const e of this.adj[c]) {
+            if (!set.has(e.to) || comp.has(e.to)) continue;
+            comp.set(e.to, nc);
+            stack.push(e.to);
+          }
+        }
+        nc++;
+      }
+      if (nc <= 1) return;
+      // Pares candidatos entre la componente 0 y el resto, de más cerca a más lejos
+      const a0 = ids.filter((i) => comp.get(i) === 0);
+      const rest = ids.filter((i) => comp.get(i) !== 0);
+      const pairs: [number, number, number][] = [];
+      for (const a of a0) {
+        for (const b of rest) {
+          const d = Math.hypot(this.nodes[a].x - this.nodes[b].x, this.nodes[a].z - this.nodes[b].z);
+          if (d < 45) pairs.push([d, a, b]);
+        }
+      }
+      pairs.sort((p, q) => p[0] - q[0]);
+      let joined = false;
+      for (const [, a, b] of pairs.slice(0, 40)) {
+        const A = this.nodes[a];
+        const B = this.nodes[b];
+        if (this.nav.walkLine(A.x, A.z, B.x, B.z, true) || this.nav.findPath(A.x, A.z, B.x, B.z, { gates: true, margin: 14, maxNodes: 12000 })) {
+          this.connect(a, b);
+          joined = true;
+          break;
+        }
+      }
+      if (!joined) return;
+    }
   }
 
   /** La superficie: una malla de puntos por calles y patios, unida a las salidas del metro. */
