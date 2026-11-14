@@ -3,6 +3,8 @@
 // nada), así que sirve igual para partidas nuevas y cargadas.
 
 import { BUILDS } from '../data/edificios';
+import { SCENARIO_BY_ID } from '../data/escenarios';
+import { ITEMS } from '../data/items';
 import { hasTech } from './build';
 import { countItem } from './chars';
 import { isCivilDefense } from './events';
@@ -35,18 +37,77 @@ export interface Step {
   done: boolean;
 }
 
-/** Los primeros pasos de una escuadra recién llegada. */
+interface StepDef {
+  title: string;
+  hint: string;
+  done: (sim: Sim) => boolean;
+}
+
+/** Algún almacén blindado de Tenevskaya abierto. */
+const vaultOpen = (sim: Sim) => sim.state.containers.some((c) => isCivilDefense(c) && c.opened);
+const carrying = (sim: Sim, id: string) => sim.players.some((q) => countItem(q, id) > 0);
+/** Camas en la base principal. */
+function bedsAtBase(sim: Sim): number {
+  const main = playerBases(sim)[0];
+  if (!main) return 0;
+  return sim.state.buildings.filter((b) => main.ids.includes(b.id) && b.prog >= 1).reduce((a, b) => a + (BUILDS[b.def].beds ?? 0), 0);
+}
+/** Balas que lleva la escuadra, contando las de los cargadores. */
+function bullets(sim: Sim): number {
+  let n = 0;
+  for (const c of sim.players) {
+    n += countItem(c, 'balas');
+    const w = c.eq.arma;
+    if (w && ITEMS[w.id]?.weapon?.ranged?.ammo === 'balas') n += w.mag ?? 0;
+  }
+  return n;
+}
+
+/**
+ * Catálogo de primeros pasos. Cada comienzo elige los suyos y en qué orden
+ * (data/escenarios.ts): los que enseñan a jugar y los de su propia historia.
+ */
+export const STEPS: Record<string, StepDef> = {
+  hablar: { title: 'Habla con alguien', hint: 'Selecciona a uno de los tuyos y haz clic derecho sobre cualquier persona: «Hablar».', done: (sim) => !!sim.state.flags.tHablar },
+  comercio: { title: 'Compra o vende algo', hint: 'Los comerciantes están en los puestos de los andenes. Habla con uno y elige «Comerciar».', done: (sim) => !!sim.state.flags.tComercio || sim.state.stats.earned > 0 },
+  chatarra: { title: 'Desguaza chatarra', hint: 'Clic derecho sobre un montón de chatarra de los túneles: «Desguazar». Es la materia prima de todo.', done: (sim) => !!sim.state.flags.tChatarra },
+  construir: { title: 'Levanta tu primera obra', hint: 'Pulsa {tecla:construir}, elige un jergón o una hoguera y colócalo en un túnel o cruce sin dueño.', done: (sim) => sim.state.stats.built > 0 || sim.state.buildings.some((b) => b.prog >= 1) },
+  estudio: { title: 'Investiga una técnica', hint: 'Construye una mesa de estudio, elige qué estudiar ({tecla:investigar}) y pon a alguien a trabajar en ella.', done: (sim) => sim.state.tech.done.length > 0 },
+  recluta: { title: 'Contrata a alguien', hint: 'En las cantinas hay gente que se alquila: habla con ellos y paga lo que piden.', done: (sim) => !!sim.state.flags.tRecluta },
+  // La saca de correo
+  tse: { title: 'Vuelve a Tsentral’naya', hint: 'Por el Túnel del Comercio, que sale de Staraya hacia el oeste. Si te pierdes, abre el mapa ({tecla:mapa}).', done: (sim) => !!sim.state.stations.TSE?.visited },
+  carta: { title: 'Encuentra la carta', hint: 'En Correos del metro, en Tsentral’naya, un cajón tiene cerradura. Forzarlo no es delito, pero coger lo que guarda delante de un guardia sí.', done: (sim) => carrying(sim, 'cartaBessmertny') || !!sim.state.flags.cartaEntregada },
+  cartaDecidida: { title: 'Decide qué hacer con la carta', hint: 'Llévasela a Volkov, devuélvesela a Bessmertny, véndesela a Orlova… o quémala (pantalla de hilos, {tecla:hilos}).', done: (sim) => !!sim.state.flags.cartaEntregada },
+  // Colonos de Tenevskaya
+  campamento: { title: 'Levantad el campamento', hint: 'Pulsa {tecla:construir} y levantad aquí mismo, en el cruce, un jergón para cada uno.', done: (sim) => sim.players.length > 0 && bedsAtBase(sim) >= sim.players.length },
+  comidaPropia: { title: 'Comida propia', hint: 'Un bancal de hongos o un corral: así no dependéis de lo que traigan las caravanas.', done: (sim) => sim.state.buildings.some((b) => b.prog >= 1 && !!BUILDS[b.def].farm) },
+  tenevskaya: { title: 'Entrad en Tenevskaya', hint: 'La estación fantasma, al este del Nudo de Tenevskaya. Llevad luz y no os separéis.', done: (sim) => !!sim.state.stations.TEN?.visited },
+  almacen: { title: 'Abrid un almacén de la defensa civil', hint: 'Las puertas blindadas de Tenevskaya: forzarlas cuesta (Cerraduras); con la llave de la defensa civil se abren solas.', done: vaultOpen },
+  // Stalkers del Norte
+  superficie: { title: 'Subid a la superficie', hint: 'Por las escaleras mecánicas de Severnyy, con la máscara puesta. El respirador no basta arriba: quien lo lleve, que no se quede mucho.', done: (sim) => !!sim.state.flags.tSuperficie },
+  botinArriba: { title: 'Bajad algo de arriba', hint: 'Registrad maleteros helados, quioscos, farmacias y pisos del Barrio del Norte: lo que haya lleva veinte años esperando.', done: (sim) => !!sim.state.flags.tBotinSuperficie },
+  skrebun: { title: 'Cazad un skrebun', hint: 'Anidan arriba, entre los bloques y en la playa de vías, y en la Galería del Refugio, pasado Nadezhdy.', done: (sim) => !!sim.state.flags.tSkrebun },
+  glandula: { title: 'Vended una glándula en Nadezhdy', hint: 'Registrad al skrebun muerto y llevad su glándula a Ubezhishche Nadezhdy: allí la pagan mejor que en ningún sitio.', done: (sim) => !!sim.state.flags.tGlandula },
+  // Hijos de Vhlainska
+  llave: { title: 'Coged la llave del botín', hint: 'El botín de la Hermandad está junto a la guarida del Tuerto. Que nadie os vea coger nada: en sigilo ({tecla:sigilo}), a oscuras y cuando no miren.', done: (sim) => carrying(sim, 'llaveAlmacen') || vaultOpen(sim) },
+  // Veteranos del sur
+  comer: { title: 'Comed algo', hint: 'Comprad comida en los puestos (Hablar y comerciar) o pedídsela a quien la tenga. Con hambre no se pelea ni se trabaja.', done: (sim) => sim.players.length > 0 && sim.players.every((c) => c.st === 'muerto' || c.hunger >= 45) },
+  curar: { title: 'Que os curen', hint: 'Cualquier médico os atiende por unos cartuchos (Hablar). El mejor hospital del metro está en Ubezhishche Nadezhdy.', done: (sim) => !!sim.state.flags.tCurado },
+  municion: { title: 'Conseguid munición', hint: 'Se compra en los puestos de armas (en Industrialnaya, más barata) o se fabrica en una prensa de munición.', done: (sim) => bullets(sim) >= 80 },
+  // El hambre de la Esmeralda
+  muro: { title: 'Encontrad la galería tapiada', hint: 'Sale de Izumrudnaya hacia el este: un túnel viejo que acaba en un tabique de ladrillo.', done: (sim) => !!sim.state.flags.tMuro },
+  tabique: { title: 'Echad abajo el primer tabique', hint: 'Clic derecho sobre el muro: «Derribar el muro». Con el pico se va más deprisa.', done: (sim) => sim.state.nodes.filter((n) => n.kind === 'muro').length < 2 || !!sim.state.flags.galeriaOlvidada },
+  galeria: { title: 'Abrid la Galería Olvidada', hint: 'Cruzadla deprisa: el aire viciado quema el pecho. Al fondo, otro tabique da a Mostovaya.', done: (sim) => !!sim.state.flags.galeriaOlvidada },
+  contrabando: { title: 'Traed comida a Izumrudnaya', hint: 'Vended comida en la estación, tres raciones o más: romper el embargo os hará queridos.', done: (sim) => (sim.state.flags.contrabando ?? 0) >= 3 },
+};
+
+/** Primeros pasos genéricos (partidas sin comienzo conocido). */
+const DEFAULT_STEPS = ['hablar', 'comercio', 'chatarra', 'construir', 'estudio', 'recluta'];
+
+/** Los primeros pasos de la escuadra: los de su comienzo, en su orden. */
 export function firstSteps(sim: Sim): Step[] {
-  const st = sim.state;
-  const f = st.flags;
-  return [
-    { id: 'hablar', title: 'Habla con alguien', hint: 'Selecciona a uno de los tuyos y haz clic derecho sobre cualquier persona: «Hablar».', done: !!f.tHablar },
-    { id: 'comercio', title: 'Compra o vende algo', hint: 'Los comerciantes están en los puestos de los andenes. Habla con uno y elige «Comerciar».', done: !!f.tComercio || st.stats.earned > 0 },
-    { id: 'chatarra', title: 'Desguaza chatarra', hint: 'Clic derecho sobre un montón de chatarra de los túneles: «Desguazar». Es la materia prima de todo.', done: !!f.tChatarra },
-    { id: 'construir', title: 'Levanta tu primera obra', hint: 'Pulsa {tecla:construir}, elige un jergón o una hoguera y colócalo en un túnel o cruce sin dueño.', done: st.stats.built > 0 || st.buildings.some((b) => b.prog >= 1) },
-    { id: 'estudio', title: 'Investiga una técnica', hint: 'Construye una mesa de estudio, elige qué estudiar ({tecla:investigar}) y pon a alguien a trabajar en ella.', done: st.tech.done.length > 0 },
-    { id: 'recluta', title: 'Contrata a alguien', hint: 'En las cantinas hay gente que se alquila: habla con ellos y paga lo que piden.', done: !!f.tRecluta },
-  ];
+  const ids = SCENARIO_BY_ID[sim.state.scenario]?.steps ?? DEFAULT_STEPS;
+  return ids.filter((id) => STEPS[id]).map((id) => ({ id, title: STEPS[id].title, hint: STEPS[id].hint, done: STEPS[id].done(sim) }));
 }
 
 /** Los hilos de la historia y el estado de la base. */
@@ -122,7 +183,7 @@ export function storyThreads(sim: Sim): Thread[] {
       sprite: 'pico',
       state: walls < 2 ? 'en curso' : 'pendiente',
       text: 'Desde 2029 ni una caravana entra en Mertvaya. Los viejos hablan de una galería soviética tapiada que une Mostovaya con Izumrudnaya.',
-      hint: walls < 2 ? 'Un tabique ha caído. Queda otro al fondo de la galería.' : 'Busca los tabiques de ladrillo en los túneles auxiliares de Mostovaya y échalos abajo (clic derecho: «Derribar el muro»). Un pico ayuda.',
+      hint: walls < 2 ? 'Un tabique ha caído. Queda otro al fondo de la galería.' : 'La galería sale de Izumrudnaya hacia el este y llega a Mostovaya, tapiada por los dos extremos. Echad abajo los tabiques (clic derecho: «Derribar el muro»); un pico ayuda. Dentro, el aire está viciado.',
       progress: walls < 2 ? 0.5 : 0,
     });
 

@@ -103,6 +103,7 @@ export function kill(sim: Sim, c: Char, by?: Char, cause?: string): void {
   if (c.player) sim.log(`${c.name} ha muerto${cause ? ' ' + cause : ''}.`, 'malo');
   else if (by?.player) {
     sim.state.stats.kills++;
+    if (c.kind === 'skrebun') sim.state.flags.tSkrebun = 1;
     if (c.unique) sim.onUniqueDeath(c, by);
   }
   // Los caídos en una estación quedan anotados para no reaparecer enseguida

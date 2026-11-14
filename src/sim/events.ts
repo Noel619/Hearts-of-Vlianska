@@ -9,7 +9,7 @@ import type { FactionId, SideId } from '../data/tipos';
 import { F_DYN, F_TALL } from '../world/grid';
 import { insideStation, linkPointAt } from '../world/layout';
 import { COLLAPSE_NODES } from '../world/plans';
-import { addItem, countItem, gainXp, gradeStacks, hirePrice, invWeight, maxCarry, NAME_MAX, takeItem } from './chars';
+import { addItem, countItem, gainXp, gradeStacks, hirePrice, invWeight, isFlesh, maxCarry, NAME_MAX, takeItem } from './chars';
 import { hasTech } from './build';
 import { clearDest, faceTo, setDest } from './move';
 import { newSquad, placePos } from './population';
@@ -17,6 +17,7 @@ import { launchRaid, playerBases, punishPending, stepVisitArrival, stepVisits, t
 import { stepBountyHunters } from './derrota';
 import type { Sim } from './sim';
 import type { Char, Container, Order, ResNode, Shop } from './types';
+import { placeId } from './world';
 
 // ---------------------------------------------------------------------------
 // Siembra del mundo (partida nueva)
@@ -314,7 +315,8 @@ const SPECIAL: Record<string, Partial<Record<Cat | 'todo', number>> & Record<str
   STL: { comida: 0.85, tela: 0.85 },
   VYS: { medicina: 1.4, municion: 1.25 },
   MER: { comida: 3.2, medicina: 1.7, agua: 0.4 },
-  UBE: { medicina: 0.62 },
+  // El Hospital de la Esperanza paga bien las glándulas de skrebun
+  UBE: { medicina: 0.62, glandula: 1.9 },
   SEV: { componentes: 0.7, libros: 0.75, filtros: 0.7, planos: 0.8 },
   VHL: { arma: 0.88, samogon: 0.7 },
   CHE: { comida: 1.9, recurso: 1.5, arma: 0.82, medicina: 1.5 },
@@ -432,6 +434,7 @@ export function sellItem(sim: Sim, seller: Char, vendor: Char, index: number, n:
   sim.state.money += price;
   sim.state.stats.earned += price;
   sim.state.flags.tComercio = 1;
+  if (s.id === 'glandula' && vendor.ai.place === 'UBE') sim.state.flags.tGlandula = 1;
   addItem({ inv: shop.stock }, s.id, n, { ...stackState(s), hot: undefined });
   s.n -= n;
   if (s.n <= 0) seller.inv.splice(index, 1);
@@ -699,14 +702,27 @@ export function stepWorldEvents(sim: Sim, dt: number) {
       }
     }
   }
-  // Peaje de los bandidos
+  // Peaje de los bandidos (a los hermanos de la Hermandad no se les cobra: se les saluda)
   for (const sq of st.squads) {
     if (sq.kind !== 'banda' || !sq.mat || sq.talked || sq.angry) continue;
     if (sim.playerDist(sq.x, sq.z) < 15 && st.rep.VHL > -50) {
       sq.talked = true;
       const lead = sq.roster.map((m) => (m.id ? sim.char(m.id) : null)).find((c) => c && c.st === 'ok');
-      if (lead) sim.emit({ t: 'mundo', k: 'peaje', id: lead.id });
+      if (!lead) continue;
+      if (sim.brothers()) {
+        if (sim.playerDist(placePos(sim, 'VHL')?.x ?? 0, placePos(sim, 'VHL')?.z ?? 0) > 80) sim.emit({ t: 'habla', id: lead.id, text: '¡Hermanos! Buena caza.' });
+      } else sim.emit({ t: 'mundo', k: 'peaje', id: lead.id });
     }
+  }
+  // Marcas de los primeros pasos: subir a la superficie y dar con la galería tapiada
+  if ((sim.tick & 7) === 0) {
+    for (const c of sim.players) {
+      if (c.st !== 'ok' || c.captive) continue;
+      if (!st.flags.tSuperficie && placeId(sim.world, c.x, c.z).startsWith('SUP')) st.flags.tSuperficie = 1;
+      if (!st.flags.tMuro && st.nodes.some((n) => n.kind === 'muro' && Math.hypot(n.x - c.x, n.z - c.z) < 10)) st.flags.tMuro = 1;
+    }
+    // Curados: nadie con heridas abiertas ni partes del cuerpo muy dañadas
+    if (!st.flags.tCurado && sim.players.length && sim.players.every((c) => c.st === 'muerto' || (c.wound.every((w) => w < 0.8) && c.hp.every((h, i) => !isFlesh(c, i) || h >= c.hpMax[i] * 0.9)))) st.flags.tCurado = 1;
   }
   // El peaje de Staraya: se cobra al entrar, una vez por jornada
   if (st.stations.STA?.owner === 'STA' && staTollState(sim) === 'libre' && st.rep.STA < 15 && st.rep.STA > -40) {

@@ -14,7 +14,8 @@ import { Icon, ItemSprite, SpriteSheet } from './sprites/Sprite';
 import { ITEMS } from '../data/items';
 import { ContextMenuView, InspectPanel, LogView, Overlays, SelectionPanel, SquadBar, ThingPanel, TopBar, Tracker, type Screen } from './Hud';
 import { PanelView } from './Panels';
-import { Briefing, BuildScreen, CodexScreen, Epilogue, FactionsScreen, GameOver, HelpBody, LogScreen, MapScreen, PauseScreen, ResearchScreen, SettingsBody, ThreadsScreen } from './Screens';
+import { Briefing, BuildScreen, CodexScreen, Epilogue, FactionsScreen, GameOver, HelpBody, LogScreen, MapScreen, PauseScreen, ResearchScreen, SettingsBody, StandingList, ThreadsScreen } from './Screens';
+import { standingLines } from '../sim/situacion';
 import { VERSION_LABEL } from '../version';
 import { Win } from './core';
 
@@ -375,7 +376,7 @@ function NewGame({ back, start }: { back: () => void; start: (scenario: string, 
           <div className="cols">
             <div className="col">
               {SCENARIOS.map((s) => (
-                <button key={s.id} className={'card scen' + (s.id === sel ? ' sel' : '')} onClick={() => setSel(s.id)}>
+                <button key={s.id} className={'card scen' + (s.id === sel ? ' sel' : '')} onClick={() => setSel(s.id)} title={s.tagline}>
                   <h4>{s.name}</h4>
                   <small className="row">
                     <Icon id="escuadra" size={12} /> {s.members.length} · <span className={'diff d-' + s.difficulty.replace(/\s/g, '')}>{s.difficulty}</span>
@@ -383,11 +384,16 @@ function NewGame({ back, start }: { back: () => void; start: (scenario: string, 
                 </button>
               ))}
             </div>
-            <div className="col lore" style={{ gap: 4 }}>
+            <div className="col lore scen-detail" style={{ gap: 4 }}>
+              <div className="scen-text">
               <h3 style={{ marginTop: 0 }}>{sc.name}</h3>
+              <p className="tagline">{sc.tagline}</p>
               {sc.intro.map((p, i) => (
                 <p key={i}>{p}</p>
               ))}
+              <StandingList lines={standingLines({ rep: sc.rep ?? {}, bounty: sc.bounty, flags: sc.flags, hungry: sc.hungry, hurt: sc.hurt })} />
+              </div>
+              <div className="scen-form">
               <div className="startkit">
                 <span className="chip" title="Cartuchos para empezar">
                   <ItemSprite id="cartucho" size={22} />
@@ -404,7 +410,6 @@ function NewGame({ back, start }: { back: () => void; start: (scenario: string, 
                   </span>
                 ))}
               </div>
-              <div className="sp" />
               <label className="dim">Nombre de tu gente</label>
               <input className="txt" value={name} maxLength={28} onChange={(e) => setName(e.target.value)} />
               <label className="dim" style={{ marginTop: 6 }}>
@@ -424,6 +429,7 @@ function NewGame({ back, start }: { back: () => void; start: (scenario: string, 
                 <button className="btn" onClick={back}>
                   Volver
                 </button>
+              </div>
               </div>
             </div>
           </div>

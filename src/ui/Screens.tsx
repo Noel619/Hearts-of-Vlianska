@@ -19,6 +19,7 @@ import { SCENARIOS } from '../data/escenarios';
 import { burnLetter } from '../sim/events';
 import { epilogue, firstSteps, storyThreads } from '../sim/hilos';
 import { HUNT_MIN, PRISONS } from '../sim/derrota';
+import { standingLines, type StandingLine } from '../sim/situacion';
 import { VERSION, VERSION_LABEL } from '../version';
 import { actionLabel, KEY_ACTIONS, KEY_GROUPS, keyFor, keyLabel, keyName, keyProblem, keysCustomized, onKeysChange, resetKeys, setKey, withKeys } from '../game/keys';
 import { Bar, Cost, Face, ItemIcon, Money, Win, hex, useGame, useTick } from './core';
@@ -560,11 +561,33 @@ export function ThreadsScreen({ close }: { close: () => void }) {
   );
 }
 
+/** Quién os quiere, quién no y quién paga por vuestras cabezas. */
+export function StandingList({ lines }: { lines: StandingLine[] }) {
+  return (
+    <ul className="standing">
+      {lines.map((l, i) => (
+        <li key={i} className={l.kind}>
+          <Icon id={l.kind === 'bueno' ? 'check' : l.kind === 'malo' ? 'aviso' : 'diario'} size={12} />
+          <span>{l.text}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** Informe al bajar al metro: quiénes sois, qué lleváis y cómo se manda. */
 export function Briefing({ scenario, close }: { scenario: string; close: () => void }) {
   const g = useGame();
   const sim = g.sim;
   const sc = SCENARIOS.find((s) => s.id === scenario);
+  // Cómo están las cosas, sacado de la propia partida
+  const standing = standingLines({
+    rep: sim.state.rep,
+    bounty: sim.state.bounty,
+    flags: sim.state.flags,
+    hungry: sim.players.some((c) => c.hunger < 40) && !sim.players.some((c) => c.inv.some((s) => (ITEMS[s.id]?.food ?? 0) > 0 && s.id !== 'samogon')),
+    hurt: sim.players.some((c) => c.hp.some((h, i) => h < c.hpMax[i] * 0.75)),
+  });
   return (
     <Win title={sc?.name ?? 'Bajada al metro'} icon="play" width={720} cls="brief">
       {(sc?.intro ?? []).map((p, i) => (
@@ -572,6 +595,7 @@ export function Briefing({ scenario, close }: { scenario: string; close: () => v
           {p}
         </p>
       ))}
+      <StandingList lines={standing} />
       <div className="crew">
         {sim.players.map((c) => (
           <div key={c.id} className="crewman">

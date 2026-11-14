@@ -81,6 +81,7 @@ export function transfer(sim: Sim, from: Holder, to: Holder, index: number, n: n
       });
       if (seen) {
         sim.log('¡Te han visto robar!', 'malo');
+        if (victimSide === 'VHL') sim.betrayHermandad('Os han visto robar a la Hermandad.');
         const witness = from.kind === 'char' ? from.c : null;
         if (witness) sim.crime(witness, 25);
         else {
@@ -92,6 +93,8 @@ export function transfer(sim: Sim, from: Holder, to: Holder, index: number, n: n
       }
     }
   }
+  // Lo primero que se baja de la superficie
+  if (from.kind === 'cont' && from.c.place.startsWith('SUP') && to.kind === 'char' && to.c.player) sim.state.flags.tBotinSuperficie = 1;
   s.n -= n;
   if (s.n <= 0) src.splice(index, 1);
   addItem({ inv: holderItems(to) }, s.id, n, { ...stackState(s), hot });
@@ -240,6 +243,7 @@ export function payHeal(sim: Sim, around: Char): string | null {
     if (o.st === 'ko') o.koT = 0;
   });
   sim.log(`Los médicos atienden a tu gente (${cost} cartuchos).`, 'bueno');
+  sim.state.flags.tCurado = 1;
   return null;
 }
 

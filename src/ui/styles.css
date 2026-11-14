@@ -1837,6 +1837,34 @@ input.txt.nameedit.bad {
   display: grid;
   grid-template-columns: 290px 1fr;
   gap: 18px;
+  height: min(650px, calc(100vh - 150px));
+}
+.newgame .cols > .col {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+/* El texto del comienzo se desplaza; el nombre, el color y los botones quedan a la vista */
+.newgame .scen-detail {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.newgame .scen-text {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: #5a5e66 #0c0d0f;
+}
+.newgame .scen-form {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
 }
 .card.scen {
   flex-direction: column;
@@ -1858,6 +1886,39 @@ input.txt.nameedit.bad {
   flex-wrap: wrap;
   gap: 5px;
   margin: 2px 0 6px;
+}
+/* Cómo están las cosas al empezar: quién os quiere y quién no */
+.standing {
+  list-style: none;
+  margin: 4px 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 13px;
+}
+.standing li {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  color: var(--dim);
+}
+.standing li svg {
+  flex: none;
+  position: relative;
+  top: 1px;
+}
+.standing li.bueno svg {
+  color: var(--good);
+}
+.standing li.malo svg {
+  color: var(--bad);
+}
+.lore .tagline,
+.tagline {
+  color: var(--amber2);
+  font-style: italic;
+  margin: -2px 0 6px;
 }
 .startkit .chip {
   font-size: 13px;

@@ -184,7 +184,22 @@ export class Sim {
   }
 
   /** El jugador ha agredido o robado a alguien de un bando pacífico. */
+  /** ¿Os tiene la Hermandad por suyos? (comienzo «Hijos de Vhlainska», mientras no la traicionéis) */
+  brothers(): boolean {
+    return !!this.state.flags.hermano && this.state.rep.VHL >= 10;
+  }
+
+  /** Os han pillado traicionando a la Hermandad: ya no sois hermanos, sois traidores. */
+  betrayHermandad(why: string) {
+    if (!this.state.flags.hermano) return;
+    delete this.state.flags.hermano;
+    this.state.rep.VHL = Math.min(this.state.rep.VHL, -60);
+    this.log(`${why} Ya no sois hermanos: para la Hermandad sois traidores, y la Hermandad no perdona.`, 'malo');
+    for (const c of this.state.chars) if (c.side === 'VHL' && c.st === 'ok' && c.kind === 'humano') c.ai.sub = 'enfadado';
+  }
+
   crime(victim: Char, severity: number) {
+    if (victim.side === 'VHL') this.betrayHermandad(`Habéis atacado a ${victim.name}, de la Hermandad.`);
     const f = victim.side as string;
     if (!FACTION_IDS.includes(f as FactionId)) {
       if (victim.side === 'LIB') victim.ai.sub = 'enfadado';

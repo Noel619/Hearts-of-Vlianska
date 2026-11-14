@@ -1,10 +1,12 @@
 // Creación de una partida nueva a partir de un comienzo.
 
-import { SCENARIO_BY_ID } from '../data/escenarios';
+import { SCENARIO_BY_ID, type Scenario } from '../data/escenarios';
 import { FILTER_LIFE } from '../data/gases';
 import { ITEMS } from '../data/items';
 import type { FactionId } from '../data/tipos';
 import { SKILL_IDS } from '../data/skills';
+import { annexCentre, annexPoint, LANDING } from '../world/arch';
+import { stationToWorld } from '../world/layout';
 import { addItem, makeHuman } from './chars';
 import { seedWorld } from './events';
 import { placePos, seedPacks } from './population';
@@ -16,6 +18,36 @@ export interface NewGameOptions {
   seed?: number;
   name?: string;
   color?: number;
+}
+
+/**
+ * Dónde empieza la escuadra y hacia dónde mira: en la sala o el rincón que
+ * dice su comienzo (al pie de las escaleras, si la sala sube a la superficie),
+ * o en un extremo del andén.
+ */
+export function startPoint(sim: Sim, sc: Scenario): { x: number; z: number; face: number } {
+  const world = sim.world;
+  const f = world.layout.stationById[sc.place];
+  const at = placePos(sim, sc.place) ?? { x: 0, z: 0 };
+  const toward = (x: number, z: number, tx: number, tz: number) => ({ x, z, face: Math.atan2(tz - z, tx - x) });
+  if (f && sc.at && 'annex' in sc.at) {
+    const id = sc.at.annex;
+    const a = f.annexes.find((q) => q.id === id);
+    if (a) {
+      // Las salas que suben a la superficie se toman al pie de la escalera, mirando a la estación
+      const [u, v] = a.exit || a.rise > 0.5 ? annexPoint(a, LANDING * 0.55, 0) : annexCentre(a);
+      const p = stationToWorld(f, u, v);
+      return toward(p.x, p.z, f.x, f.z);
+    }
+  }
+  if (sc.at && 'spot' in sc.at) {
+    const { spot, data } = sc.at;
+    const sp = world.decor.spots.find((s) => s.place === sc.place && s.kind === spot && (data === undefined || s.data === data));
+    if (sp) return toward(sp.x, sp.z, f ? f.x : at.x, f ? f.z : at.z);
+  }
+  // En las estaciones, en un extremo del andén
+  if (f) return toward(f.x + f.ax * (f.hl * 0.35), f.z + f.az * (f.hl * 0.35), f.x, f.z);
+  return { x: at.x, z: at.z, face: 0 };
 }
 
 export function newGame(world: World, opts: NewGameOptions): Sim {
@@ -31,13 +63,18 @@ export function newGame(world: World, opts: NewGameOptions): Sim {
   seedWorld(sim);
   seedPacks(sim);
   for (const [f, v] of Object.entries(sc.rep ?? {})) state.rep[f as FactionId] = v as number;
+  for (const [f, v] of Object.entries(sc.bounty ?? {})) state.bounty[f as FactionId] = v as number;
+  Object.assign(state.flags, sc.flags ?? {});
   const at = placePos(sim, sc.place) ?? { x: 0, z: 0 };
-  const f = world.layout.stationById[sc.place];
-  // En las estaciones se empieza en un extremo del andén
-  const start = f ? { x: f.x + f.ax * (f.hl * 0.35), z: f.z + f.az * (f.hl * 0.35) } : at;
+  const start = startPoint(sim, sc);
+  // Ya estáis aquí: la llegada no se anuncia como si acabarais de entrar
+  if (state.stations[sc.place]) state.stations[sc.place].visited = true;
   sc.members.forEach((m, i) => {
-    const a = (i / sc.members.length) * Math.PI * 2;
-    const p = world.nav.nearestPassable(start.x + Math.cos(a) * 1.4, start.z + Math.sin(a) * 1.4, 8) ?? world.nav.nearestPassable(at.x, at.z, 12) ?? at;
+    // En fila, uno al lado del otro, mirando hacia donde mira el sitio
+    const off = (i - (sc.members.length - 1) / 2) * 0.95;
+    const px = start.x - Math.sin(start.face) * off;
+    const pz = start.z + Math.cos(start.face) * off;
+    const p = world.nav.nearestPassable(px, pz, 3) ?? world.nav.nearestPassable(start.x, start.z, 8) ?? world.nav.nearestPassable(at.x, at.z, 12) ?? at;
     const c = makeHuman(sim, m.from, m.role, p.x, p.z);
     c.side = 'JUG';
     c.player = true;
@@ -45,17 +82,17 @@ export function newGame(world: World, opts: NewGameOptions): Sim {
     c.ai.mode = 'jugador';
     c.stance = 'defensivo';
     c.money = 0;
-    c.face = a;
+    c.face = start.face;
     // El equipo lo fija el comienzo, no el arquetipo
     c.inv = [];
     c.eq = {};
     if (m.weapon) {
       const r = ITEMS[m.weapon].weapon?.ranged;
-      c.eq.arma = { id: m.weapon, n: 1, ...(r ? { mag: r.mag } : {}) };
+      c.eq.arma = { id: m.weapon, n: 1, ...(r ? { mag: Math.min(r.mag, m.mag ?? r.mag) } : {}) };
     }
     for (const a2 of m.armor ?? []) {
       const def = ITEMS[a2];
-      if (def?.armor) c.eq[def.armor.slot] = def.armor.filter ? { id: a2, n: 1, fil: FILTER_LIFE } : { id: a2, n: 1 };
+      if (def?.armor) c.eq[def.armor.slot] = def.armor.filter ? { id: a2, n: 1, fil: FILTER_LIFE * (m.filter ?? 1) } : { id: a2, n: 1 };
     }
     for (const [id, n] of m.items ?? []) addItem(c, id, n);
     if (c.inv.some((s) => s.id === 'linterna')) c.lamp = true;

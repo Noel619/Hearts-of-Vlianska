@@ -5,7 +5,7 @@ import { canDismiss, dismiss, hire, renameChar } from '../src/sim/events';
 import { newGame } from '../src/sim/newGame';
 import { deserialize, serialize } from '../src/sim/save';
 import type { Sim } from '../src/sim/sim';
-import { buildWorld, type World } from '../src/sim/world';
+import { buildWorld, placeId, type World } from '../src/sim/world';
 
 let world: World;
 beforeAll(() => {
@@ -65,12 +65,11 @@ describe('despedir', () => {
     expect(sim.state.drops.length).toBe(drops + 1);
     const d = sim.state.drops[sim.state.drops.length - 1];
     for (const [id, k] of carried) expect(countItem({ inv: d.items }, id)).toBe(k);
-    // Se marcha hacia una estación habitada
+    // Pasa a vivir en la estación habitada más cercana (si ya está en ella, se busca un sitio libre)
     expect(sim.state.stations[c.ai.place]?.owner).toBeTruthy();
-    const x0 = c.x;
-    const z0 = c.z;
     run(sim, 10);
-    expect(Math.hypot(c.x - x0, c.z - z0)).toBeGreaterThan(3);
+    expect(c.ai.mode).toBe('residente');
+    expect(placeId(world, c.x, c.z) === c.ai.place || c.hasDest).toBe(true);
     // Y vuelve si se le paga
     sim.state.money = 5000;
     expect(hire(sim, c)).toBeNull();
