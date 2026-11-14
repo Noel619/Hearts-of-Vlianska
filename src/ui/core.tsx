@@ -290,6 +290,7 @@ export function statusIcon(c: Char): string {
       case 'seguir':
         return 'seguir';
       case 'atacar':
+      case 'rematar':
         return 'atacar';
       case 'curar':
         return 'curar';
@@ -332,7 +333,12 @@ export function statusText(g: Game, c: Char): string {
     const by = g.sim.char(c.carriedBy);
     if (by && !by.player) return by.kind === 'humano' ? `Se lo lleva ${by.name}` : '¡Lo arrastra una fiera!';
   }
-  if (c.st === 'ko') return c.gas > 0.05 ? 'Inconsciente en el gas' : c.bleed > 0.05 ? 'Inconsciente y sangrando' : 'Inconsciente';
+  if (c.st === 'ko') {
+    // Lo peor primero: que se lo coman o que lo rematen
+    const q = g.sim.state.chars.find((o) => o.st === 'ok' && (o.order?.t === 'devorar' || o.order?.t === 'rematar') && o.order.id === c.id && Math.hypot(o.x - c.x, o.z - c.z) < 2.5);
+    if (q) return q.order!.t === 'devorar' ? '¡Se lo están comiendo!' : '¡Lo están rematando!';
+    return c.gas > 0.05 ? 'Inconsciente en el gas' : c.bleed > 0.05 ? 'Inconsciente y sangrando' : 'Inconsciente';
+  }
   if (c.carriedBy) return 'A hombros';
   if (c.gas > 0.05) return c.target ? 'Lucha en el gas' : 'Respira gas';
   if (c.target && (c.atkT >= 0 || c.aim > 0)) return 'Luchando';
@@ -344,6 +350,8 @@ export function statusText(g: Game, c: Char): string {
         return 'En marcha';
       case 'atacar':
         return 'Atacando';
+      case 'rematar':
+        return 'Rematando';
       case 'curar':
         return 'Curando';
       case 'construir':

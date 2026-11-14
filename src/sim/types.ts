@@ -38,6 +38,8 @@ export type OrderType =
   // Fieras: arrastrar a un caído al nido y devorarlo
   | 'arrastrar'
   | 'devorar'
+  // Golpe de gracia a un caído (lo da cualquiera: tu gente o la del metro)
+  | 'rematar'
   // Forzar los grilletes o la jaula de un compañero preso
   | 'liberar';
 
@@ -215,6 +217,8 @@ export interface Char {
   fled?: { by: SideId; until: number };
   /** Escuadra propia del jugador a la que pertenece (0 = la principal). */
   team?: number;
+  /** Segundos que llevan las fieras comiéndoselo mientras está caído (al llegar a su límite, muere). */
+  eaten?: number;
 }
 
 export type SquadKind = 'jugador' | 'patrulla' | 'caravana' | 'banda' | 'jauria' | 'asalto' | 'cobradores' | 'refugiados' | 'stalkers' | 'cazadores' | 'visita';
@@ -271,6 +275,8 @@ export interface Squad {
   loot?: Stack[];
   /** Ya se van con lo que han venido a buscar. */
   done?: boolean;
+  /** Bajas que les ha hecho tu gente: quien ha perdido a uno de los suyos no hace prisioneros. */
+  blood?: number;
 }
 
 export interface Building {
@@ -401,8 +407,8 @@ export interface SimState {
 
 /** Sucesos efímeros para el render, el sonido y la interfaz. */
 export type SimEvent =
-  | { t: 'tiro'; id: number; x: number; z: number; tx: number; tz: number; hit: boolean; w: string }
-  | { t: 'golpe'; id: number; target: number; part: number; dmg: number; kind: 'corte' | 'contusion' | 'bala'; block: boolean }
+  | { t: 'tiro'; id: number; x: number; z: number; tx: number; tz: number; hit: boolean; w: string; low?: boolean }
+  | { t: 'golpe'; id: number; target: number; part: number; dmg: number; kind: 'corte' | 'contusion' | 'bala'; block: boolean; low?: boolean }
   | { t: 'ataque'; id: number }
   | { t: 'ko'; id: number }
   | { t: 'muerte'; id: number }

@@ -115,6 +115,8 @@ export function kill(sim: Sim, c: Char, by?: Char, cause?: string): void {
   if (sq) {
     const m = sq.roster.find((r) => r.id === c.id);
     if (m) m.dead = true;
+    // Sangre por sangre: quien pierde a uno de los suyos a vuestras manos no lo olvida
+    if (by?.player && c.kind === 'humano') sq.blood = (sq.blood ?? 0) + 1;
   }
   // Las criaturas sueltan carne y trofeos
   if (c.kind !== 'humano') {
@@ -279,6 +281,7 @@ export function stepNeeds(sim: Sim, c: Char, dt: number): void {
       c.st = 'ok';
       c.pose = 'normal';
       c.sinceHit = 9;
+      delete c.eaten;
       if (c.player) sim.log(`${c.name} recupera el conocimiento.`, 'bueno');
     }
   }
@@ -451,7 +454,8 @@ function hasAmmo(c: Char): boolean {
  */
 export function stepFight(sim: Sim, c: Char, dt: number): boolean {
   const t = c.target ? sim.char(c.target) : null;
-  if (!t || t.st === 'muerto' || (t.st === 'ko' && c.order?.data !== 'rematar') || t.carriedBy) {
+  // A un caído no se le pelea: se le remata (orden aparte)
+  if (!t || t.st !== 'ok' || t.carriedBy) {
     c.target = 0;
     c.aim = 0;
     if (c.atkT >= 0) c.atkT = -1;

@@ -10,8 +10,9 @@ import { manningTurret, stepJobs, workOnBuilding } from './build';
 import { cleanAirNear } from './gas';
 import { freeSpot, occupySpot, pickSpot } from './population';
 import { isCivilDefense, workNode } from './events';
-import { defeatIntent, downedNear, runDefeatOrder, stepCaptive } from './derrota';
+import { defeatIntent, downedNear, dragAnchor, runDefeatOrder, stepCaptive } from './derrota';
 import { raidIdle, runRaidOrder } from './asaltos';
+import { runRemate } from './remate';
 import type { Sim } from './sim';
 import type { Char, Order } from './types';
 
@@ -26,10 +27,11 @@ export function stepChar(sim: Sim, c: Char, dt: number): void {
       if (o) o.carry = 0;
       c.pose = c.st === 'ok' ? 'normal' : 'ko';
     } else if (o.kind !== 'humano') {
-      // Una fiera lo arrastra por el suelo, cogido con los dientes
-      c.x = o.x + Math.cos(o.face) * 0.8;
-      c.z = o.z + Math.sin(o.face) * 0.8;
-      c.face = o.face + Math.PI;
+      // Una fiera lo arrastra por el suelo, cogido de un tobillo
+      const a = dragAnchor(o);
+      c.x = a.x;
+      c.z = a.z;
+      c.face = a.face;
       c.pose = 'ko';
       c.speed = 0;
       return;
@@ -94,8 +96,8 @@ export function stepChar(sim: Sim, c: Char, dt: number): void {
       stepMove(sim, c, dt);
       return;
     }
-  } else if (c.atkT >= 0 && c.order?.t !== 'romper' && c.order?.t !== 'devorar') {
-    // (Romper una obra o morder a un caído llevan su propio golpe)
+  } else if (c.atkT >= 0 && c.order?.t !== 'romper' && c.order?.t !== 'devorar' && c.order?.t !== 'rematar') {
+    // (Romper una obra, morder a un caído o rematarlo llevan su propio golpe)
     c.atkT = -1;
   }
   c.aim = 0;
@@ -145,9 +147,10 @@ function think(sim: Sim, c: Char): void {
       if (e) c.target = e.id;
       return;
     }
-    // No interrumpe órdenes de movimiento salvo en modo agresivo
+    // No interrumpe órdenes de movimiento ni un remate salvo en modo agresivo
+    // (si le atacan, se defiende igual)
     const e = findEnemy(sim, c, c.stance === 'agresivo' ? 40 : 11);
-    if (e && (c.stance === 'agresivo' || !c.order || c.order.t !== 'mover')) c.target = e.id;
+    if (e && (c.stance === 'agresivo' || !c.order || (c.order.t !== 'mover' && c.order.t !== 'rematar'))) c.target = e.id;
     return;
   }
   if (PEACEFUL.has(c.role)) {
@@ -217,24 +220,34 @@ function done(c: Char) {
 function runOrder(sim: Sim, c: Char, o: Order, dt: number): void {
   switch (o.t) {
     case 'mover': {
-      if (!c.hasDest) {
-        const d = Math.hypot((o.x ?? c.x) - c.x, (o.z ?? c.z) - c.z);
-        if (d < 0.6) done(c);
-        else setDest(c, o.x!, o.z!, 0.4, o.data !== 'andar');
+      // El destino en marcha tiene que ser el de la orden: si se le da otra
+      // mientras camina (o el combate lo desvió), corrige el rumbo al momento
+      // en lugar de terminar el camino viejo y dar la orden nueva por cumplida.
+      const ox = o.x ?? c.x;
+      const oz = o.z ?? c.z;
+      if (!c.hasDest || Math.hypot(c.destX - ox, c.destZ - oz) > 0.3) {
+        if (Math.hypot(ox - c.x, oz - c.z) < 0.6) {
+          clearDest(c);
+          done(c);
+        } else setDest(c, ox, oz, 0.4, o.data !== 'andar');
       }
       break;
     }
     case 'atacar': {
+      if (o.data === 'rematar') {
+        // Orden de partidas antiguas: ahora el remate es una orden propia
+        c.order = { t: 'rematar', id: o.id };
+        break;
+      }
       const t = sim.char(o.id!);
-      if (!t || t.st === 'muerto' || (t.st === 'ko' && o.data !== 'rematar')) {
+      if (!t || t.st !== 'ok') {
         done(c);
         c.target = 0;
-      } else {
-        if (t.st === 'ko' && o.data === 'rematar') {
-          // Rematar a un caído
-          if (approach(sim, c, t.x, t.z, 1.4)) c.target = t.id;
-        } else c.target = t.id;
-      }
+      } else c.target = t.id;
+      break;
+    }
+    case 'rematar': {
+      if (!runRemate(sim, c, o, dt)) done(c);
       break;
     }
     case 'seguir': {
@@ -435,7 +448,7 @@ function preyOnDowned(sim: Sim, c: Char): boolean {
     const o = defeatIntent(sim, c, v);
     if (!o) return false;
     // Uno se encarga; los demás vigilan
-    if (sim.state.chars.some((q) => q !== c && q.order && (q.order.t === 'capturar' || q.order.t === 'despojar') && q.order.id === v.id)) return false;
+    if (sim.state.chars.some((q) => q !== c && q.order && (q.order.t === 'capturar' || q.order.t === 'despojar' || q.order.t === 'rematar') && q.order.id === v.id)) return false;
     freeSpot(sim, c);
     c.order = o;
     return true;

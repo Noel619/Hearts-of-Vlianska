@@ -12,9 +12,10 @@ import { ITEMS, stackState, unitValue, type EquipSlot, type Stack } from '../dat
 import type { FactionId, SideId } from '../data/tipos';
 import { stationToLocal, stationToWorld } from '../world/layout';
 import { addItem, countItem, gainXp, hirePrice, takeItem } from './chars';
-import { damage, hostile, knockOut, sightRange } from './combat';
+import { damage, hostile, kill, knockOut, sightRange } from './combat';
 import { clearDest, faceTo, setDest, stepMove } from './move';
 import { newSquad, placePos } from './population';
+import { beastName } from './remate';
 import type { Sim } from './sim';
 import type { Captive, Char, Container, Order, Squad } from './types';
 
@@ -464,6 +465,10 @@ export function defeatIntent(sim: Sim, c: Char, v: Char): Order | null {
   if (!v.player || v.st !== 'ko' || v.captive || v.carriedBy) return null;
   if (!hostile(sim, c, v) && c.ai.sub !== 'enfadado') return null;
   const sq = c.squad ? sim.squad(c.squad) : null;
+  // Sangre por sangre: quien ha perdido a uno de los suyos a vuestras manos no hace
+  // prisioneros (salvo los cazarrecompensas, que cobran por traeros vivos, y los
+  // hambrientos, que solo quieren comer)
+  if (sq && (sq.blood ?? 0) > 0 && sq.kind !== 'cazadores' && sq.kind !== 'visita' && sq.raid !== 'hambre') return { t: 'rematar', id: v.id };
   if (sq?.kind === 'cazadores' && sq.hunt) {
     return prisonOf(sim, sq.hunt) && freeCell(sim, PRISONS[sq.hunt]!.place) ? { t: 'capturar', id: v.id, data: sq.hunt } : { t: 'despojar', id: v.id, data: 'multa:' + sq.hunt };
   }
@@ -540,6 +545,28 @@ function strip(sim: Sim, c: Char, v: Char): string[] {
   }
   return took;
 }
+
+/**
+ * Dónde queda el cuerpo que arrastra una fiera. Los cuadrúpedos lo agarran de
+ * un tobillo con los dientes y tiran hacia atrás, así que el cuerpo va delante
+ * de su hocico con los pies hacia ella; los bípedos lo llevan de la mano a su
+ * espalda mientras andan. El dibujo ajusta el agarre exacto.
+ */
+export function dragAnchor(beast: Char): { x: number; z: number; face: number } {
+  const def = CREATURES[beast.kind];
+  const s = def?.scale ?? 1;
+  const quad = def?.shape !== 'bipedo';
+  const d = quad ? 0.78 * s + 0.78 : -(0.42 * s + 0.6);
+  return { x: beast.x + Math.cos(beast.face) * d, z: beast.z + Math.sin(beast.face) * d, face: quad ? beast.face + Math.PI : beast.face };
+}
+
+/** ¿Tira hacia atrás? (cuadrúpedo arrastrando a alguien con los dientes) */
+export function dragsBackward(c: Char): boolean {
+  return c.carry !== 0 && c.kind !== 'humano' && CREATURES[c.kind]?.shape === 'cuadrupedo';
+}
+
+/** Segundos que tarda una fiera en acabar con quien se está comiendo (varias, antes). */
+export const DEVOUR_TIME: Record<string, number> = { rata: 6, skrebun: 3.5, glubinnik: 2.6, sheptun: 2.4 };
 
 /** Órdenes de la derrota: despojar, capturar, liberar y las de las fieras. Devuelve false cuando acaba. */
 export function runDefeatOrder(sim: Sim, c: Char, o: Order, dt: number): boolean {
@@ -680,10 +707,14 @@ export function runDefeatOrder(sim: Sim, c: Char, o: Order, dt: number): boolean
       }
       const there = reach(sim, c, o, c.ai.homeX, c.ai.homeZ, 2.2, false);
       if (there || (o.fail ?? 0) > 5) {
+        // En el nido lo suelta donde está y empieza a comer
+        const a = dragAnchor(c);
+        const p = sim.world.nav.nearestPassable(a.x, a.z, 2, true) ?? a;
         c.carry = 0;
         v.carriedBy = 0;
-        v.x = c.x + Math.cos(c.face) * 0.9;
-        v.z = c.z + Math.sin(c.face) * 0.9;
+        v.x = p.x;
+        v.z = p.z;
+        v.face = a.face;
         v.pose = 'ko';
         c.order = { t: 'devorar', id: v.id };
         return true;
@@ -691,28 +722,40 @@ export function runDefeatOrder(sim: Sim, c: Char, o: Order, dt: number): boolean
       return true;
     }
     case 'devorar': {
+      // Se lo come: muerde y desgarra sin parar. No hay pelea que valga: si nadie
+      // se la quita de encima, en unos segundos lo mata (y varias, antes)
       const v = sim.char(o.id!);
       if (!v || v.st !== 'ko' || v.captive || v.carriedBy) {
         c.atkT = -1;
         return false;
       }
-      if (!reach(sim, c, o, v.x, v.z, (CREATURES[c.kind]?.reach ?? 1) + 0.3)) return true;
+      const def = CREATURES[c.kind];
+      if (!reach(sim, c, o, v.x, v.z, (def?.reach ?? 1) + 0.3)) return true;
       faceTo(c, v.x, v.z, dt);
+      c.work = 'comer';
       if (c.atkT >= 0) {
-        c.atkT += dt / 0.7;
+        c.atkT += dt / 0.6;
         if (c.atkT >= 1) c.atkT = -1;
       }
+      v.eaten = (v.eaten ?? 0) + dt;
       c.workT += dt;
-      if (c.workT < 2.6) return true;
-      c.workT = 0;
-      c.atkT = 0;
-      const def = CREATURES[c.kind];
-      // Muerden sobre todo brazos y piernas
-      const part = sim.rng.chance(0.7) ? 3 + Math.floor(sim.rng.next() * 4) : 1 + Math.floor(sim.rng.next() * 2);
-      const dmg = damage(sim, v, part, ((def?.cut ?? 6) + (def?.blunt ?? 4)) * 0.5 * sim.rng.range(0.7, 1.2), 'corte', c);
-      sim.emit({ t: 'golpe', id: c.id, target: v.id, part, dmg, kind: 'corte', block: false });
-      if (v.player && (sim.tick + v.id) % 7 === 0) sim.emit({ t: 'flota', x: v.x, z: v.z, text: '¡Se lo están comiendo!', color: '#ff7a6a' });
-      return true;
+      if (c.workT >= 0.9 + ((c.id * 0.37) % 0.4)) {
+        c.workT = 0;
+        c.atkT = 0;
+        // Va a lo blando: el vientre, el pecho y el cuello; a veces, un brazo o una pierna
+        const r = sim.rng.next();
+        const part = r < 0.35 ? 2 : r < 0.62 ? 1 : r < 0.78 ? 0 : 3 + Math.floor(sim.rng.next() * 4);
+        const dmg = damage(sim, v, part, ((def?.cut ?? 6) + (def?.blunt ?? 4)) * 0.8 * sim.rng.range(0.8, 1.2), 'corte', c);
+        sim.emit({ t: 'golpe', id: c.id, target: v.id, part, dmg, kind: 'corte', block: false, low: true });
+        if (v.player && (sim.tick + v.id) % 3 === 0) sim.emit({ t: 'flota', x: v.x, z: v.z, text: '¡Se lo están comiendo!', color: '#ff7a6a' });
+      }
+      if (v.st === 'ko' && v.eaten >= (DEVOUR_TIME[c.kind] ?? 4)) {
+        const female = v.look?.female ?? false;
+        kill(sim, v, c, `${female ? 'devorada' : 'devorado'} por ${beastName(c)}`);
+        c.atkT = -1;
+        c.work = 'nada';
+      }
+      return v.st === 'ko';
     }
     default:
       return false;

@@ -18,8 +18,11 @@ import { buildSurfaceMesh } from '../render/surfaceMesh';
 import { Sky } from '../render/sky';
 import { building, buildingLight, canPlace, placeBuilding, restoreBuildings } from '../sim/build';
 import { applyNodes, isCivilDefense } from '../sim/events';
+import { giveOrder } from '../sim/actions';
+import { isMurder, remateHow } from '../sim/remate';
 import { totalHpFrac } from '../sim/chars';
 import { hostile, needsCare } from '../sim/combat';
+import { clearDest } from '../sim/move';
 import { newGame, type NewGameOptions } from '../sim/newGame';
 import { Sim } from '../sim/sim';
 import type { Char, JobType, Order, SimState } from '../sim/types';
@@ -305,18 +308,19 @@ export class Game {
     for (const e of ev) {
       switch (e.t) {
         case 'tiro': {
-          const y = nav.heightAt(e.x, e.z) + 1.4;
+          // A quemarropa contra un caído, la boca del arma apunta al suelo
+          const y = nav.heightAt(e.x, e.z) + (e.low ? 1.15 : 1.4);
           const c = sim.char(e.id);
-          const ox = c ? Math.cos(c.face) * 0.6 : 0;
-          const oz = c ? Math.sin(c.face) * 0.6 : 0;
-          this.fx.shot(e.x + ox, y, e.z + oz, e.tx, nav.heightAt(e.tx, e.tz) + 1.2, e.tz);
+          const ox = c ? Math.cos(c.face) * (e.low ? 0.75 : 0.6) : 0;
+          const oz = c ? Math.sin(c.face) * (e.low ? 0.75 : 0.6) : 0;
+          this.fx.shot(e.x + ox, y, e.z + oz, e.tx, nav.heightAt(e.tx, e.tz) + (e.low ? 0.15 : 1.2), e.tz);
           this.onSound?.(e.w === 'neumatico' ? 'tiroAire' : e.w === 'escopeta' ? 'escopeta' : 'tiro', e.x, e.z);
           break;
         }
         case 'golpe': {
           const t = sim.char(e.target);
           if (!t) break;
-          const y = nav.heightAt(t.x, t.z) + (e.part === 0 ? 1.6 : e.part <= 2 ? 1.2 : e.part <= 4 ? 1.1 : 0.5);
+          const y = nav.heightAt(t.x, t.z) + (e.low ? 0.22 : e.part === 0 ? 1.6 : e.part <= 2 ? 1.2 : e.part <= 4 ? 1.1 : 0.5);
           if (e.block) {
             this.fx.sparks(t.x, y, t.z, 6);
             this.onSound?.('parada', t.x, t.z);
@@ -590,14 +594,7 @@ export class Game {
   }
 
   private give(c: Char, o: Order, queue: boolean) {
-    if (queue && (c.order || c.queue.length)) c.queue.push(o);
-    else {
-      c.order = o;
-      c.queue.length = 0;
-      c.workT = 0;
-      if (o.t !== 'atacar') c.target = 0;
-      if (c.ai.sub === 'cama') c.ai.sub = '';
-    }
+    giveOrder(c, o, queue);
   }
 
   orderAll(o: Order, queue = false) {
@@ -669,7 +666,19 @@ export class Game {
         if (c.st === 'ko') {
           actions.push({ label: 'Primeros auxilios', run: one({ t: 'curar', id: c.id }) });
           actions.push({ label: 'Cargar a hombros', run: one({ t: 'cargar', id: c.id }) });
-          actions.push({ label: 'Rematar', run: all({ t: 'atacar', id: c.id, data: 'rematar' }), danger: true });
+          // Lo remata quien esté más cerca; los demás siguen a lo suyo
+          const near = sq.slice().sort((a, b) => Math.hypot(a.x - c.x, a.z - c.z) - Math.hypot(b.x - c.x, b.z - c.z))[0];
+          const how = remateHow(near);
+          const hint = isMurder(sim, near, c) ? 'Es un asesinato' : how === 'tiro' ? 'Un tiro de gracia' : how === 'ahogar' ? 'Sin arma: con las manos' : 'Un golpe de gracia';
+          actions.push({
+            label: 'Rematar',
+            hint,
+            run: () => {
+              this.give(near, { t: 'rematar', id: c.id }, queue);
+              this.bump();
+            },
+            danger: true,
+          });
         } else if (c.kind === 'humano') actions.push({ label: 'Cargar el cuerpo', run: one({ t: 'cargar', id: c.id }) });
       }
     } else if (t.kind === 'build') {
@@ -1025,7 +1034,7 @@ export class Game {
           c.order = null;
           c.queue.length = 0;
           c.target = 0;
-          c.hasDest = false;
+          clearDest(c);
         }
         this.bump();
         break;

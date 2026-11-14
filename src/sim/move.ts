@@ -4,6 +4,7 @@
 import { angleDiff } from '../core/math';
 import { F_SLOW, F_WATER } from '../world/grid';
 import { moveSpeed, trainMove } from './chars';
+import { dragsBackward } from './derrota';
 import type { Sim } from './sim';
 import type { Char } from './types';
 
@@ -148,19 +149,25 @@ export function stepMove(sim: Sim, c: Char, dt: number): boolean {
   let vmax = moveSpeed(c, c.run);
   if (flags & F_WATER) vmax *= 0.62;
   if (flags & F_SLOW) vmax *= 0.4;
+  // Una fiera que arrastra a alguien con los dientes tira hacia atrás, a tirones:
+  // afianza las patas, da un tirón y vuelve a afianzarlas
+  const back = dragsBackward(c);
+  if (back) vmax *= 0.3 + 1.35 * Math.max(0, Math.sin((sim.state.time * 0.85 + c.id * 0.31) * Math.PI * 2));
   // Frena al llegar
   const remain = c.route ? 99 : dist;
-  const want = Math.min(vmax, Math.max(0.6, remain * 3.2));
+  const want = Math.min(vmax, Math.max(back ? 0 : 0.6, remain * 3.2));
   c.speed += (want - c.speed) * Math.min(1, dt * 7);
-  // Gira hacia el punto; avanza más despacio si va muy cruzado
+  // Gira hacia el punto (de espaldas, si tira hacia atrás); avanza más despacio si va muy cruzado
+  const head = back ? c.face + Math.PI : c.face;
   const wantFace = Math.atan2(tz - c.z, tx - c.x);
-  const dAng = angleDiff(c.face, wantFace);
-  const turn = (c.kind === 'humano' ? 9 : 7) * dt;
-  c.face += Math.abs(dAng) < turn ? dAng : Math.sign(dAng) * turn;
+  const dAng = angleDiff(head, wantFace);
+  const turn = (c.kind === 'humano' ? 9 : 7) * dt * (back ? 0.45 : 1);
+  const newHead = head + (Math.abs(dAng) < turn ? dAng : Math.sign(dAng) * turn);
+  c.face = back ? newHead - Math.PI : newHead;
   const align = Math.max(0.15, Math.cos(Math.min(1.5, Math.abs(dAng))));
   const stepLen = Math.min(td, c.speed * align * dt);
-  const mx = Math.cos(c.face) * stepLen;
-  const mz = Math.sin(c.face) * stepLen;
+  const mx = Math.cos(newHead) * stepLen;
+  const mz = Math.sin(newHead) * stepLen;
   // Si está bien alineado va directo al punto para no orbitar
   const ux = (tx - c.x) / (td || 1);
   const uz = (tz - c.z) / (td || 1);

@@ -8,10 +8,29 @@ import type { FactionId } from '../data/tipos';
 import { hasTech, stored, storeWeight } from './build';
 import { filterMask, fitFilter } from './gas';
 import { addItem, countItem, equip, fitProsthesis, invWeight, isFlesh, maxCarry, sneakMult, takeItem, unequip, wieldProblem } from './chars';
+import { clearDest } from './move';
 import type { Sim } from './sim';
-import type { Building, Char, Container } from './types';
+import type { Building, Char, Container, Order } from './types';
 
 export type Holder = { kind: 'char'; c: Char } | { kind: 'cont'; c: Container } | { kind: 'build'; b: Building };
+
+/**
+ * Da una orden a alguien de tu escuadra. Con `queue` se encadena detrás de las
+ * que ya tiene; si no, la orden nueva sustituye del todo a la anterior, también
+ * el camino que llevaba, para que cambie de rumbo en el acto.
+ */
+export function giveOrder(c: Char, o: Order, queue = false): void {
+  if (queue && (c.order || c.queue.length)) {
+    c.queue.push(o);
+    return;
+  }
+  c.order = o;
+  c.queue.length = 0;
+  c.workT = 0;
+  clearDest(c);
+  if (o.t !== 'atacar') c.target = 0;
+  if (c.ai.sub === 'cama') c.ai.sub = '';
+}
 
 export function holderItems(h: Holder): Stack[] {
   return h.kind === 'char' ? h.c.inv : h.kind === 'cont' ? h.c.items : h.b.store;
