@@ -14,14 +14,27 @@ export interface BoneDef {
 /** Pesos de un vértice: pares hueso/peso (máximo 4). */
 export type W = readonly (readonly [number, number])[];
 
+/** Vértice calculado por `ringBy`: posición, color y pesos. */
+export interface VOut {
+  x: number;
+  y: number;
+  z: number;
+  c: RGB;
+  w: W;
+}
+const VO: VOut = { x: 0, y: 0, z: 0, c: [1, 1, 1], w: [[0, 1]] };
+
 export class SkinBuilder {
-  pos: number[] = [];
-  nor: number[] = [];
-  col: number[] = [];
-  fx: number[] = [];
-  si: number[] = [];
-  sw: number[] = [];
-  idx: number[] = [];
+  // Arrays tipados que crecen al doble: construir un personaje no deja basura
+  pos = new Float32Array(3 * 1024);
+  nor = new Float32Array(3 * 1024);
+  col = new Float32Array(3 * 1024);
+  fx = new Float32Array(2 * 1024);
+  si = new Uint16Array(4 * 1024);
+  sw = new Float32Array(4 * 1024);
+  idx = new Uint32Array(3 * 2048);
+  private nv = 0;
+  private ni = 0;
   r = 1;
   g = 1;
   b = 1;
@@ -29,7 +42,38 @@ export class SkinBuilder {
   private w: W = [[0, 1]];
 
   get vcount() {
-    return this.pos.length / 3;
+    return this.nv;
+  }
+  get icount() {
+    return this.ni;
+  }
+
+  private growV() {
+    const cap = this.pos.length / 3;
+    const g = <T extends Float32Array | Uint16Array>(a: T, k: number): T => {
+      const o = new (a.constructor as { new (n: number): T })(cap * 2 * k);
+      o.set(a);
+      return o;
+    };
+    this.pos = g(this.pos, 3);
+    this.nor = g(this.nor, 3);
+    this.col = g(this.col, 3);
+    this.fx = g(this.fx, 2);
+    this.si = g(this.si, 4);
+    this.sw = g(this.sw, 4);
+  }
+
+  private pushIdx(a: number, b: number, c: number) {
+    if (this.ni + 3 > this.idx.length) {
+      const o = new Uint32Array(this.idx.length * 2);
+      o.set(this.idx);
+      this.idx = o;
+    }
+    const I = this.idx;
+    I[this.ni] = a;
+    I[this.ni + 1] = b;
+    I[this.ni + 2] = c;
+    this.ni += 3;
   }
 
   color(c: RGB, k = 1): this {
@@ -48,22 +92,36 @@ export class SkinBuilder {
   }
 
   v(x: number, y: number, z: number, w: W = this.w, shade = 1): number {
-    const i = this.vcount;
-    this.pos.push(x, y, z);
-    this.nor.push(0, 0, 0);
-    this.col.push(this.r * shade, this.g * shade, this.b * shade);
-    this.fx.push(this.emis, 0);
+    const i = this.nv;
+    if (i * 3 + 3 > this.pos.length) this.growV();
+    const p = i * 3;
+    this.pos[p] = x;
+    this.pos[p + 1] = y;
+    this.pos[p + 2] = z;
+    this.col[p] = this.r * shade;
+    this.col[p + 1] = this.g * shade;
+    this.col[p + 2] = this.b * shade;
+    this.fx[i * 2] = this.emis;
+    const n = w.length < 4 ? w.length : 4;
     let total = 0;
-    for (let k = 0; k < 4; k++) total += w[k]?.[1] ?? 0;
+    for (let k = 0; k < n; k++) total += w[k][1];
+    const inv = total > 0 ? 1 / total : 1;
+    const q = i * 4;
     for (let k = 0; k < 4; k++) {
-      this.si.push(w[k]?.[0] ?? 0);
-      this.sw.push((w[k]?.[1] ?? 0) / (total || 1));
+      if (k < n) {
+        this.si[q + k] = w[k][0];
+        this.sw[q + k] = w[k][1] * inv;
+      } else {
+        this.si[q + k] = 0;
+        this.sw[q + k] = 0;
+      }
     }
+    this.nv++;
     return i;
   }
 
   tri(a: number, b: number, c: number) {
-    this.idx.push(a, b, c);
+    this.pushIdx(a, b, c);
   }
 
   /** Une dos anillos del mismo número de lados; orienta las caras hacia fuera de `center`. */
@@ -90,9 +148,11 @@ export class SkinBuilder {
     for (let k = 0; k < lim; k++) {
       const k2 = (k + 1) % n;
       if (flip) {
-        this.idx.push(a + k, b + k, a + k2, a + k2, b + k, b + k2);
+        this.pushIdx(a + k, b + k, a + k2);
+        this.pushIdx(a + k2, b + k, b + k2);
       } else {
-        this.idx.push(a + k, a + k2, b + k, a + k2, b + k2, b + k);
+        this.pushIdx(a + k, a + k2, b + k);
+        this.pushIdx(a + k2, b + k2, b + k);
       }
     }
   }
@@ -115,8 +175,8 @@ export class SkinBuilder {
     const flip = nx * awayX + ny * awayY + nz * awayZ < 0;
     for (let k = 0; k < n; k++) {
       const k2 = (k + 1) % n;
-      if (flip) this.idx.push(c, ring + k2, ring + k);
-      else this.idx.push(c, ring + k, ring + k2);
+      if (flip) this.pushIdx(c, ring + k2, ring + k);
+      else this.pushIdx(c, ring + k, ring + k2);
     }
   }
 
@@ -141,6 +201,79 @@ export class SkinBuilder {
       else this.v(cx + c * ra, cy + s * rb, cz, ww);
     }
     return start;
+  }
+
+  /**
+   * Anillo de `n` vértices calculados uno a uno: `f` recibe el ángulo (0 = +X,
+   * a la izquierda del personaje; π/2 = +Z, al frente) y rellena posición,
+   * color y pesos. Devuelve el índice del primer vértice.
+   */
+  ringBy(n: number, f: (a: number, k: number, o: VOut) => void, a0 = 0, a1 = Math.PI * 2, closed = true): number {
+    const start = this.vcount;
+    const steps = closed ? n : n - 1;
+    for (let k = 0; k < n; k++) {
+      const a = a0 + ((a1 - a0) * k) / steps;
+      f(a, k, VO);
+      this.r = VO.c[0];
+      this.g = VO.c[1];
+      this.b = VO.c[2];
+      this.v(VO.x, VO.y, VO.z, VO.w);
+    }
+    return start;
+  }
+
+  /** Une anillos sucesivos (mismo número de lados); cada par se orienta hacia fuera de su centro. */
+  loft(rings: number[], n: number, centers: [number, number, number][], closed = true): this {
+    for (let i = 1; i < rings.length; i++) {
+      const a = centers[i - 1];
+      const b = centers[i];
+      this.bridge(rings[i - 1], rings[i], n, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, closed);
+    }
+    return this;
+  }
+
+  /** Gira un rango de vértices alrededor de un punto (ángulos en X, Y y Z, en ese orden de aplicación Y·X·Z). */
+  rotate(v0: number, v1: number, cx: number, cy: number, cz: number, rx: number, ry: number, rz = 0): this {
+    const cX = Math.cos(rx);
+    const sX = Math.sin(rx);
+    const cY = Math.cos(ry);
+    const sY = Math.sin(ry);
+    const cZ = Math.cos(rz);
+    const sZ = Math.sin(rz);
+    for (let i = v0; i < v1; i++) {
+      const p = i * 3;
+      let x = this.pos[p] - cx;
+      let y = this.pos[p + 1] - cy;
+      let z = this.pos[p + 2] - cz;
+      // Z
+      let t = x * cZ - y * sZ;
+      y = x * sZ + y * cZ;
+      x = t;
+      // X
+      t = y * cX - z * sX;
+      z = y * sX + z * cX;
+      y = t;
+      // Y
+      t = x * cY + z * sY;
+      z = -x * sY + z * cY;
+      x = t;
+      this.pos[p] = x + cx;
+      this.pos[p + 1] = y + cy;
+      this.pos[p + 2] = z + cz;
+    }
+    return this;
+  }
+
+  /** Multiplica el color de un rango de vértices por una función de su posición (manchas, desgaste). */
+  tint(v0: number, v1: number, f: (x: number, y: number, z: number) => number): this {
+    for (let i = v0; i < v1; i++) {
+      const p = i * 3;
+      const k = f(this.pos[p], this.pos[p + 1], this.pos[p + 2]);
+      this.col[p] *= k;
+      this.col[p + 1] *= k;
+      this.col[p + 2] *= k;
+    }
+    return this;
   }
 
   /** Elipsoide (o casquete) con pesos fijos. lat0..lat1 en [0,1] de abajo arriba. */
@@ -178,7 +311,8 @@ export class SkinBuilder {
       const i1 = P(b[0], b[1], b[2]);
       const i2 = P(cc[0], cc[1], cc[2]);
       const i3 = P(d[0], d[1], d[2]);
-      this.idx.push(i0, i1, i2, i0, i2, i3);
+      this.pushIdx(i0, i1, i2);
+      this.pushIdx(i0, i2, i3);
     };
     face([hx, -hy, hz], [hx, -hy, -hz], [hx, hy, -hz], [hx, hy, hz]);
     face([-hx, -hy, -hz], [-hx, -hy, hz], [-hx, hy, hz], [-hx, hy, -hz]);
@@ -191,12 +325,15 @@ export class SkinBuilder {
 
   /** Calcula normales suaves (vértices compartidos) con oclusión falsa por orientación. */
   finish(ao = 0.28): THREE.BufferGeometry {
+    const n = this.nv;
     const P = this.pos;
-    const N = this.nor;
-    for (let i = 0; i < this.idx.length; i += 3) {
-      const a = this.idx[i] * 3;
-      const b = this.idx[i + 1] * 3;
-      const c = this.idx[i + 2] * 3;
+    const N = this.nor.subarray(0, n * 3);
+    N.fill(0);
+    const I = this.idx;
+    for (let i = 0; i < this.ni; i += 3) {
+      const a = I[i] * 3;
+      const b = I[i + 1] * 3;
+      const c = I[i + 2] * 3;
       const ux = P[b] - P[a];
       const uy = P[b + 1] - P[a + 1];
       const uz = P[b + 2] - P[a + 2];
@@ -206,13 +343,17 @@ export class SkinBuilder {
       const nx = uy * vz - uz * vy;
       const ny = uz * vx - ux * vz;
       const nz = ux * vy - uy * vx;
-      for (const k of [a, b, c]) {
-        N[k] += nx;
-        N[k + 1] += ny;
-        N[k + 2] += nz;
-      }
+      N[a] += nx;
+      N[a + 1] += ny;
+      N[a + 2] += nz;
+      N[b] += nx;
+      N[b + 1] += ny;
+      N[b + 2] += nz;
+      N[c] += nx;
+      N[c + 1] += ny;
+      N[c + 2] += nz;
     }
-    const n = this.vcount;
+    const C = this.col;
     for (let i = 0; i < n; i++) {
       const p = i * 3;
       const l = Math.hypot(N[p], N[p + 1], N[p + 2]);
@@ -228,18 +369,18 @@ export class SkinBuilder {
       }
       // Las caras que miran hacia abajo quedan algo más oscuras
       const k = 1 - ao * Math.max(0, -N[p + 1] * 0.8 + 0.2);
-      this.col[p] *= k;
-      this.col[p + 1] *= k;
-      this.col[p + 2] *= k;
+      C[p] *= k;
+      C[p + 1] *= k;
+      C[p + 2] *= k;
     }
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
-    g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
-    g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
-    g.setAttribute('fx', new THREE.Float32BufferAttribute(this.fx, 2));
-    g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(this.si, 4));
-    g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(this.sw, 4));
-    g.setIndex(n > 65535 ? new THREE.Uint32BufferAttribute(this.idx, 1) : new THREE.Uint16BufferAttribute(this.idx, 1));
+    g.setAttribute('position', new THREE.BufferAttribute(P.slice(0, n * 3), 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(N.slice(), 3));
+    g.setAttribute('color', new THREE.BufferAttribute(C.slice(0, n * 3), 3));
+    g.setAttribute('fx', new THREE.BufferAttribute(this.fx.slice(0, n * 2), 2));
+    g.setAttribute('skinIndex', new THREE.BufferAttribute(this.si.slice(0, n * 4), 4));
+    g.setAttribute('skinWeight', new THREE.BufferAttribute(this.sw.slice(0, n * 4), 4));
+    g.setIndex(new THREE.BufferAttribute(n > 65535 ? I.slice(0, this.ni) : new Uint16Array(I.subarray(0, this.ni)), 1));
     g.computeBoundingSphere();
     g.computeBoundingBox();
     return g;

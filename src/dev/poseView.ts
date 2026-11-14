@@ -1,4 +1,4 @@
-// Banco de poses para desarrollo: ?view&poses[=listo|apuntar|ataque|marcha|correr|sigilo|reposo|caida|giro|varios]
+// Banco de poses para desarrollo: ?view&poses[=listo|apuntar|ataque|marcha|correr|sigilo|reposo|caida|giro|varios|modelos]
 // muestra una fila de personajes sobre un suelo neutro, cada uno con un arma,
 // para revisar de cerca cómo la sujetan y cómo se mueven. Parámetros:
 //   only=ak,hacha   solo esas armas       t=0.4   fase fija del ataque (0..1)
@@ -106,6 +106,32 @@ function casesFor(preset: string): Case[] {
       out.push({ weapon: 'cuchillo', hold: 'una', alert: true });
       out.push({ weapon: null, hold: 'nada', alert: true });
       break;
+    case 'modelos': {
+      // Muestrario de aspectos, de frente y quietos
+      const m = (look: Partial<Look>) => out.push({ weapon: null, hold: 'nada', look: { hat: 'nada', mask: 'nada', ...look } });
+      m({ top: 'guerrera', topColor: 0x4a5a3a, pantsColor: 0x3a3f2e, hair: 'corto', hairColor: 0x3a2a1c, facial: 'nada' });
+      m({ top: 'camisa', topColor: 0x8a8272, pantsColor: 0x3a4250, female: true, hair: 'largo', hairColor: 0x6e2e1a, height: 0.95, build: -0.3 });
+      m({ top: 'abrigo', topColor: 0x5a4632, pantsColor: 0x2e2a26, hair: 'corto', hairColor: 0x9a9a96, age: 2, facial: 'barba', build: 0.6, glasses: true });
+      m({ top: 'chaqueton', topColor: 0x54584a, pantsColor: 0x2e3030, hair: 'rapado', hairColor: 0x1c1612, facial: 'barba3', build: 0.8, skin: 0xa8774f });
+      m({ top: 'cuero', topColor: 0x4a3626, pantsColor: 0x35302a, female: true, hair: 'mono', hairColor: 0x1c1612, scar: true });
+      m({ top: 'traje', topColor: 0x2a2c34, pantsColor: 0x24262c, hair: 'calvo', age: 2, facial: 'bigote', hairColor: 0x5c4028 });
+      m({ top: 'tunica', topColor: 0xd8d2bc, pantsColor: 0x6a6456, facial: 'barbaLarga', skin: 0xc4946c, hairColor: 0x1c1612, hair: 'corto' });
+      m({ top: 'mono', topColor: 0x3d5674, pantsColor: 0x3d5674, hair: 'corto', hairColor: 0x8a6a3c, gloves: 0x5a4a30, build: 0.4 });
+      m({ top: 'harapos', topColor: 0x6a5c4c, pantsColor: 0x4a4238, hair: 'largo', facial: 'barba', build: -0.6, age: 2, hairColor: 0x5c4028 });
+      m({ top: 'guerrera', topColor: 0x2f4263, pantsColor: 0x232a38, hat: 'casco', hatColor: 0x3a4a66, vest: 0x1e2430, pouches: true, armband: 0x2f62d8 });
+      m({ top: 'chaqueton', topColor: 0x4a5a3a, pantsColor: 0x3a3f2e, hat: 'ushanka', hatColor: 0x4a4436, facial: 'bigote', armband: 0x3f8f3a });
+      m({ top: 'abrigo', topColor: 0xd8d8d0, pantsColor: 0x4a4a48, female: true, hair: 'mono', mask: 'respirador', build: -0.4, height: 0.94 });
+      // Sombreros y máscaras
+      m({ top: 'chaqueton', topColor: 0x6a5238, hat: 'gorra', hatColor: 0x7a2a24, facial: 'bigote' });
+      m({ top: 'guerrera', topColor: 0x5a5066, hat: 'plato', hatColor: 0x4a3f5a, medals: true, age: 2, facial: 'bigote' });
+      m({ top: 'cuero', topColor: 0x4a3626, hat: 'boina', hatColor: 0x5a1e1a, female: true, hair: 'corto' });
+      m({ top: 'cuero', topColor: 0x2e2622, hat: 'panuelo', hatColor: 0xe8572a, mask: 'panuelo', scarf: 0x8a3a1c, eyepatch: true, bandolier: true });
+      m({ top: 'tunica', topColor: 0x1f6e58, hat: 'kufi', hatColor: 0xe8e4d8, facial: 'barba', skin: 0xc4946c });
+      m({ top: 'mono', topColor: 0x6a5f44, hat: 'capucha', hatColor: 0x4a4a3c, mask: 'antigas', backpack: 0x4a4636 });
+      m({ top: 'chaqueton', topColor: 0x54584a, hat: 'pasamontanas', hatColor: 0x1e1e1e, vest: 0x2e3326, vestPlates: true, pouches: true });
+      m({ top: 'chaqueton', topColor: 0x4a4a3a, mask: 'gafas', hair: 'corto', scarf: 0x7a6a4a });
+      break;
+    }
     case 'caida':
       out.push({ weapon: null, hold: 'nada', fall: 'ko' });
       out.push({ weapon: 'ak', hold: 'fusil', fall: 'ko', look: { seed: 4 } });
@@ -150,7 +176,8 @@ export async function startPoses(root: HTMLElement, params: URLSearchParams) {
   gfx.scene.fog = null;
   gfx.scene.background = new THREE.Color(0x3a3d42);
   const only = (params.get('only') ?? '').split(',').filter(Boolean);
-  let cases = casesFor(params.get('poses') || 'listo');
+  const preset = params.get('poses') || 'listo';
+  let cases = casesFor(preset);
   if (only.length) cases = cases.filter((c) => only.includes(c.weapon ?? 'nada'));
   const pick = (params.get('pick') ?? '').split(',').filter(Boolean).map(Number);
   if (pick.length) cases = cases.filter((_, i) => pick.includes(i));
@@ -175,7 +202,7 @@ export async function startPoses(root: HTMLElement, params: URLSearchParams) {
   const facing = Number(params.get('face') ?? Math.PI / 2);
   const out = new Float32Array(6);
   const views = cases.map((c, i) => {
-    const look: Look = { ...DEFAULT_LOOK, seed: i * 13 + 5, ...LOOKS[i % LOOKS.length], ...c.look };
+    const look: Look = { ...DEFAULT_LOOK, seed: i * 13 + 5, ...(preset === 'modelos' ? {} : LOOKS[i % LOOKS.length]), ...c.look };
     const v = new HumanView(look);
     const x = (i + 0.5) * gap;
     v.place(x, 0, 0, facing);
