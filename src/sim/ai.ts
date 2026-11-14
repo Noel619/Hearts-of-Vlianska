@@ -508,7 +508,9 @@ function resident(sim: Sim, c: Char, dt: number, prevPose: string): void {
       const d = Math.hypot(sp.x - c.x, sp.z - c.z);
       if (d < 1.1) {
         ai.sub = 'estar';
-        ai.n = 25 + sim.rng.next() * 90;
+        // En la cama de noche se queda hasta el amanecer (más o menos)
+        const h = sim.hour;
+        ai.n = sp.kind === 'cama' && (h >= 22 || h < 6) ? 240 + sim.rng.next() * 360 : 25 + sim.rng.next() * 90;
         c.x += (sp.x - c.x) * 0.5;
         c.z += (sp.z - c.z) * 0.5;
       } else {

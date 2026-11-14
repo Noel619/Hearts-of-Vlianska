@@ -40,7 +40,7 @@ export function resetWorld(world: World) {
 /** Estación que contiene un punto (con margen), o null. */
 export function stationAt(world: World, x: number, z: number, margin = 2): StationFrame | null {
   for (const f of world.layout.stations) {
-    if (Math.abs(x - f.x) > f.hl + f.hw + margin || Math.abs(z - f.z) > f.hl + f.hw + margin) continue;
+    if (Math.abs(x - f.x) > f.reach + margin || Math.abs(z - f.z) > f.reach + margin) continue;
     if (insideStation(f, x, z, margin)) return f;
   }
   return null;

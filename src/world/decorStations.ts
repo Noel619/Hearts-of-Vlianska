@@ -19,12 +19,24 @@ import type { LRect, Port, StationFrame } from './layout';
  */
 interface Program {
   must: string[];
+  /** Relleno del barrio de viviendas (hacia los extremos del andén). */
   fill: string[];
   fillSide?: string[];
   fillPos?: string[];
+  /** Relleno de la calle del mercado (el tercio central). */
+  market?: string[];
+  /** Relleno junto a las bocas (almacenes, cuerpo de guardia). */
+  edge?: string[];
   /** Alumbrado del andén. */
   lamp?: 'farola' | 'bidon' | 'poca';
+  /** Sin guirnaldas sobre el pasillo del mercado. */
+  dark?: boolean;
 }
+
+/** Relleno por zonas si el programa no dice otra cosa. */
+const MARKET = ['puesto:comida', 'puesto:bazar', 'comedor', 'puesto:ropa', 'escenario', 'puesto:chatarrero', 'lavadero', 'puesto:libros'];
+const EDGE = ['almacen', 'barracon', 'hoguera', 'almacen'];
+const HOMES = ['chabolas', 'tiendas', 'lavadero', 'chabolas', 'dormitorio', 'escuelita', 'barracon', 'hoguera'];
 
 const PROGRAMS: Record<string, Program> = {
   SEV: {
@@ -41,7 +53,9 @@ const PROGRAMS: Record<string, Program> = {
   },
   RUB: {
     must: ['mando:sdr_kravets@0', 'cuartel@-0.8', 'cuartel@0.8', 'armeria@0.2', 'cuartel@-0.5', 'cuartel@0.5', 'puesto:armas@-0.2', 'cocina@0.1', 'bar@-0.3', 'hospital@0.35', 'almacen@-0.1', 'puesto:comida@0.3'],
-    fill: ['tiendas', 'almacen', 'hoguera', 'barracon'],
+    fill: ['barracon', 'dormitorio', 'hoguera', 'tiendas'],
+    market: ['comedor', 'puesto:armas', 'puesto:comida'],
+    edge: ['barracon', 'almacen'],
   },
   KHO: {
     must: ['mitin:sdr_popova@0', 'cuartel@-0.92', 'cuartel@0.92', 'armeria@-0.75', 'puesto:comida@0.2', 'puesto:ropa@0.26', 'puesto:armas@0.34', 'puesto:bazar@0.46', 'bar@0.6', 'cocina@-0.55', 'hospital@-0.65', 'plaza:estatua@0.14', 'taller@0.75', 'granja@-0.3', 'radio@-0.22'],
@@ -72,7 +86,8 @@ const PROGRAMS: Record<string, Program> = {
       'm/plaza@0.05',
     ],
     fill: ['puesto:bazar', 'puesto:comida', 'plaza', 'puesto:ropa'],
-    fillSide: ['tiendas', 'barracon', 'almacen', 'hoguera', 'dormitorio'],
+    fillSide: ['chabolas', 'tiendas', 'barracon', 'lavadero', 'almacen', 'hoguera', 'dormitorio', 'escuelita'],
+    market: ['puesto:bazar', 'puesto:comida', 'comedor', 'puesto:ropa', 'escenario', 'puesto:negro'],
   },
   TSE: {
     must: [
@@ -100,12 +115,16 @@ const PROGRAMS: Record<string, Program> = {
       's/plaza@-0.45',
     ],
     fill: ['puesto:bazar', 'puesto:comida', 'plaza', 'hoguera'],
-    fillSide: ['tiendas', 'barracon', 'tiendas', 'dormitorio', 'almacen', 'hoguera'],
+    fillSide: ['chabolas', 'tiendas', 'escuelita', 'barracon', 'lavadero', 'dormitorio', 'almacen', 'hoguera'],
+    market: ['puesto:bazar', 'puesto:comida', 'comedor', 'puesto:ropa', 'escenario', 'puesto:libros', 'puesto:chatarrero'],
   },
   VHL: {
     must: ['figura:vhl_lisa:negro@0.3', 'bar@-0.3', 'santuario:vhl_monje@-0.8', 'hoguera@-0.55', 'hoguera@0.75', 'taller:armas@-0.95', 'almacen@0.95'],
-    fill: ['barracon', 'tiendas', 'hoguera', 'almacen', 'dormitorio'],
+    fill: ['chabolas', 'barracon', 'hoguera', 'tiendas', 'almacen', 'dormitorio'],
+    market: ['hoguera', 'puesto:negro', 'chabolas', 'puesto:armas'],
+    edge: ['hoguera', 'barracon'],
     lamp: 'bidon',
+    dark: true,
   },
   RAS: {
     must: [
@@ -136,13 +155,18 @@ const PROGRAMS: Record<string, Program> = {
   },
   VYS: {
     must: ['cuartel@0.9', 'armeria@0.55', 'cuartel@0.4', 'hospital@0', 'cocina@-0.2', 'puesto:comida@-0.4', 'puesto:armas@-0.5', 'bar@-0.6', 'almacen@0.1', 'plaza@-0.3'],
-    fill: ['tiendas', 'hoguera', 'barracon', 'almacen'],
+    fill: ['barracon', 'dormitorio', 'hoguera', 'tiendas'],
+    market: ['comedor', 'puesto:comida', 'puesto:armas'],
+    edge: ['barracon', 'almacen'],
     lamp: 'poca',
+    dark: true,
   },
   MER: {
     must: ['mando:baghdadi:cal_harbi@-0.35', 'figura:cal_aliyev:negro@0.6', 'puesto:comida@0.5', 'cocina@0.2', 'cuartel@-0.8', 'granja@0.8', 'corral@0.92', 'hospital@-0.6'],
-    fill: ['tiendas', 'hoguera', 'dormitorio', 'almacen'],
+    fill: ['tiendas', 'chabolas', 'hoguera', 'dormitorio', 'lavadero'],
+    market: ['puesto:comida', 'lavadero', 'comedor', 'chabolas'],
     lamp: 'poca',
+    dark: true,
   },
   ZVE: {
     must: ['plaza:estatua@0', 'puesto:comida@-0.4', 'puesto:ropa@-0.3', 'puesto:bazar@0.3', 'puesto:libros@0.4', 'bar@0.55', 'cuartel@0.92', 'cuartel@-0.92', 'hospital@-0.6', 'cocina@0.2', 'taller@0.7', 'granja@-0.75'],
@@ -155,7 +179,10 @@ const PROGRAMS: Record<string, Program> = {
   CHE: {
     must: ['cuartel@0.7', 'cuartel@0.45', 'taller@0.3', 'figura:che_minin@0.2', 'plaza:sokolova@-0.2', 'puesto:comida@-0.3', 'cocina@-0.1', 'hospital@0.1', 'granja@-0.6', 'granja@-0.75', 'corral@-0.9', 'bar@-0.45', 'almacen@0.85'],
     fill: ['tiendas', 'dormitorio', 'hoguera', 'barracon', 'dormitorio'],
+    market: ['comedor', 'puesto:comida', 'escuelita'],
+    edge: ['barracon', 'almacen'],
     lamp: 'poca',
+    dark: true,
   },
 };
 
@@ -317,11 +344,23 @@ function layoutBands(st: St, bands: BandX[], prog: Program) {
     });
     if (best >= 0) run(slots[best], best, e);
   }
-  // Relleno
+  // Relleno por zonas: controles en los extremos, viviendas hacia las puntas y el mercado en el centro
   let k = 0;
+  const zoneOf = (s: Slot): 'edge' | 'homes' | 'market' => {
+    const t = (s.uc - s.band.u0) / Math.max(1, s.band.u1 - s.band.u0);
+    if (t < 0.1 || t > 0.9) return 'edge';
+    if (t > 0.34 && t < 0.66) return 'market';
+    return 'homes';
+  };
   slots.forEach((s, i) => {
     if (s.used) return;
-    const list = s.band.kind === 'side' && prog.fillSide ? prog.fillSide : s.band.dv > 0 && prog.fillPos ? prog.fillPos : prog.fill;
+    const zone = zoneOf(s);
+    let list: string[];
+    if (s.band.dv > 0 && prog.fillPos) list = prog.fillPos;
+    else if (s.band.kind === 'side' && prog.fillSide) list = zone === 'edge' ? (prog.edge ?? EDGE) : prog.fillSide;
+    else if (zone === 'market') list = prog.market ?? MARKET;
+    else if (zone === 'edge') list = prog.edge ?? EDGE;
+    else list = st.f.def.owner === 'VHL' || prog.lamp === 'poca' ? prog.fill : [...prog.fill, ...HOMES];
     for (let tries = 0; tries < list.length * 2; tries++) {
       const e = parseEntry(list[k++ % list.length]);
       const def = BLOCKS[e.name];
@@ -331,6 +370,12 @@ function layoutBands(st: St, bands: BandX[], prog: Program) {
       break;
     }
   });
+  // Guirnaldas de bombillas sobre el pasillo del mercado
+  if (!prog.dark) {
+    const P0 = st.f.platforms[0];
+    const span = P0.u1 - P0.u0;
+    for (let u = P0.u0 + span * 0.34; u < P0.u0 + span * 0.66; u += 7.5) st.put('guirnalda', u, 0, 0, 1, { aisle: true });
+  }
   // Alumbrado: postes en las esquinas de los bloques, al borde del pasillo
   const mode = prog.lamp ?? 'farola';
   let n = 0;

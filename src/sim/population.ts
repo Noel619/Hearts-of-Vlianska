@@ -71,17 +71,22 @@ export function pickSpot(sim: Sim, c: Char): number {
   if (!list) return -1;
   const spots = sim.world.decor.spots;
   const worker = c.role === 'obrero' || c.role === 'medico';
+  // Rutina del día: de noche se duerme, al caer la tarde se cena junto al fuego
+  const h = sim.hour;
+  const night = h >= 22.5 || h < 6;
+  const evening = h >= 19 && h < 22.5;
+  const siesta = h >= 14 && h < 15.5;
   let best = -1;
   let bestScore = -Infinity;
-  for (let k = 0; k < 8; k++) {
+  for (let k = 0; k < 10; k++) {
     const i = list[Math.floor(sim.rng.next() * list.length)];
     const s = spots[i];
     if (r.spotUser.has(i)) continue;
     let score = 0;
-    if (s.kind === 'asiento') score = 3;
-    else if (s.kind === 'ocio') score = 2.5;
-    else if (s.kind === 'trabajo') score = worker ? 5 : s.data === 'rezo' && c.side === 'CAL' ? 4 : 0.5;
-    else if (s.kind === 'cama') score = 0.6;
+    if (s.kind === 'asiento') score = night ? 1 : evening ? 4.2 : 3;
+    else if (s.kind === 'ocio') score = night ? 0.5 : evening && s.data === 'fuego' ? 4 : 2.5;
+    else if (s.kind === 'trabajo') score = night ? 0.3 : worker ? 5 : s.data === 'rezo' && c.side === 'CAL' ? 4 : s.data === 'escribir' || s.data === 'cocina' ? 1.6 : 0.8;
+    else if (s.kind === 'cama') score = night ? 9 : siesta ? 1.8 : 0.4;
     else continue;
     score += sim.rng.next() * 2 - Math.hypot(s.x - c.x, s.z - c.z) * 0.02;
     if (score > bestScore) {
@@ -231,16 +236,16 @@ function spawnPlace(sim: Sim, place: string) {
       n++;
     }
   }
-  // Vecinos: según la población de la estación
+  // Vecinos: según la población de la estación (una estación de mil almas se nota)
   if (f && owner) {
-    const count = Math.max(6, Math.min(26, Math.round(f.def.population / 26)));
+    const count = Math.max(8, Math.min(60, Math.round(f.def.population / 16)));
     for (let k = 0; k < count; k++) {
       const slot = `${place}:v${k}`;
       if (sim.state.chars.some((c) => c.slot === slot) || !alive(slot)) continue;
       const seed = seedFrom(slot, sim.state.seed + (st?.dead[slot] ?? 0));
       const role: Role = owner === 'VHL' ? ((seed & 3) === 0 ? 'civil' : 'bandido') : (seed % 5) === 0 ? 'obrero' : (seed % 11) === 0 ? 'refugiado' : 'civil';
-      // Sitio de aparición: un punto de ocio al azar o el centro del andén
-      const cand = list.filter((i) => spots[i].kind === 'ocio' || spots[i].kind === 'asiento');
+      // Sitio de aparición: un punto de vida al azar (ocio, asiento, trabajo o cama) o el centro del andén
+      const cand = list.filter((i) => spots[i].kind === 'ocio' || spots[i].kind === 'asiento' || spots[i].kind === 'trabajo' || spots[i].kind === 'cama');
       const sp = cand.length ? spots[cand[seed % cand.length]] : { x: f.x, z: f.z, rot: 0 };
       const p = sim.world.nav.nearestPassable(sp.x + ((seed % 7) - 3) * 0.6, sp.z + ((seed % 5) - 2) * 0.6, 4) ?? sp;
       const c = makeHuman(sim, owner, role, p.x, p.z, seed);
