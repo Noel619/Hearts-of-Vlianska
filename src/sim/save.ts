@@ -38,6 +38,9 @@ export function deserialize(text: string): SimState | null {
 /** Completa las partidas guardadas con versiones anteriores del juego (campos nuevos con su valor por defecto). */
 function migrate(s: SimState): SimState {
   for (const c of s.chars) c.gas ??= 0;
+  // 0.5: los de la Hermandad son hermanos mientras no la traicionen (las partidas
+  // de antes no tenían la marca, y sus bandas les cobraban peaje)
+  if (s.scenario === 'hermandad' && !s.flags.hermano && !s.flags.traidores && (s.rep.VHL ?? 0) >= 10) s.flags.hermano = 1;
   return s;
 }
 

@@ -193,6 +193,7 @@ export class Sim {
   betrayHermandad(why: string) {
     if (!this.state.flags.hermano) return;
     delete this.state.flags.hermano;
+    this.state.flags.traidores = 1;
     this.state.rep.VHL = Math.min(this.state.rep.VHL, -60);
     this.log(`${why} Ya no sois hermanos: para la Hermandad sois traidores, y la Hermandad no perdona.`, 'malo');
     for (const c of this.state.chars) if (c.side === 'VHL' && c.st === 'ok' && c.kind === 'humano') c.ai.sub = 'enfadado';

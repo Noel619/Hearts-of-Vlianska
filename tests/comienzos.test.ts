@@ -12,6 +12,7 @@ import { sellPrice } from '../src/sim/events';
 import { firstSteps, STEPS } from '../src/sim/hilos';
 import { newGame } from '../src/sim/newGame';
 import { newSquad } from '../src/sim/population';
+import { deserialize, serialize } from '../src/sim/save';
 import type { Sim } from '../src/sim/sim';
 import { standingLines } from '../src/sim/situacion';
 import type { Char, SimEvent } from '../src/sim/types';
@@ -206,6 +207,14 @@ describe('cada comienzo', () => {
     sim.betrayHermandad('Prueba.');
     expect(sim.brothers()).toBe(false);
     expect(sim.state.rep.VHL).toBeLessThanOrEqual(-50);
+    // Y una partida guardada de traidores no vuelve a ser de hermanos al cargarla
+    expect(deserialize(serialize(sim.state))!.flags.hermano).toBeUndefined();
+  });
+
+  it('Hijos de Vhlainska: las partidas guardadas antes de la 0.5 recuperan la hermandad', () => {
+    const sim = newGame(world, { scenario: 'hermandad', seed: 37 });
+    delete sim.state.flags.hermano;
+    expect(deserialize(serialize(sim.state))!.flags.hermano).toBe(1);
   });
 
   it('Veteranos: al pie de la escalera del pozo, con una treintena de balas, sin comida y medio congelados', () => {
