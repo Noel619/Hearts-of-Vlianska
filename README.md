@@ -23,11 +23,16 @@ Este repositorio contenía antes *Hearts of Vlianska* (gran estrategia en 2D). E
 
 ## Jugar
 
+**Sin instalar nada:** descarga [`docs/jugar/Sombras-de-Vlianska.html`](docs/jugar/Sombras-de-Vlianska.html) y ábrelo con doble clic. Es el juego entero en un solo archivo y funciona sin internet. Los pasos, con ayuda por si algo falla, están en [`docs/jugar/`](docs/jugar/README.md).
+
+Para trabajar con el código:
+
 ```bash
 npm install
 npm run dev          # servidor de desarrollo en http://localhost:5173
 npm run build        # web estática en dist/
 npm run build:single # dist-single/index.html: un único archivo que se abre con doble clic
+npm run build:jugar  # lo mismo, copiado a docs/jugar/ para quien solo quiere jugar
 ```
 
 Hace falta un navegador con WebGL 2. La partida se guarda en el almacenamiento local del navegador (autoguardado cada minuto, `F5`/`F9` y tres huecos).
@@ -76,7 +81,7 @@ src/
   dev/      visor de desarrollo
 tests/      pruebas de la simulación y de la partida (Vitest)
 tools/      utilidades (plano 2D del trazado, banco de equilibrio)
-docs/       la historia completa del universo
+docs/       la historia completa del universo y, en docs/jugar/, el juego listo para abrir
 ```
 
 La simulación es determinista, no depende del render y su estado es JSON puro: las pruebas la ejecutan sin navegador.

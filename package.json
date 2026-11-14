@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "build:single": "tsc --noEmit && vite build --mode single",
+    "build:jugar": "npm run build:single && node -e \"require('fs').copyFileSync('dist-single/index.html','docs/jugar/Sombras-de-Vlianska.html')\"",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
