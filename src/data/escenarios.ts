@@ -201,7 +201,7 @@ export const SCENARIOS: Scenario[] = [
     ],
     rep: { CAL: 15, LEV: -55 },
     hungry: true,
-    steps: ['comer', 'muro', 'tabique', 'galeria', 'contrabando', 'construir'],
+    steps: ['muro', 'tabique', 'hambreCerco', 'galeria', 'contrabando', 'construir'],
   },
 ];
 

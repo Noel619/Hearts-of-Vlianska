@@ -1,5 +1,41 @@
 # Cambios
 
+## 0.5 beta
+
+Comienzos que cuentan la verdad, órdenes que obedecen al instante y un golpe de gracia que no perdona.
+
+### Órdenes
+
+- **Cambiar de rumbo en el acto.** Con alguien en marcha, un segundo clic derecho en otro sitio le hace girar enseguida. Antes terminaba el camino viejo y, al llegar, daba la orden nueva por cumplida. Una orden sin Mayús borra también las encadenadas.
+
+### Rematar
+
+- **El golpe de gracia es una orden propia, rápida y sin vuelta atrás.** Quien remata se coloca junto a la cabeza o el pecho del caído y acaba en un momento según lo que lleve: un tiro a quemarropa inclinado sobre él (gasta una bala, del cargador o metida a mano), una puñalada de rodillas, un golpe hacia el suelo con hacha, maza, tubo o culata, o, sin arma, estrangularlo con las dos manos (tarda más cuanta menos fuerza). Antes era una pelea normal contra alguien en el suelo: golpes a brazos y piernas al azar, a culatazos aunque se llevara un fusil, y podía tardar muchísimo.
+- Lo hace el más cercano de los seleccionados; el menú dice cómo («Un tiro de gracia», «Sin arma: con las manos») o si es un asesinato. Rematar a quien no es enemigo es un crimen grave.
+- **Sangre por sangre.** Quien ha perdido a alguien de los suyos a vuestras manos no hace prisioneros: remata a los vuestros cuando caen. Los cazarrecompensas, que cobran por traeros vivos, y los hambrientos, que solo quieren comida, no.
+- Si el caído se levanta antes del golpe, vuelve a ser una pelea.
+
+### Las fieras y sus presas
+
+- **Arrastrar de verdad.** El skrebun agarra al caído de un tobillo con los dientes y tira de espaldas, a tirones, con la cabeza baja y las patas afianzadas; la marcha hacia atrás no patina. El cuerpo va boca arriba, con la pierna en alto hasta la boca de la fiera, la otra a rastras y los brazos por encima de la cabeza, sacudiéndose con cada tirón. El glubinnik y el sheptun lo llevan del tobillo con la mano, a su espalda. Antes el cuerpo iba empujado delante del hocico, tieso y sin que nada lo sujetara.
+- **Comerse a alguien no lleva minutos.** Con el hocico sobre su pecho, desgarra a cada mordisco y lo mata en unos segundos (varias fieras, antes). Antes roían brazos y piernas durante minutos sin que pasara nada.
+
+### Comienzos
+
+- **Cada comienzo empieza donde dice**: los refugiados en el suelo del andén de Tsentral'naya, el cartero en el caravasar de Staraya, los colonos en el Cruce Oriental, los stalkers en su base de Severnyy, los de la Hermandad en la guarida del Tuerto, los veteranos al pie de la escalera del pozo de Kholodnogo Vozduha y los vecinos de la Esmeralda en los baños de las abluciones.
+- **Hijos de Vhlainska**: seguís siendo hermanos, así que las bandas de la Hermandad ya no os cobran peaje (os paraban nada más empezar, dentro de vuestra propia estación). Si os pillan robando a la Hermandad o atacando a uno de los suyos, sois traidores. Staraya paga por vuestras cabezas y la llave de los almacenes de Tenevskaya está en el botín del Tuerto, junto a su guarida.
+- **Veteranos del sur**: Mostovaya no tiene salida a la superficie, así que ahora bajan por el pozo de Kholodnogo Vozduha, el acceso más cercano a Chernovodskaya. Son desertores de la junta, llevan máscaras con los filtros casi agotados y una treintena de balas de verdad (antes, con los cargadores llenos, más de setenta).
+- **El hambre de la Esmeralda**: las barricadas del Levantamiento disparan a quien sale (antes se podía salir andando por Vysotnaya). La galería tapiada sale de la propia Izumrudnaya.
+- **Stalkers del Norte**: el Hospital de la Esperanza paga de verdad mejor las glándulas de skrebun.
+- **Nadie**: el texto cuenta lo que lleváis (antes hablaba de «un cuchillo» y había también un tubo).
+- **Primeros pasos propios de cada comienzo**: el cartero vuelve a Tsentral'naya y busca la carta; los colonos levantan el campamento y entran en Tenevskaya; los stalkers suben a la superficie, cazan un skrebun y venden su glándula en Nadezhdy; los de la Hermandad cogen la llave sin que les vean; los veteranos comen, se curan y consiguen munición; los de la Esmeralda buscan la galería y la abren.
+- **Cómo están las cosas**: el menú y el informe de bajada dicen quién os quiere, quién os dispara nada más veros, quién paga por vuestras cabezas y si venís heridos o con hambre, calculado de la propia partida.
+- La estación donde empezáis ya no se anuncia con «Has llegado a…».
+
+### Desarrollo
+
+- Pruebas nuevas: `tests/ordenes.test.ts` (cambiar de rumbo, encadenar), `tests/remate.test.ts` (cada forma de rematar, asesinato, venganza, fieras que comen y arrastran) y `tests/comienzos.test.ts` (cada comienzo empieza donde dice, con lo que dice, sin peajes absurdos y con un informe que coincide con la partida); pruebas de animación del arrastrado, la marcha hacia atrás y el comer.
+
 ## 0.4 beta
 
 Caer tiene consecuencias, las heridas dejan marca, el equipo se gasta y las bases son más que un campamento. También llegan a esta versión las estaciones con forma y la superficie.

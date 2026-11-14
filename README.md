@@ -2,7 +2,7 @@
 
 RPG de escuadra y supervivencia en mundo abierto, en 3D, ambientado en el metro de Vlianska.
 
-**Versión 0.4 (beta).** El juego se puede jugar de principio a fin: todos los hilos de la trama se pueden cerrar y la emisora de onda corta lleva al final abierto. Los cambios de cada versión están en [`CHANGELOG.md`](CHANGELOG.md).
+**Versión 0.5 (beta).** El juego se puede jugar de principio a fin: todos los hilos de la trama se pueden cerrar y la emisora de onda corta lleva al final abierto. Los cambios de cada versión están en [`CHANGELOG.md`](CHANGELOG.md).
 
 Enero de 2033. Veinte años después de las bombas, ocho facciones se reparten las dieciséis estaciones del metro. Tú no eres ninguna de ellas: empiezas con un puñado de supervivientes, un cuchillo y sesenta cartuchos, y nadie te espera ni te debe nada. Comercia, rebusca chatarra, caza lo que vive en los túneles, contrata gente en las cantinas y levanta tu propia estación donde nadie mande.
 
@@ -12,7 +12,8 @@ Este repositorio contenía antes *Hearts of Vlianska* (gran estrategia en 2D). E
 
 - **El metro entero, de una pieza.** Las 16 estaciones y los 24 cruces del plano original, unidos por más de nueve kilómetros de túneles que se recorren a pie y sin pantallas de carga. Cada estación es un asentamiento distinto: el Gran Mercado de Tsentral'naya alrededor del edificio quemado del gobierno, los pozos de aire frío de Kholodnogo Vozduha, las escaleras mecánicas de Severnyy hacia la superficie, las granjas de Rassvetnaya, el manantial esmeralda de Izumrudnaya, el trono del Tuerto en Vhlainska… y Tenevskaya, a oscuras, con sus almacenes intactos.
 - **Escuadra, no héroe.** Hasta doce personas (veinte con estructura de mando) a las que das órdenes en tiempo real con pausa. Veintidós habilidades que suben con el uso (el atletismo, corriendo; la fuerza, también cargando peso); siete partes del cuerpo con su propia salud; heridas que sangran hasta que alguien las venda; inconscientes a los que se puede cargar, curar, saquear o rematar. Se puede cambiar el nombre a cualquiera y despedir a quien sobre.
-- **Caer tiene consecuencias.** Los saqueadores despojan a los caídos; las facciones encierran en sus calabozos a quien tiene la cabeza a precio; Vhlainska y el Califato encadenan esclavos y el Levantamiento manda a reeducarse a sus granjas. Los presos cumplen condena, salen bajo fianza, fuerzan los grilletes cuando nadie mira o esperan a que un compañero los rescate. Las fieras arrastran a los inconscientes a su nido y se los comen, y con una buena recompensa por vuestras cabezas salen cazarrecompensas.
+- **Caer tiene consecuencias.** Los saqueadores despojan a los caídos; las facciones encierran en sus calabozos a quien tiene la cabeza a precio; Vhlainska y el Califato encadenan esclavos y el Levantamiento manda a reeducarse a sus granjas. Los presos cumplen condena, salen bajo fianza, fuerzan los grilletes cuando nadie mira o esperan a que un compañero los rescate. Las fieras arrastran a los inconscientes a su nido, cogidos de un tobillo, y allí se los comen en unos segundos; quien ha perdido a alguien a vuestras manos no hace prisioneros, y con una buena recompensa por vuestras cabezas salen cazarrecompensas.
+- **Rematar es cosa seria.** Un tiro a quemarropa, una puñalada de rodillas, un golpe hacia el suelo o, sin arma, estrangular: un momento y no tiene vuelta atrás. Rematar a quien no es enemigo es un asesinato.
 - **Heridas que dejan marca.** Brazos y piernas que se pierden para siempre, muñones que hay que vendar, prótesis que se compran o se fabrican y cojeras crónicas que solo arreglan en el quirófano de Nadezhdy.
 - **Equipo con calidad y desgaste.** Cinco grados, de chatarra a militar, en armas, armaduras y prótesis; todo se gasta con el uso y se repara en los bancos de trabajo. Huecos para cabeza, cara, torso, manos, piernas, pies y espalda.
 - **Gas en los túneles.** Cinco bolsas de gas en los túneles y salas más peligrosos, marcadas en el mapa. Sin máscara quema el pecho, hace toser y delata; quien cae dentro se asfixia si nadie lo saca. La máscara antigás lo deja fuera mientras aguanta el filtro; el respirador, solo el gas ligero. El equipo pesado estorba al sigilo y a la esquiva.
@@ -69,7 +70,7 @@ Estas son las teclas de siempre; todas, salvo `Esc` y las combinaciones con `Ctr
 
 ### Comienzos
 
-Siete maneras de bajar al metro, de «Nadie» (tres refugiados en Tsentral'naya) a los veteranos de Chernovodskaya, la partida de stalkers de Severnyy o los colonos que acampan a las puertas de Tenevskaya.
+Siete maneras de bajar al metro, cada una con su sitio exacto, su gente, su equipo, sus amigos y enemigos y sus primeros pasos: los refugiados que duermen en el andén de Tsentral'naya, el cartero que llevó sin saberlo la carta de Bessmertny, los colonos que acampan a las puertas de Tenevskaya, los stalkers de Severnyy, los cuatro de la Hermandad que se largan sabiendo dónde guarda el Tuerto la llave de Tenevskaya, dos desertores de Chernovodskaya que bajan del frío por el pozo de Kholodnogo Vozduha y tres vecinos hambrientos de la Esmeralda sitiada. El menú y el informe de bajada dicen quién os quiere, quién os dispara y quién paga por vuestras cabezas, tal como está en la partida.
 
 ## Estructura del código
 

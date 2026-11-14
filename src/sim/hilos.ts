@@ -95,6 +95,7 @@ export const STEPS: Record<string, StepDef> = {
   curar: { title: 'Que os curen', hint: 'Cualquier médico os atiende por unos cartuchos (Hablar). El mejor hospital del metro está en Ubezhishche Nadezhdy.', done: (sim) => !!sim.state.flags.tCurado },
   municion: { title: 'Conseguid munición', hint: 'Se compra en los puestos de armas (en Industrialnaya, más barata) o se fabrica en una prensa de munición.', done: (sim) => bullets(sim) >= 80 },
   // El hambre de la Esmeralda
+  hambreCerco: { title: 'Comed algo', hint: 'En Izumrudnaya la comida vale su peso en balas: vended lo que no os haga falta o traedla de fuera, por la galería. Con hambre no se pelea ni se trabaja.', done: (sim) => sim.players.length > 0 && sim.players.every((c) => c.st === 'muerto' || c.hunger >= 45) },
   muro: { title: 'Encontrad la galería tapiada', hint: 'Sale de Izumrudnaya hacia el este: un túnel viejo que acaba en un tabique de ladrillo.', done: (sim) => !!sim.state.flags.tMuro },
   tabique: { title: 'Echad abajo el primer tabique', hint: 'Clic derecho sobre el muro: «Derribar el muro». Con el pico se va más deprisa.', done: (sim) => sim.state.nodes.filter((n) => n.kind === 'muro').length < 2 || !!sim.state.flags.galeriaOlvidada },
   galeria: { title: 'Abrid la Galería Olvidada', hint: 'Cruzadla deprisa: el aire viciado quema el pecho. Al fondo, otro tabique da a Mostovaya.', done: (sim) => !!sim.state.flags.galeriaOlvidada },
