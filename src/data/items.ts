@@ -6,8 +6,11 @@ import type { Hat, Look, Mask } from './looks';
 
 export type ItemKind = 'recurso' | 'comida' | 'medicina' | 'municion' | 'arma' | 'armadura' | 'herramienta' | 'varios' | 'clave';
 export type WeaponClass = 'filo' | 'contundente' | 'asta' | 'pistola' | 'fusil' | 'escopeta' | 'pesada';
-export type ArmorSlot = 'cabeza' | 'cara' | 'torso' | 'mochila';
+export type ArmorSlot = 'cabeza' | 'cara' | 'torso' | 'manos' | 'piernas' | 'pies' | 'mochila';
 export type EquipSlot = 'arma' | 'arma2' | ArmorSlot | 'luz';
+
+/** Todos los huecos de ropa y armadura, de la cabeza a los pies. */
+export const ARMOR_SLOTS: readonly ArmorSlot[] = ['cabeza', 'cara', 'torso', 'manos', 'piernas', 'pies', 'mochila'];
 
 export interface WeaponDef {
   cls: WeaponClass;
@@ -58,6 +61,14 @@ export interface ArmorDef {
   carry?: number;
   /** Penalización al sigilo y a la esquiva (0..1). */
   bulk?: number;
+  /** Botas: más (o menos) velocidad al correr (fracción). */
+  speed?: number;
+  /** Botas: pisada silenciosa, ayuda al sigilo (0..1). */
+  quiet?: number;
+  /** Guantes: trabajo de manos más rápido (o más lento) en obras y talleres (fracción). */
+  work?: number;
+  /** Guantes: mejor agarre, puntos de ataque cuerpo a cuerpo. */
+  grip?: number;
 }
 
 export interface ItemDef {
@@ -87,6 +98,12 @@ export interface ItemDef {
   tool?: { skill: string; bonus: number };
   /** Robado o ilegal en ciertas estaciones. */
   contraband?: boolean;
+  /** Comida que se estropea: días que aguanta fresca (sin esto, no se pudre). */
+  spoil?: number;
+  /** Prótesis: el miembro que sustituye. */
+  pros?: 'brazo' | 'pierna';
+  /** Material con que se repara (si no, se deduce de la clase de objeto). */
+  fix?: string;
 }
 
 const D: ItemDef[] = [];
@@ -110,20 +127,25 @@ res('libros', 'Libros de antes', 'Química, mecánica, medicina. El saber de un 
 res('planos', 'Planos técnicos', 'Planos de ingeniería del metro y de sus máquinas.', 0.1, 140, 0x3a5a8a, 10);
 
 // --- Comida -------------------------------------------------------------------
-const food = (id: string, name: string, desc: string, w: number, price: number, nutrition: number, tint: number) => add({ id, name, desc, kind: 'comida', w, price, stack: 30, food: nutrition, tint });
-food('hongos', 'Hongos', 'La base de la dieta del metro. Crudos saben a tierra.', 0.25, 3, 14, 0xc9b9a0);
-food('hongosSecos', 'Hongos secos', 'Duran meses. Saben a cartón.', 0.12, 5, 16, 0x9a8a6a);
-food('carne', 'Carne cruda', 'De cerdo, de rata… no preguntes.', 0.5, 6, 12, 0x9a3a34);
-food('carneAsada', 'Carne asada', 'Caliente y con grasa. Un lujo.', 0.4, 12, 38, 0x7a4a2a);
-food('guiso', 'Guiso de hongos', 'Hongos, grasa de cerdo y lo que hubiera. Llena.', 0.5, 14, 50, 0x8a6a3a);
+// `spoil`: días que aguanta fresca. Lo seco, lo ahumado, las latas y el aguardiente no se pudren.
+const food = (id: string, name: string, desc: string, w: number, price: number, nutrition: number, tint: number, spoil?: number) => add({ id, name, desc, kind: 'comida', w, price, stack: 30, food: nutrition, tint, spoil });
+food('hongos', 'Hongos', 'La base de la dieta del metro. Crudos saben a tierra. Frescos, se estropean en unos días: se secan para guardarlos.', 0.25, 3, 14, 0xc9b9a0, 4);
+food('hongosSecos', 'Hongos secos', 'Duran meses. Saben a cartón.', 0.12, 5, 16, 0x9a8a6a, 60);
+food('carne', 'Carne cruda', 'De cerdo, de rata… no preguntes. Se pudre enseguida si no se asa o se ahúma.', 0.5, 6, 12, 0x9a3a34, 2);
+food('carneAsada', 'Carne asada', 'Caliente y con grasa. Un lujo.', 0.4, 12, 38, 0x7a4a2a, 3);
+food('guiso', 'Guiso de hongos', 'Hongos, grasa de cerdo y lo que hubiera. Llena.', 0.5, 14, 50, 0x8a6a3a, 2.5);
 food('conserva', 'Conserva de antes', 'Una lata sin etiqueta de 2012. Sigue buena.', 0.4, 30, 60, 0x8a8f96);
-food('te', 'Té de hongos', 'Calienta las manos y engaña al estómago.', 0.3, 4, 6, 0x6a5a2a);
+food('te', 'Té de hongos', 'Calienta las manos y engaña al estómago.', 0.3, 4, 6, 0x6a5a2a, 2);
+food('cecina', 'Carne ahumada', 'Tiras de carne curadas al humo con salitre. Duras como suela, pero aguantan semanas.', 0.3, 15, 30, 0x5a2a1a, 30);
 add({ id: 'samogon', name: 'Samogón', desc: 'Aguardiente de alambique. Se bebe, se vende y desinfecta.', kind: 'comida', w: 0.5, price: 16, stack: 20, food: 4, tint: 0xb8c8c0 });
+add({ id: 'podrido', name: 'Comida podrida', desc: 'Lo que queda cuando nadie se lo come a tiempo. No se come, pero los cerdos no le hacen ascos.', kind: 'varios', w: 0.3, price: 0, stack: 50, tint: 0x4a4a28 });
 
 // --- Medicina -------------------------------------------------------------------
 add({ id: 'vendas', name: 'Vendas', desc: 'Tela hervida. Cortan la hemorragia.', kind: 'medicina', w: 0.1, price: 8, stack: 30, med: { heal: 6, bleed: true, skill: 0 }, tint: 0xe8e4d8 });
 add({ id: 'botiquin', name: 'Botiquín', desc: 'Antiséptico, sutura y morfina. Medicina de verdad.', kind: 'medicina', w: 0.5, price: 55, stack: 10, med: { heal: 30, bleed: true, skill: 15 }, model: 'botiquin' });
 add({ id: 'antibioticos', name: 'Antibióticos', desc: 'Moho cultivado en el hospital de Nadezhdy.', kind: 'medicina', w: 0.1, price: 90, stack: 10, med: { heal: 45, bleed: false, skill: 25 }, tint: 0x9ad0a0 });
+add({ id: 'protesisBrazo', name: 'Brazo ortopédico', desc: 'Tubo de acero, un muelle y una garra de tres dedos, sujetos al muñón con correas. Agarra un arma, aunque peor que una mano.', kind: 'medicina', w: 2.4, price: 260, stack: 1, pros: 'brazo', fix: 'piezas', tint: 0x8a8f96 });
+add({ id: 'protesisPierna', name: 'Pierna ortopédica', desc: 'Un tubo con rodillera y un taco de goma por pie. Se anda y hasta se corre, cojeando.', kind: 'medicina', w: 3.2, price: 220, stack: 1, pros: 'pierna', fix: 'piezas', tint: 0x8a8f96 });
 
 // --- Munición -------------------------------------------------------------------
 add({ id: 'balas', name: 'Munición recargada', desc: 'Casquillos recuperados y pólvora casera. Para disparar, no para pagar.', kind: 'municion', w: 0.012, price: 1, stack: 300, tint: 0xa98a3c });
@@ -181,6 +203,16 @@ armor('respirador', 'Respirador', 'Media máscara con dos filtros. Aguanta el po
 armor('chaleco', 'Chaleco de carga', 'Lona gruesa con bolsillos. Para una paliza, no una bala.', { slot: 'torso', cover: [1, 2], cut: 0.25, blunt: 0.15, pierce: 0.08, look: { vest: 0x3a3c30, pouches: true } }, 1.5, 80, 0x3a3c30);
 armor('chalecoPlacas', 'Chaleco de placas', 'Planchas de vagón cosidas a un chaleco. Para balas… a veces.', { slot: 'torso', cover: [1, 2], cut: 0.6, blunt: 0.4, pierce: 0.5, look: { vest: 0x2e3326, vestPlates: true, pouches: true }, bulk: 0.12 }, 7.5, 420, 0x2e3326);
 armor('petoCuero', 'Peto de cuero', 'Cuero de cerdo endurecido con hombreras de neumático.', { slot: 'torso', cover: [1, 2, 3, 4], cut: 0.38, blunt: 0.25, pierce: 0.12, look: { vest: 0x3a2a1e, shoulderPads: 0x1e1e1e }, bulk: 0.04 }, 3.0, 150, 0x3a2a1e);
+// Manos, piernas y pies
+armor('guantes', 'Guantes de trabajo', 'Lona con la palma de cuero. Las manos duran más y trabajan más deprisa.', { slot: 'manos', cover: [3, 4], cut: 0.06, blunt: 0.05, pierce: 0, look: { gloves: 0x5a4a30 }, work: 0.08 }, 0.2, 18, 0x5a4a30);
+armor('guantesCuero', 'Guantes de cuero', 'Cuero de cerdo cosido a mano: el arma no resbala.', { slot: 'manos', cover: [3, 4], cut: 0.16, blunt: 0.12, pierce: 0.03, look: { gloves: 0x2a1c12 }, grip: 3 }, 0.4, 55, 0x2a1c12);
+armor('manoplas', 'Guanteletes de chapa', 'Láminas remachadas sobre cuero. Paran un machetazo; atornillar con ellos, no tanto.', { slot: 'manos', cover: [3, 4], cut: 0.4, blunt: 0.28, pierce: 0.18, look: { gloves: 0x4a4f52 }, bulk: 0.03, work: -0.12 }, 1.4, 150, 0x4a4f52);
+armor('pantalonGuata', 'Pantalón de guata', 'Acolchado de algodón del ejército. Abriga y amortigua algún golpe.', { slot: 'piernas', cover: [5, 6], cut: 0.12, blunt: 0.15, pierce: 0.03, look: { pantsColor: 0x3d4234 } }, 1.1, 35, 0x3d4234);
+armor('perneras', 'Perneras de cuero', 'Cuero endurecido con rodilleras de neumático.', { slot: 'piernas', cover: [5, 6], cut: 0.32, blunt: 0.2, pierce: 0.08, look: { pantsColor: 0x3a2a1e, kneePads: 0x1e1e1e }, bulk: 0.02 }, 2.2, 95, 0x3a2a1e);
+armor('grebas', 'Grebas de chapa', 'Chapa de vagón doblada sobre los muslos y las espinillas. Pesan como un muerto.', { slot: 'piernas', cover: [5, 6], cut: 0.55, blunt: 0.38, pierce: 0.36, look: { pantsColor: 0x2e3326, kneePads: 0x4a4f52 }, bulk: 0.06 }, 5.2, 280, 0x4a4f52);
+armor('botas', 'Botas de trabajo', 'Suela gruesa y puntera de acero: se corre mejor por las traviesas.', { slot: 'pies', cover: [5, 6], cut: 0.05, blunt: 0.07, pierce: 0.02, look: { bootsColor: 0x3a2a1c }, speed: 0.04 }, 1.2, 40, 0x3a2a1c);
+armor('botasMilitares', 'Botas militares', 'Cuero y caña alta de 2012. Las mejores para correr.', { slot: 'pies', cover: [5, 6], cut: 0.1, blunt: 0.1, pierce: 0.04, look: { bootsColor: 0x16130f }, speed: 0.08 }, 1.5, 120, 0x16130f);
+armor('valenki', 'Botas de fieltro', 'Fieltro prensado: abrigan y no hacen ruido al pisar.', { slot: 'pies', cover: [5, 6], cut: 0.03, blunt: 0.06, pierce: 0, look: { bootsColor: 0x6a6458 }, quiet: 0.35 }, 0.9, 60, 0x6a6458);
 armor('mochila', 'Mochila', 'Lona y correas. Caben muchas cosas.', { slot: 'mochila', cover: [], cut: 0, blunt: 0, pierce: 0, look: { backpack: 0x4a4636 }, carry: 25 }, 1.0, 60, 0x4a4636);
 armor('mochilaGrande', 'Mochila de stalker', 'Armazón de aluminio: media casa a la espalda.', { slot: 'mochila', cover: [], cut: 0, blunt: 0, pierce: 0, look: { backpack: 0x3d4a3a }, carry: 50, bulk: 0.06 }, 2.2, 190, 0x3d4a3a);
 
@@ -204,17 +236,105 @@ export interface Stack {
   hot?: string;
   /** Máscaras: lo que le queda al filtro puesto (segundos de gas denso). */
   fil?: number;
+  /** Calidad de armas, armaduras y prótesis (0 chatarra … 4 militar; sin dato, «de taller»). */
+  q?: number;
+  /** Estado de conservación (0 roto … 1 nuevo; sin dato, nuevo). */
+  dur?: number;
+  /** Frescura de la comida (0 podrida … 1 recién hecha; sin dato, fresca). */
+  fresh?: number;
 }
 
-/** Estado propio de un objeto suelto (cargador, filtro, procedencia) para que viaje con él. */
+/** Estado propio de un objeto suelto (cargador, filtro, procedencia, calidad, desgaste, frescura) para que viaje con él. */
 export function stackState(s: Stack): Partial<Stack> {
   const o: Partial<Stack> = {};
   if (s.mag !== undefined) o.mag = s.mag;
   if (s.hot !== undefined) o.hot = s.hot;
   if (s.fil !== undefined) o.fil = s.fil;
+  if (s.q !== undefined) o.q = s.q;
+  if (s.dur !== undefined) o.dur = s.dur;
+  if (s.fresh !== undefined) o.fresh = s.fresh;
   return o;
 }
 
 export function stackWeight(s: Stack): number {
   return (ITEMS[s.id]?.w ?? 0) * s.n;
+}
+
+// --- Calidad y desgaste -------------------------------------------------------------
+
+/** Grados de calidad, de lo hecho con restos a lo de fábrica militar. */
+export const QUALITY_NAMES = ['Chatarra', 'Casera', 'De taller', 'Buena', 'Militar'] as const;
+/** Calidad de lo que no la indica. */
+export const QUALITY_DEFAULT = 2;
+/** Rendimiento por calidad: daño de las armas, protección de las armaduras y fuerza de las prótesis. */
+export const Q_POWER = [0.72, 0.86, 1, 1.12, 1.26];
+/** Dispersión de los disparos por calidad (menos es mejor). */
+export const Q_SPREAD = [1.4, 1.18, 1, 0.88, 0.76];
+/** Precio por calidad. */
+export const Q_PRICE = [0.42, 0.7, 1, 1.55, 2.4];
+/** Lo que se desgasta por uso según la calidad: lo bueno aguanta más. */
+export const Q_WEAR = [1.7, 1.3, 1, 0.78, 0.58];
+
+/** ¿Tiene calidad y se desgasta? (armas, armaduras y prótesis) */
+export function hasQuality(def: ItemDef | undefined): boolean {
+  return !!def && (!!def.weapon || !!def.armor || !!def.pros);
+}
+
+export function qualityOf(s: Stack): number {
+  return Math.max(0, Math.min(4, Math.round(s.q ?? QUALITY_DEFAULT)));
+}
+
+export function condOf(s: Stack): number {
+  return Math.max(0, Math.min(1, s.dur ?? 1));
+}
+
+/** Lo que pierde un objeto gastado: nada hasta la mitad; roto, casi la mitad de su rendimiento. */
+export function condFactor(dur: number): number {
+  return dur >= 0.5 ? 1 : 0.55 + dur * 0.9;
+}
+
+/** Rendimiento de un objeto según su calidad y su estado (1 = uno de taller, nuevo). */
+export function itemPower(s: Stack): number {
+  return Q_POWER[qualityOf(s)] * condFactor(condOf(s));
+}
+
+/** Palabra para el estado de conservación. */
+export function condWord(dur: number): string {
+  if (dur <= 0) return 'Roto';
+  if (dur < 0.25) return 'Destrozado';
+  if (dur < 0.5) return 'Muy gastado';
+  if (dur < 0.8) return 'Gastado';
+  if (dur < 0.97) return 'Usado';
+  return 'Nuevo';
+}
+
+/** Valor de una unidad según su calidad, su estado y su frescura. */
+export function unitValue(s: Stack): number {
+  const def = ITEMS[s.id];
+  if (!def) return 0;
+  let v = def.price;
+  if (hasQuality(def)) v *= Q_PRICE[qualityOf(s)] * (0.3 + 0.7 * condOf(s));
+  if (def.spoil && s.fresh !== undefined) v *= 0.4 + 0.6 * Math.max(0, s.fresh);
+  return v;
+}
+
+/** Material con que se repara un objeto. */
+export function repairMaterial(def: ItemDef): string {
+  if (def.fix) return def.fix;
+  const a = def.armor;
+  if (a) {
+    if (a.cut >= 0.38 || a.pierce >= 0.3) return 'piezas';
+    if (a.cut >= 0.12 && a.slot !== 'cara') return 'cuero';
+    return 'tela';
+  }
+  if (def.weapon?.cls === 'asta') return 'tablones';
+  return 'piezas';
+}
+
+/** Palabra para la frescura de la comida. */
+export function freshWord(f: number): string {
+  if (f > 0.75) return 'Fresca';
+  if (f > 0.4) return 'Pasable';
+  if (f > 0.15) return 'Pasada';
+  return 'A punto de pudrirse';
 }

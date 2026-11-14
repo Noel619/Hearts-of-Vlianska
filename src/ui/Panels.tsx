@@ -195,7 +195,7 @@ function TradeWin({ p }: { p: Extract<Panel, { t: 'comercio' }> }) {
                 <ItemIcon id={s.id} />
                 <span className="nm">{ITEMS[s.id].name}</span>
                 <span className="q">×{s.n}</span>
-                <Money n={buyPrice(sim, place, s.id, npc.side)} size={15} cls="p" />
+                <Money n={buyPrice(sim, place, s.id, npc.side, s)} size={15} cls="p" />
               </div>
             ))}
             {!shop.stock.length && <div className="dim">No le queda nada.</div>}
@@ -216,7 +216,7 @@ function TradeWin({ p }: { p: Extract<Panel, { t: 'comercio' }> }) {
             {actor.inv.map((s, i) => (
               <div
                 key={i + s.id}
-                className={'item' + (sellPrice(sim, place, s.id, npc.side) <= 0 || ITEMS[s.id].kind === 'clave' ? ' no' : '')}
+                className={'item' + (sellPrice(sim, place, s.id, npc.side, s) <= 0 || ITEMS[s.id].kind === 'clave' ? ' no' : '')}
                 {...tip.bind(itemTip(s), s.id)}
                 onClick={(e) => {
                   setMsg(sellItem(sim, actor, npc, i, qty(e, s.n)) ?? '');
@@ -226,7 +226,7 @@ function TradeWin({ p }: { p: Extract<Panel, { t: 'comercio' }> }) {
                 <ItemIcon id={s.id} />
                 <span className="nm">{ITEMS[s.id].name}</span>
                 <span className="q">×{s.n}</span>
-                <Money n={sellPrice(sim, place, s.id, npc.side)} size={15} cls="p" />
+                <Money n={sellPrice(sim, place, s.id, npc.side, s)} size={15} cls="p" />
               </div>
             ))}
             {!actor.inv.length && <div className="dim">No llevas nada que vender.</div>}
@@ -539,7 +539,7 @@ function WorkshopWin({ p }: { p: Extract<Panel, { t: 'taller' }> }) {
   );
 }
 
-const SLOT_NAMES: Record<EquipSlot, string> = { arma: 'Arma', arma2: 'Arma', cabeza: 'Cabeza', cara: 'Cara', torso: 'Torso', mochila: 'Espalda', luz: 'Luz' };
+const SLOT_NAMES: Record<EquipSlot, string> = { arma: 'Arma', arma2: 'Arma', cabeza: 'Cabeza', cara: 'Cara', torso: 'Torso', manos: 'Manos', piernas: 'Piernas', pies: 'Pies', mochila: 'Espalda', luz: 'Luz' };
 
 /** Confirmación para despedir a alguien: qué se lleva, qué deja y adónde va. */
 function DismissWin({ p }: { p: Extract<Panel, { t: 'despedir' }> }) {

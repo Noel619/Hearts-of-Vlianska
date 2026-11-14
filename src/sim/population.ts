@@ -10,12 +10,13 @@ import { HAIR_COLORS, SKIN_TONES, type Look } from '../data/looks';
 import type { SkillId } from '../data/skills';
 import type { FactionId, SideId } from '../data/tipos';
 import { seedFrom } from '../core/rng';
-import { addItem, hirePrice, makeCreature, makeHuman } from './chars';
+import { addItem, gradeStacks, hirePrice, makeCreature, makeHuman } from './chars';
 import { hostile } from './combat';
 import { clearDest, setDest } from './move';
 import type { Sim } from './sim';
 import type { Char, Squad, SquadKind } from './types';
 import { stationAt } from './world';
+import { depositLoot, packLoot, unpackLoot } from './derrota';
 
 const ON = 78;
 const OFF = 115;
@@ -258,6 +259,8 @@ function despawnPlace(sim: Sim, place: string) {
     const c = chars[i];
     if (c.player || c.squad) continue;
     if (c.ai.place !== place) continue;
+    // Quien se lleva a un preso no desaparece por el camino
+    if (c.carry || c.order?.t === 'capturar') continue;
     if (c.persist && c.unique) {
       // Las figuras se retiran pero su estado se conserva
       continue;
@@ -328,6 +331,9 @@ function materialize(sim: Sim, s: Squad) {
     sim.addChar(c);
     k++;
   }
+  // El botín que llevaban vuelve a cargarlo el primero
+  const lead = s.roster.map((m) => (m.id ? sim.char(m.id) : null)).find((c) => c && c.st !== 'muerto') ?? null;
+  unpackLoot(s, lead);
 }
 
 const COMBAT_SKILLS: SkillId[] = ['fuerza', 'destreza', 'aguante', 'percepcion', 'ataque', 'defensa', 'filo', 'contundente', 'asta', 'pelea', 'punteria', 'esquiva', 'atletismo'];
@@ -346,6 +352,8 @@ export function toughen(sim: Sim, c: Char, grade: number) {
     addItem(c, 'balas', 60);
     c.eq.torso = { id: 'chalecoPlacas', n: 1 };
     c.eq.cabeza = { id: 'casco', n: 1 };
+    if (rng.chance(0.5)) c.eq.piernas = { id: 'grebas', n: 1 };
+    gradeStacks(rng, Object.values(c.eq), 2 + grade, 0.35);
     return;
   }
   // Armas: más fusiles, y los cabecillas con Kaláshnikov
@@ -360,6 +368,9 @@ export function toughen(sim: Sim, c: Char, grade: number) {
   // Blindaje
   if (rng.chance(grade * 0.7)) c.eq.torso = { id: leader && grade > 0.5 ? 'chalecoPlacas' : 'petoCuero', n: 1 };
   if (rng.chance(grade * (leader ? 0.9 : 0.45))) c.eq.cabeza = { id: 'casco', n: 1 };
+  if (rng.chance(grade * 0.5)) c.eq.piernas = { id: grade > 0.6 ? 'perneras' : 'pantalonGuata', n: 1 };
+  if (rng.chance(grade * 0.4)) c.eq.manos = { id: 'guantesCuero', n: 1 };
+  gradeStacks(rng, Object.values(c.eq), 1 + grade * 1.5, 0.45);
 }
 
 function dematerialize(sim: Sim, s: Squad) {
@@ -367,6 +378,8 @@ function dematerialize(sim: Sim, s: Squad) {
   let sx = 0;
   let sz = 0;
   let n = 0;
+  const alive = s.roster.map((m) => (m.id ? sim.char(m.id) : null)).filter((c): c is Char => !!c && c.st !== 'muerto');
+  packLoot(s, alive);
   for (const m of s.roster) {
     if (!m.id) continue;
     const c = sim.char(m.id);
@@ -419,7 +432,7 @@ function stepSquad(sim: Sim, s: Squad, dt: number) {
   s.life -= dt;
   const pd = sim.playerDist(s.x, s.z);
   if (!s.mat && pd < ON) materialize(sim, s);
-  else if (s.mat && pd > OFF) dematerialize(sim, s);
+  else if (s.mat && pd > OFF && !carrying(sim, s)) dematerialize(sim, s);
   const wild = s.kind === 'jauria';
   if (s.mat) {
     const members = aliveMembers(sim, s);
@@ -427,6 +440,7 @@ function stepSquad(sim: Sim, s: Squad, dt: number) {
       // Todos caídos: si no queda nadie vivo la escuadra desaparece
       if (s.roster.every((m) => m.dead || !m.id || sim.char(m.id)?.st === 'muerto')) {
         for (const m of s.roster) m.id = 0;
+        s.loot = [];
         sim.removeSquad(s);
       }
       return;
@@ -492,14 +506,27 @@ function stepSquad(sim: Sim, s: Squad, dt: number) {
       }
     }
   }
-  if (s.life <= 0 && !s.mat) sim.removeSquad(s);
+  if (s.life <= 0 && !s.mat) {
+    depositLoot(sim, s);
+    sim.removeSquad(s);
+  }
+}
+
+/** ¿Alguno de la escuadra lleva a alguien a cuestas (un preso)? */
+function carrying(sim: Sim, s: Squad): boolean {
+  return s.roster.some((m) => {
+    const c = m.id ? sim.char(m.id) : null;
+    return !!c && (!!c.carry || c.order?.t === 'capturar');
+  });
 }
 
 function arriveSquad(sim: Sim, s: Squad) {
   if (s.mode === 'vuelta' && s.pi === 0 && s.life < 1e8) {
-    // De vuelta en casa: se disuelve
-    if (!s.mat) sim.removeSquad(s);
-    else s.life = 0;
+    // De vuelta en casa: se disuelve (y deja el botín)
+    if (!s.mat) {
+      depositLoot(sim, s);
+      sim.removeSquad(s);
+    } else s.life = 0;
     return;
   }
   s.mode = s.kind === 'banda' ? 'acecho' : 'espera';

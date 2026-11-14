@@ -42,6 +42,10 @@ export interface Look {
   shoulderPads?: number;
   kneePads?: number;
   medals?: boolean;
+  /** Miembros perdidos (bits: 1 brazo izq., 2 brazo der., 4 pierna izq., 8 pierna der.): se ve el muñón. */
+  lost?: number;
+  /** Miembros perdidos con prótesis (mismos bits): se ve la pieza ortopédica. */
+  pros?: number;
 }
 
 export const SKIN_TONES = [0xe6c3a4, 0xd9ae8c, 0xc4946c, 0xa8774f, 0x8a5c3a];

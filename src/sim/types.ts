@@ -27,7 +27,19 @@ export type OrderType =
   | 'excavar'
   | 'descansar'
   | 'derribar'
-  | 'entregar';
+  | 'entregar'
+  | 'reparar'
+  // Gente del metro: despojar a un caído, cargarlo preso, llevarlo a la celda,
+  // romper una obra y saquear un almacén
+  | 'despojar'
+  | 'capturar'
+  | 'romper'
+  | 'robar'
+  // Fieras: arrastrar a un caído al nido y devorarlo
+  | 'arrastrar'
+  | 'devorar'
+  // Forzar los grilletes o la jaula de un compañero preso
+  | 'liberar';
 
 export interface Order {
   t: OrderType;
@@ -41,6 +53,39 @@ export interface Order {
 }
 
 export type JobType = 'operar' | 'construir' | 'acarrear' | 'cultivar' | 'chatarrear' | 'medico' | 'guardia' | 'cocinar' | 'investigar';
+
+/** Preso de una facción: en la cárcel, en trabajos forzados o como esclavo. */
+export interface Captive {
+  /** Bando que lo tiene preso. */
+  by: SideId;
+  /** Estación de la prisión. */
+  place: string;
+  kind: 'carcel' | 'trabajos' | 'esclavo';
+  /** Dónde está encerrado o encadenado, y hacia dónde mira. */
+  x: number;
+  z: number;
+  face: number;
+  /** Encerrado en una jaula (si no, encadenado a la pared o al tajo). */
+  cage: boolean;
+  /** Puesto de trabajo forzado, si lo tiene. */
+  wx?: number;
+  wz?: number;
+  /** Momento (tiempo de juego) en que cumple la condena; 0 = sin fin. */
+  until: number;
+  /** Dificultad de los grilletes y la cerradura. */
+  lock: number;
+  /** Progreso de la fuga (0..1) y si la está intentando ahora. */
+  pick: number;
+  escaping: boolean;
+  /** Lo que se le quitó al encerrarlo (para devolvérselo si sale por las buenas). */
+  seized?: Stack[];
+}
+
+/** Escuadra propia del jugador (para organizar a la gente en grupos que van por su cuenta). */
+export interface Team {
+  id: number;
+  name: string;
+}
 
 export interface Job {
   t: JobType;
@@ -158,9 +203,21 @@ export interface Char {
   seenT: number;
   /** Segundos hasta que el cadáver desaparece. */
   rot: number;
+  /** Miembros perdidos (3 brazo izq., 4 brazo der., 5 pierna izq., 6 pierna der.). */
+  lost?: number[];
+  /** Prótesis puestas en los miembros perdidos, por parte. */
+  pros?: Record<number, Stack>;
+  /** Pierna con cojera crónica (5 o 6). */
+  limp?: number;
+  /** Preso de una facción. */
+  captive?: Captive;
+  /** Fugado: los de ese bando lo persiguen hasta ese momento (tiempo de juego). */
+  fled?: { by: SideId; until: number };
+  /** Escuadra propia del jugador a la que pertenece (0 = la principal). */
+  team?: number;
 }
 
-export type SquadKind = 'jugador' | 'patrulla' | 'caravana' | 'banda' | 'jauria' | 'asalto' | 'cobradores' | 'refugiados' | 'stalkers';
+export type SquadKind = 'jugador' | 'patrulla' | 'caravana' | 'banda' | 'jauria' | 'asalto' | 'cobradores' | 'refugiados' | 'stalkers' | 'cazadores' | 'visita';
 
 export interface SquadMember {
   /** Arquetipo humano o id de criatura. */
@@ -202,6 +259,18 @@ export interface Squad {
   /** Veteranía (0..1): en una partida avanzada los asaltos traen gente más curtida y mejor armada. */
   grade?: number;
   talked?: boolean;
+  /** Cazarrecompensas: la facción que paga por tu cabeza. */
+  hunt?: FactionId;
+  /** Asaltos: quién lo manda y a qué viene (saquear, castigar, robar comida). */
+  raid?: 'saqueo' | 'castigo' | 'hambre';
+  /** Visitas de una facción a la base: a cobrar el tributo o a registrar. */
+  visit?: 'tributo' | 'registro';
+  /** Lo que piden (cartuchos) en una visita. */
+  demand?: number;
+  /** Botín: lo que se llevan de tu gente o de tu base. */
+  loot?: Stack[];
+  /** Ya se van con lo que han venido a buscar. */
+  done?: boolean;
 }
 
 export interface Building {
@@ -256,6 +325,8 @@ export interface Container {
   /** Reposición (segundos de juego) o 0. */
   refill: number;
   label: string;
+  /** Depósito de decomisos de una prisión: aquí acaba lo que se les quita a los presos. */
+  seize?: boolean;
 }
 
 /** Nodo de recursos (chatarra, salitre, derrumbe excavable…). */
@@ -324,6 +395,8 @@ export interface SimState {
   /** Temporizadores de sucesos. */
   timers: Record<string, number>;
   stats: { kills: number; days: number; earned: number; built: number };
+  /** Escuadras propias (la 0, la principal, no se guarda aquí). */
+  teams?: Team[];
 }
 
 /** Sucesos efímeros para el render, el sonido y la interfaz. */

@@ -2,11 +2,12 @@
 // edificios, talleres con recetas, cultivos, energía, investigación y los
 // trabajos automáticos de la escuadra.
 
-import { BUILDS, RECIPES, TECHS, type BuildDef } from '../data/edificios';
-import { ITEMS, type Stack } from '../data/items';
+import { BUILDS, RECIPES, REPAIR_RECIPE, TECHS, type BuildDef } from '../data/edificios';
+import { ITEMS, QUALITY_NAMES, condOf, hasQuality, repairMaterial, type Stack } from '../data/items';
 import { F_DYN, F_GATE, F_SLOW, F_TALL } from '../world/grid';
 import { makeLight, type LightDef } from '../world/lights';
-import { addItem, countItem, gainXp, invWeight, maxCarry, takeItem } from './chars';
+import { addItem, countItem, gainXp, handFactor, invWeight, isFlesh, maxCarry, syncPros, takeItem } from './chars';
+import { fire, hostile } from './combat';
 import { breathable } from './gas';
 import { clearDest, faceTo, setDest } from './move';
 import type { Sim } from './sim';
@@ -162,13 +163,13 @@ export function storeWeight(b: Building): number {
 
 function isStorage(b: Building): boolean {
   const def = BUILDS[b.def];
-  return b.prog >= 1 && !!def.store && !def.recipes && !def.power;
+  return b.prog >= 1 && !!def.store && !def.recipes && !def.power && !def.turret;
 }
 
-/** Total de un objeto en los almacenes de la base. */
+/** Total de un objeto en los almacenes de la base (sin contar la munición de los nidos). */
 export function stored(sim: Sim, id: string): number {
   let n = 0;
-  for (const b of sim.state.buildings) if (b.prog >= 1 && BUILDS[b.def].store) n += countItem({ inv: b.store }, id);
+  for (const b of sim.state.buildings) if (b.prog >= 1 && BUILDS[b.def].store && !BUILDS[b.def].turret) n += countItem({ inv: b.store }, id);
   return n;
 }
 
@@ -176,7 +177,7 @@ function nearestStorageWith(sim: Sim, x: number, z: number, ids: string[], maxD 
   let best: Building | null = null;
   let bestD = maxD;
   for (const b of sim.state.buildings) {
-    if (b.prog < 1 || !BUILDS[b.def].store) continue;
+    if (b.prog < 1 || !BUILDS[b.def].store || BUILDS[b.def].turret) continue;
     if (!b.store.some((s) => ids.includes(s.id))) continue;
     const d = Math.hypot(b.x - x, b.z - z);
     if (d < bestD) {
@@ -320,6 +321,7 @@ export function workOnBuilding(sim: Sim, c: Char, o: Order, dt: number): boolean
     }
     return true;
   }
+  if (o.t === 'reparar') return repairBuilding(sim, c, b, o, dt);
   if (o.t === 'construir') {
     if (b.prog >= 1) return false;
     const s = supply(sim, c, b, def.cost, b.got);
@@ -336,7 +338,7 @@ export function workOnBuilding(sim: Sim, c: Char, o: Order, dt: number): boolean
     clearDest(c);
     faceTo(c, b.x, b.z, dt);
     c.work = 'martillo';
-    b.prog += (dt * (0.55 + c.sk.ingenieria * 0.03) * speedBonus(sim)) / def.work;
+    b.prog += (dt * (0.55 + c.sk.ingenieria * 0.03) * speedBonus(sim) * handFactor(c)) / def.work;
     gainXp(sim, c, 'ingenieria', dt * 0.35);
     if ((sim.tick + c.id) % 24 === 0) sim.emit({ t: 'sonido', k: 'martillo', x: b.x, z: b.z });
     if (b.prog >= 1) {
@@ -368,10 +370,10 @@ export function workOnBuilding(sim: Sim, c: Char, o: Order, dt: number): boolean
     c.speed = 0;
     // Las buenas camas curan más
     const k = (def.heal ?? 1) - 1;
-    if (k > 0) for (let i = 0; i < 7; i++) if (c.hp[i] < c.hpMax[i] && c.wound[i] < 1.5) c.hp[i] = Math.min(c.hpMax[i], c.hp[i] + dt * 0.035 * 5 * k);
+    if (k > 0) for (let i = 0; i < 7; i++) if (c.hp[i] < c.hpMax[i] && c.wound[i] < 1.5 && isFlesh(c, i)) c.hp[i] = Math.min(c.hpMax[i], c.hp[i] + dt * 0.035 * 5 * k);
     if (o.data === 'job') {
       let hurt = false;
-      for (let i = 0; i < 7; i++) if (c.hp[i] < c.hpMax[i] * 0.95) hurt = true;
+      for (let i = 0; i < 7; i++) if (c.hp[i] < c.hpMax[i] * 0.95 && isFlesh(c, i)) hurt = true;
       return hurt;
     }
     return true;
@@ -381,6 +383,8 @@ export function workOnBuilding(sim: Sim, c: Char, o: Order, dt: number): boolean
     if ((sim.tick + c.id) % 120 === 0) sim.emit({ t: 'flota', x: b.x, z: b.z, text: 'Sin energía', color: '#d8a060' });
     return false;
   }
+  if (def.turret) return manTurret(sim, c, b, def, dt);
+  if (def.repair && b.recipe === REPAIR_RECIPE) return repairAtBench(sim, c, b, def, dt);
   if (def.research) {
     const tech = sim.state.tech;
     if (!tech.cur) return false;
@@ -467,20 +471,243 @@ export function workOnBuilding(sim: Sim, c: Char, o: Order, dt: number): boolean
     faceTo(c, b.x, b.z, dt);
     c.work = def.anim ?? 'operar';
     const sk = def.skill ?? 'ingenieria';
-    b.craft += (dt * (0.6 + c.sk[sk] * 0.025) * speedBonus(sim)) / r.time;
+    b.craft += (dt * (0.6 + c.sk[sk] * 0.025) * speedBonus(sim) * handFactor(c)) / r.time;
     gainXp(sim, c, sk, dt * 0.3);
     if (b.craft >= 1) {
       b.craft = 0;
       for (const [id, n] of r.in) takeItem({ inv: b.store }, id, n);
-      addItem({ inv: b.store }, r.out[0], r.out[1]);
+      const out = ITEMS[r.out[0]];
+      // Armas, armaduras y prótesis salen mejores o peores según la mano de quien las hace
+      const q = hasQuality(out) ? craftQuality(sim, c.sk[sk]) : undefined;
+      addItem({ inv: b.store }, r.out[0], r.out[1], q !== undefined ? { q } : undefined);
       if (!b.loop) b.count--;
-      sim.emit({ t: 'flota', x: b.x, z: b.z, text: `+${r.out[1]} ${ITEMS[r.out[0]].name}`, color: '#e8d08a' });
+      sim.emit({ t: 'flota', x: b.x, z: b.z, text: `+${r.out[1]} ${out.name}${q !== undefined ? ` (${QUALITY_NAMES[q].toLowerCase()})` : ''}`, color: '#e8d08a' });
       sim.emit({ t: 'sonido', k: 'hecho', x: b.x, z: b.z });
     }
     return true;
   }
   return false;
 }
+
+/**
+ * Calidad de lo que sale de un taller según la pericia de quien lo hace: un
+ * novato saca chatarra o algo casero; un maestro, piezas buenas. Lo militar
+ * solo sale con las técnicas de la carabina y mucha mano.
+ */
+export function craftQuality(sim: Sim, skill: number): number {
+  const roll = skill + sim.rng.range(-12, 12);
+  let q = roll < 8 ? 0 : roll < 24 ? 1 : roll < 48 ? 2 : 3;
+  if (q === 3 && skill >= 65 && hasTech(sim, 'armas2') && sim.rng.chance((skill - 60) / 60)) q = 4;
+  return q;
+}
+
+// ---------------------------------------------------------------------------
+// Daños y reparaciones de las obras
+// ---------------------------------------------------------------------------
+
+/** Daña una obra; si se viene abajo, queda en escombros (y algo de material). */
+export function damageBuilding(sim: Sim, b: Building, amount: number, by?: Char | null): void {
+  if (amount <= 0 || !sim.state.buildings.includes(b)) return;
+  b.hp -= amount;
+  if ((sim.tick + b.id) % 8 === 0) sim.emit({ t: 'sonido', k: 'golpe', x: b.x, z: b.z });
+  if (b.hp > 0) return;
+  const def = BUILDS[b.def];
+  sim.log(`${by && by.kind === 'humano' ? 'Los asaltantes han echado abajo' : 'Se ha venido abajo'}: ${def.name.toLowerCase()}.`, 'malo');
+  removeBuilding(sim, b, 0.2);
+}
+
+/** Material que hace falta para reparar una obra (el principal de los que costó). */
+export function buildingRepairMaterial(def: BuildDef): string {
+  let best = def.cost[0][0];
+  let bn = 0;
+  for (const [id, n] of def.cost) if (n > bn && id !== 'componentes') {
+    best = id;
+    bn = n;
+  }
+  return best;
+}
+
+/** Cada unidad de material devuelve una cuarta parte de la estructura. */
+const FIX_PER_UNIT = 0.25;
+
+function repairBuilding(sim: Sim, c: Char, b: Building, o: Order, dt: number): boolean {
+  const def = BUILDS[b.def];
+  if (b.prog < 1 || b.hp >= def.hp) return false;
+  const mat = buildingRepairMaterial(def);
+  if (countItem({ inv: b.got }, mat) < 1) {
+    const s = supply(sim, c, b, [[mat, 1]], b.got);
+    if (s === 'falta') {
+      if (o.data !== 'job' && (sim.tick + c.id) % 90 === 0) sim.emit({ t: 'flota', x: b.x, z: b.z, text: `Falta ${ITEMS[mat].name.toLowerCase()} para repararlo`, color: '#d8a060' });
+      return false;
+    }
+    return true;
+  }
+  if (!near(c, b)) {
+    goTo(sim, c, b);
+    return true;
+  }
+  clearDest(c);
+  faceTo(c, b.x, b.z, dt);
+  c.work = 'martillo';
+  const before = b.hp;
+  b.hp = Math.min(def.hp, b.hp + (dt * (0.6 + c.sk.ingenieria * 0.03) * speedBonus(sim) * handFactor(c) * def.hp * FIX_PER_UNIT) / Math.max(8, def.work * 0.3));
+  gainXp(sim, c, 'ingenieria', dt * 0.3);
+  if ((sim.tick + c.id) % 24 === 0) sim.emit({ t: 'sonido', k: 'martillo', x: b.x, z: b.z });
+  // Se gasta una unidad por cada cuarto de estructura
+  const units = Math.floor((b.hp - 0.001) / (def.hp * FIX_PER_UNIT)) - Math.floor((before - 0.001) / (def.hp * FIX_PER_UNIT));
+  if (units > 0) takeItem({ inv: b.got }, mat, units);
+  if (b.hp >= def.hp) {
+    b.got = [];
+    sim.emit({ t: 'flota', x: b.x, z: b.z, text: 'Reparado', color: '#9fd08a' });
+    return false;
+  }
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Reparar armas, armaduras y prótesis en un banco
+// ---------------------------------------------------------------------------
+
+export interface RepairJob {
+  s: Stack;
+  /** Quien lo lleva (puesto, en la mochila o como prótesis), o null si está en un almacén. */
+  owner: Char | null;
+  /** Parte del cuerpo si es una prótesis puesta. */
+  part?: number;
+}
+
+/** A qué distancia del banco tiene que estar la gente para que le arreglen lo suyo. */
+export const REPAIR_RANGE = 22;
+
+/** Lo que hay que reparar cerca de un banco, lo más estropeado primero. */
+export function repairQueue(sim: Sim, b: Building): RepairJob[] {
+  const out: RepairJob[] = [];
+  const consider = (s: Stack, owner: Char | null, part?: number) => {
+    if (hasQuality(ITEMS[s.id]) && condOf(s) < 0.97) out.push({ s, owner, part });
+  };
+  for (const o of sim.state.buildings) {
+    if (o.prog < 1 || !BUILDS[o.def].store || Math.hypot(o.x - b.x, o.z - b.z) > 40) continue;
+    for (const s of o.store) consider(s, null);
+  }
+  sim.forNear(b.x, b.z, REPAIR_RANGE, (p) => {
+    if (!p.player || p.st === 'muerto' || p.captive) return;
+    for (const s of Object.values(p.eq)) if (s) consider(s, p);
+    for (const s of p.inv) consider(s, p);
+    for (const [k, s] of Object.entries(p.pros ?? {})) consider(s, p, Number(k));
+  });
+  return out.sort((a, b2) => condOf(a.s) - condOf(b2.s));
+}
+
+/** Hasta dónde deja algo como nuevo quien lo repara: un novato no lo deja como salió del taller. */
+export function repairCap(skill: number): number {
+  return Math.min(1, 0.72 + skill * 0.006);
+}
+
+function repairAtBench(sim: Sim, c: Char, b: Building, def: BuildDef, dt: number): boolean {
+  const cap = repairCap(c.sk.armeria);
+  const job = repairQueue(sim, b).find((j) => condOf(j.s) < cap - 0.02);
+  if (!job) return false;
+  const mat = repairMaterial(ITEMS[job.s.id]);
+  const s = supply(sim, c, b, [[mat, 1]], b.store);
+  if (s === 'falta') {
+    if ((sim.tick + c.id) % 120 === 0) sim.emit({ t: 'flota', x: b.x, z: b.z, text: `Falta ${ITEMS[mat].name.toLowerCase()} para reparar`, color: '#d8a060' });
+    return false;
+  }
+  if (s === 'camino') return true;
+  if (!near(c, b)) {
+    goTo(sim, c, b);
+    return true;
+  }
+  clearDest(c);
+  faceTo(c, b.x, b.z, dt);
+  c.work = def.anim ?? 'martillo';
+  b.craft += (dt * (0.6 + c.sk.armeria * 0.025) * speedBonus(sim) * handFactor(c)) / 22;
+  gainXp(sim, c, 'armeria', dt * 0.25);
+  if (b.craft >= 1) {
+    b.craft = 0;
+    takeItem({ inv: b.store }, mat, 1);
+    job.s.dur = Math.min(cap, condOf(job.s) + 0.34);
+    if (job.owner && job.part !== undefined) syncPros(job.owner, job.part);
+    sim.emit({ t: 'flota', x: b.x, z: b.z, text: `Reparado: ${ITEMS[job.s.id].name}`, color: '#9fd08a' });
+    sim.emit({ t: 'sonido', k: 'hecho', x: b.x, z: b.z });
+  }
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Nidos de ametralladora
+// ---------------------------------------------------------------------------
+
+/** Dónde se pone quien sirve el arma: detrás del anillo de sacos. */
+export function turretSeat(sim: Sim, b: Building): { x: number; z: number } {
+  const d = BUILDS[b.def].hz + 0.35;
+  const x = b.x - Math.sin(b.rot) * d;
+  const z = b.z - Math.cos(b.rot) * d;
+  return sim.world.nav.nearestPassable(x, z, 2.5, true) ?? { x, z };
+}
+
+/** ¿Está sirviendo un nido de ametralladora? (no se distrae con enemigos lejanos) */
+export function manningTurret(sim: Sim, c: Char): Building | null {
+  const o = c.order;
+  if (!o || o.t !== 'operar' || !o.id) return null;
+  const b = building(sim, o.id);
+  return b && BUILDS[b.def].turret ? b : null;
+}
+
+/** Munición que le queda a un nido (su almacén más lo que lleva quien lo sirve). */
+export function turretAmmo(b: Building, op?: Char | null): number {
+  return countItem({ inv: b.store }, 'balas') + (op ? countItem(op, 'balas') : 0);
+}
+
+function manTurret(sim: Sim, c: Char, b: Building, def: BuildDef, dt: number): boolean {
+  const T = def.turret!;
+  // Sin balas en el nido, quien lo sirve va a por munición al almacén
+  if (countItem({ inv: b.store }, 'balas') < 40 && countItem(c, 'balas') < 40 && stored(sim, 'balas') > 0) {
+    const s = supply(sim, c, b, [['balas', 150]], b.store);
+    if (s === 'camino') return true;
+  }
+  const seat = turretSeat(sim, b);
+  if (Math.hypot(seat.x - c.x, seat.z - c.z) > 0.8) {
+    setDest(c, seat.x, seat.z, 0.5, true);
+    return true;
+  }
+  clearDest(c);
+  c.pose = 'cuclillas';
+  c.work = 'operar';
+  // Busca blanco: el enemigo más cercano a la vista, dentro del arco de tiro
+  const dirA = Math.atan2(Math.cos(b.rot), Math.sin(b.rot));
+  let best: Char | null = null;
+  let bd = T.range;
+  sim.forNear(b.x, b.z, T.range, (o) => {
+    if (o.st !== 'ok' || o.carriedBy || !hostile(sim, c, o)) return;
+    const d = Math.hypot(o.x - b.x, o.z - b.z);
+    if (d >= bd) return;
+    const a = Math.atan2(o.z - b.z, o.x - b.x) - dirA;
+    if (Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) > T.arc / 2) return;
+    if (sim.world.nav.sightLine(b.x, b.z, o.x, o.z) < 0.97) return;
+    best = o;
+    bd = d;
+  });
+  b.craft -= dt;
+  const t = best as Char | null;
+  if (!t) {
+    faceTo(c, b.x, b.z, dt);
+    return true;
+  }
+  faceTo(c, t.x, t.z, dt, 6);
+  if (b.craft > 0) return true;
+  const got = takeItem({ inv: b.store }, 'balas', 1) || takeItem(c, 'balas', 1);
+  if (!got) {
+    b.craft = 2;
+    sim.emit({ t: 'flota', x: b.x, z: b.z, text: 'Sin munición', color: '#d8a060' });
+    return true;
+  }
+  b.craft = T.rof * (1 + sim.rng.next() * 0.2);
+  c.sinceFire = 0;
+  fire(sim, c, t, bd, { ammo: 'balas', range: T.range, spread: T.spread, rof: T.rof, mag: 100, reload: 0, noise: T.noise }, T.pierce, 1, { x: b.x, z: b.z, w: 'ametralladora' });
+  return true;
+}
+
 
 // ---------------------------------------------------------------------------
 // Edificios que funcionan solos
@@ -519,11 +746,15 @@ export function stepBuildings(sim: Sim, dt: number) {
     }
     if (def.farm) {
       if (def.power && def.power > 0 && !pw.ok) continue;
-      // Riega (o da de comer) al empezar cada ciclo
+      // Riega (o da de comer) al empezar cada ciclo; si no hay lo de siempre, lo alternativo (los cerdos comen podrido)
       if (b.fuel <= 0 && b.grow < 1) {
-        const needs = def.farm.needs ?? [];
-        let ok = true;
-        for (const [id, n] of needs) if (stored(sim, id) + countItem({ inv: b.store }, id) < n) ok = false;
+        const has = (list: [string, number][]) => list.every(([id, n]) => stored(sim, id) + countItem({ inv: b.store }, id) >= n);
+        let needs = def.farm.needs ?? [];
+        let ok = has(needs);
+        if (!ok && def.farm.alt && has(def.farm.alt)) {
+          needs = def.farm.alt;
+          ok = true;
+        }
         if (ok) {
           for (const [id, n] of needs) {
             let left = n - takeItem({ inv: b.store }, id, n);
@@ -557,6 +788,9 @@ function hasWork(sim: Sim, b: Building): boolean {
   if (def.research) return !!sim.state.tech.cur;
   if (def.radio) return !sim.state.flags.senal;
   if (def.farm) return b.grow >= 1 || b.fuel > 0;
+  // Un nido de ametralladora siempre tiene trabajo: estar alerta
+  if (def.turret) return true;
+  if (def.repair && b.recipe === REPAIR_RECIPE) return repairQueue(sim, b).length > 0;
   if (def.recipes) {
     const r = b.recipe ? RECIPES[b.recipe] : null;
     if (!r || (!b.loop && b.count <= 0)) return false;
@@ -574,6 +808,9 @@ function outputsOf(b: Building): Stack[] {
   const r = b.recipe ? RECIPES[b.recipe] : null;
   const keep = new Set((r?.in ?? []).map((i) => i[0]));
   if (def.power && def.power < 0) keep.add('combustible');
+  // En un banco de reparación se guardan los materiales para arreglar; en un nido, la munición
+  if (b.recipe === REPAIR_RECIPE) for (const id of ['piezas', 'tela', 'cuero', 'tablones', 'acero']) keep.add(id);
+  if (def.turret) keep.add('balas');
   return b.store.filter((s) => !keep.has(s.id));
 }
 
@@ -610,6 +847,28 @@ function pickJob(sim: Sim, c: Char, safe: (x: number, z: number) => boolean): bo
       }
       if (best) {
         c.order = { t: 'construir', id: best.id, data: 'job' };
+        return true;
+      }
+      // Sin obras pendientes, repara lo que esté dañado
+      let worst: Building | null = null;
+      let wf = 0.8;
+      for (const b of sim.state.buildings) {
+        if (b.prog < 1 || !safe(b.x, b.z) || Math.hypot(b.x - c.x, b.z - c.z) > 120) continue;
+        const f = b.hp / BUILDS[b.def].hp;
+        if (f < wf && countItem({ inv: b.got }, buildingRepairMaterial(BUILDS[b.def])) + stored(sim, buildingRepairMaterial(BUILDS[b.def])) > 0) {
+          wf = f;
+          worst = b;
+        }
+      }
+      if (worst) {
+        c.order = { t: 'reparar', id: worst.id, data: 'job' };
+        return true;
+      }
+    } else if (j.t === 'guardia') {
+      // Servir un nido de ametralladora
+      const b = j.id ? building(sim, j.id) : null;
+      if (b && b.prog >= 1 && safe(b.x, b.z)) {
+        c.order = { t: 'operar', id: b.id, data: 'job' };
         return true;
       }
     } else if (j.t === 'operar' || j.t === 'cultivar' || j.t === 'cocinar' || j.t === 'investigar') {

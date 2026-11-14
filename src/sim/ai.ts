@@ -6,10 +6,12 @@ import { ITEMS, stackState } from '../data/items';
 import { addItem, countItem, crawling, gainXp, healthFrac, invWeight, limpSide, maxCarry } from './chars';
 import { findEnemy, hostile, needsCare, stepFight, topUpMagazine, treat } from './combat';
 import { clearDest, faceTo, setDest, stepMove } from './move';
-import { stepJobs, workOnBuilding } from './build';
+import { manningTurret, stepJobs, workOnBuilding } from './build';
 import { cleanAirNear } from './gas';
 import { freeSpot, occupySpot, pickSpot } from './population';
 import { isCivilDefense, workNode } from './events';
+import { defeatIntent, downedNear, runDefeatOrder, stepCaptive } from './derrota';
+import { raidIdle, runRaidOrder } from './asaltos';
 import type { Sim } from './sim';
 import type { Char, Order } from './types';
 
@@ -23,6 +25,14 @@ export function stepChar(sim: Sim, c: Char, dt: number): void {
       c.carriedBy = 0;
       if (o) o.carry = 0;
       c.pose = c.st === 'ok' ? 'normal' : 'ko';
+    } else if (o.kind !== 'humano') {
+      // Una fiera lo arrastra por el suelo, cogido con los dientes
+      c.x = o.x + Math.cos(o.face) * 0.8;
+      c.z = o.z + Math.sin(o.face) * 0.8;
+      c.face = o.face + Math.PI;
+      c.pose = 'ko';
+      c.speed = 0;
+      return;
     } else {
       c.x = o.x;
       c.z = o.z;
@@ -31,6 +41,10 @@ export function stepChar(sim: Sim, c: Char, dt: number): void {
       c.speed = 0;
       return;
     }
+  }
+  if (c.captive) {
+    stepCaptive(sim, c, dt);
+    return;
   }
   if (c.st === 'ko') {
     c.pose = 'ko';
@@ -69,7 +83,8 @@ export function stepChar(sim: Sim, c: Char, dt: number): void {
       stepMove(sim, c, dt);
       return;
     }
-  } else if (c.atkT >= 0) {
+  } else if (c.atkT >= 0 && c.order?.t !== 'romper' && c.order?.t !== 'devorar') {
+    // (Romper una obra o morder a un caído llevan su propio golpe)
     c.atkT = -1;
   }
   c.aim = 0;
@@ -113,6 +128,12 @@ function think(sim: Sim, c: Char): void {
   }
   if (c.player) {
     if (c.stance === 'pasivo') return;
+    // Quien sirve un nido de ametralladora no lo deja salvo que le tengan encima
+    if (manningTurret(sim, c)) {
+      const e = findEnemy(sim, c, 2.6);
+      if (e) c.target = e.id;
+      return;
+    }
     // No interrumpe órdenes de movimiento salvo en modo agresivo
     const e = findEnemy(sim, c, c.stance === 'agresivo' ? 40 : 11);
     if (e && (c.stance === 'agresivo' || !c.order || c.order.t !== 'mover')) c.target = e.id;
@@ -368,9 +389,66 @@ function runOrder(sim: Sim, c: Char, o: Order, dt: number): void {
       if (!workNode(sim, c, o, dt)) done(c);
       break;
     }
+    case 'reparar': {
+      if (!workOnBuilding(sim, c, o, dt)) done(c);
+      break;
+    }
+    case 'despojar':
+    case 'capturar':
+    case 'liberar':
+    case 'arrastrar':
+    case 'devorar': {
+      if (!runDefeatOrder(sim, c, o, dt)) done(c);
+      break;
+    }
+    case 'romper':
+    case 'robar': {
+      if (!runRaidOrder(sim, c, o, dt)) done(c);
+      break;
+    }
     default:
       done(c);
   }
+}
+
+/**
+ * La gente del metro ante un caído de tu escuadra (despojarlo, llevárselo
+ * preso o multarlo) y las fieras ante un inconsciente (arrastrarlo al nido o
+ * comérselo ahí mismo). Devuelve true si se pone a ello.
+ */
+function preyOnDowned(sim: Sim, c: Char): boolean {
+  if (c.order || c.target || c.carry || (sim.tick + c.id) % 15 !== 0) return false;
+  if (c.kind === 'humano') {
+    const v = downedNear(sim, c, 18);
+    if (!v) return false;
+    const o = defeatIntent(sim, c, v);
+    if (!o) return false;
+    // Uno se encarga; los demás vigilan
+    if (sim.state.chars.some((q) => q !== c && q.order && (q.order.t === 'capturar' || q.order.t === 'despojar') && q.order.id === v.id)) return false;
+    freeSpot(sim, c);
+    c.order = o;
+    return true;
+  }
+  const def = CREATURES[c.kind];
+  if (!def?.hostile) return false;
+  let best: Char | null = null;
+  let bd = 13;
+  sim.forNear(c.x, c.z, 13, (o) => {
+    if (o.kind !== 'humano' || o.st !== 'ko' || o.captive || o.carriedBy) return;
+    const d = Math.hypot(o.x - c.x, o.z - c.z);
+    if (d < bd) {
+      bd = d;
+      best = o;
+    }
+  });
+  const v = best as Char | null;
+  if (!v) return false;
+  const eaters = sim.state.chars.filter((q) => q.order && (q.order.t === 'devorar' || q.order.t === 'arrastrar') && q.order.id === v.id).length;
+  if (eaters >= 2) return false;
+  // Las fieras grandes se lo llevan a su guarida; las ratas lo roen donde cae
+  const far = Math.hypot(c.ai.homeX - v.x, c.ai.homeZ - v.z) > 6;
+  c.order = def.scale >= 0.9 && far && eaters === 0 ? { t: 'arrastrar', id: v.id } : { t: 'devorar', id: v.id };
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -419,6 +497,7 @@ function idle(sim: Sim, c: Char, dt: number, prevPose: string): void {
       break;
     case 'guardia':
     case 'vendedor': {
+      if (c.ai.mode === 'guardia' && preyOnDowned(sim, c)) return;
       const d = Math.hypot(c.ai.homeX - c.x, c.ai.homeZ - c.z);
       if (d > 1.2) setDest(c, c.ai.homeX, c.ai.homeZ, 0.5, d > 12);
       else if (!c.hasDest) {
@@ -437,6 +516,7 @@ function idle(sim: Sim, c: Char, dt: number, prevPose: string): void {
       break;
     }
     case 'fiera': {
+      if (preyOnDowned(sim, c)) return;
       // Merodea alrededor de su guarida
       c.ai.n -= dt;
       if (c.ai.sub === 'ruido') {
@@ -452,6 +532,11 @@ function idle(sim: Sim, c: Char, dt: number, prevPose: string): void {
       break;
     }
     case 'escuadra': {
+      if (preyOnDowned(sim, c)) return;
+      {
+        const sq = c.squad ? sim.squad(c.squad) : null;
+        if (sq && sq.kind === 'asalto' && raidIdle(sim, c, sq)) return;
+      }
       // El destino lo fija la lógica de escuadras; aquí solo detalles
       topUpMagazine(sim, c, dt);
       if (!c.hasDest && c.ai.sub === 'acampa') {

@@ -4,15 +4,17 @@
 
 import { BUILDS } from '../data/edificios';
 import { FACTION_LORE } from '../data/historia/facciones';
-import { ITEMS, stackState, type ItemDef, type Stack } from '../data/items';
+import { ITEMS, stackState, unitValue, type ItemDef, type Stack } from '../data/items';
 import type { FactionId, SideId } from '../data/tipos';
 import { F_DYN, F_TALL } from '../world/grid';
 import { insideStation, linkPointAt } from '../world/layout';
 import { COLLAPSE_NODES } from '../world/plans';
-import { addItem, countItem, gainXp, hirePrice, invWeight, maxCarry, NAME_MAX, takeItem } from './chars';
+import { addItem, countItem, gainXp, gradeStacks, hirePrice, invWeight, maxCarry, NAME_MAX, takeItem } from './chars';
 import { hasTech } from './build';
 import { clearDest, faceTo, setDest } from './move';
 import { newSquad, placePos } from './population';
+import { launchRaid, playerBases, punishPending, stepVisitArrival, stepVisits, type Base } from './asaltos';
+import { stepBountyHunters } from './derrota';
 import type { Sim } from './sim';
 import type { Char, Container, Order, ResNode, Shop } from './types';
 
@@ -79,6 +81,9 @@ function makeContainer(sim: Sim, x: number, z: number, place: string, kind: stri
     add('casco', 1, 2, 0.7);
     add('radioPiezas', 1, 1, 0.5);
     add('combustible', 3, 8);
+    add('botasMilitares', 1, 2, 0.5);
+    add('valenki', 1, 1, 0.4);
+    add('pantalonGuata', 1, 2, 0.5);
   } else if (kind === 'correos') {
     label = 'Cajón de la oficina de correos';
     ckind = 'cajon';
@@ -100,6 +105,8 @@ function makeContainer(sim: Sim, x: number, z: number, place: string, kind: stri
     add('escopeta', 1, 1, 0.5);
     add('petoCuero', 1, 1, 0.5);
     add('componentes', 1, 4, 0.6);
+    add('guantesCuero', 1, 1, 0.3);
+    add('perneras', 1, 1, 0.25);
     // Lo que la Hermandad le quitó a un oficial de la defensa civil
     addItem({ inv: items }, 'llaveAlmacen', 1);
   } else if (kind === 'arsenal') {
@@ -113,6 +120,8 @@ function makeContainer(sim: Sim, x: number, z: number, place: string, kind: stri
     add('casco', 1, 2);
     add('chaleco', 1, 1, 0.6);
     add('vendas', 3, 6);
+    add('botasMilitares', 1, 1, 0.4);
+    add('grebas', 1, 1, 0.2);
   } else if (kind === 'piso' || kind === 'coche' || kind === 'kiosco' || kind === 'farmacia' || kind === 'militar') {
     // La superficie: lo que nadie ha bajado al metro en veinte años
     ckind = kind === 'militar' ? 'almacen' : 'caja';
@@ -126,6 +135,9 @@ function makeContainer(sim: Sim, x: number, z: number, place: string, kind: stri
       add('te', 1, 2, 0.3);
       add('ushanka', 1, 1, 0.12);
       add('linterna', 1, 1, 0.1);
+      add('valenki', 1, 1, 0.15);
+      add('guantes', 1, 1, 0.15);
+      add('pantalonGuata', 1, 1, 0.1);
     } else if (kind === 'coche') {
       label = 'Maletero helado';
       add('combustible', 1, 4, 0.6);
@@ -160,6 +172,9 @@ function makeContainer(sim: Sim, x: number, z: number, place: string, kind: stri
       add('chaleco', 1, 1, 0.25);
       add('ak', 1, 1, 0.25);
       add('conserva', 2, 5, 0.6);
+      add('botasMilitares', 1, 1, 0.35);
+      add('pantalonGuata', 1, 1, 0.3);
+      add('guantes', 1, 1, 0.2);
     }
   } else {
     // Restos en túneles y cruces
@@ -176,8 +191,13 @@ function makeContainer(sim: Sim, x: number, z: number, place: string, kind: stri
     add('cuchillo', 1, 1, 0.12);
     add('tubo', 1, 1, 0.15);
     add('samogon', 1, 1, 0.15);
+    add('guantes', 1, 1, 0.08);
+    add('botas', 1, 1, 0.06);
     if (rng.chance(0.25)) lock = rng.int(8, 25);
   }
+  // Calidad y desgaste de lo que se encuentra: lo de los almacenes y arsenales, bueno y casi nuevo
+  const grade = kind === 'almacen' || kind === 'militar' ? 3 : kind === 'arsenal' ? 2.6 : kind === 'guarida' ? 1.5 : kind === 'correos' ? 2 : kind === 'piso' || kind === 'coche' || kind === 'kiosco' || kind === 'farmacia' ? 1.6 : 1;
+  gradeStacks(rng, items, grade, kind === 'almacen' || kind === 'militar' ? 0.25 : 0.65);
   return { id: sim.state.nextId++, x, z, place, items, lock, owner, kind: ckind, opened: false, refill: 0, label };
 }
 
@@ -311,28 +331,36 @@ export function priceMult(sim: Sim, place: string, id: string): number {
   return m;
 }
 
-/** Precio de compra (lo que paga el jugador) y de venta (lo que le pagan). */
-export function buyPrice(sim: Sim, place: string, id: string, side: SideId | null): number {
+/**
+ * Precio de compra (lo que paga el jugador) y de venta (lo que le pagan). Con
+ * la pila `s`, cuentan su calidad, su desgaste y, en la comida, su frescura.
+ */
+export function buyPrice(sim: Sim, place: string, id: string, side: SideId | null, s?: Stack): number {
   const rep = side && side !== 'LIB' && side !== 'JUG' && side !== 'MUT' ? sim.state.rep[side as FactionId] : 0;
-  return Math.max(1, Math.round(ITEMS[id].price * priceMult(sim, place, id) * 1.22 * (1 - Math.max(-30, Math.min(40, rep)) * 0.003)));
+  const base = s ? unitValue(s) : ITEMS[id].price;
+  return Math.max(1, Math.round(base * priceMult(sim, place, id) * 1.22 * (1 - Math.max(-30, Math.min(40, rep)) * 0.003)));
 }
-export function sellPrice(sim: Sim, place: string, id: string, side: SideId | null): number {
+export function sellPrice(sim: Sim, place: string, id: string, side: SideId | null, s?: Stack): number {
   const rep = side && side !== 'LIB' && side !== 'JUG' && side !== 'MUT' ? sim.state.rep[side as FactionId] : 0;
-  return Math.max(0, Math.floor(ITEMS[id].price * priceMult(sim, place, id) * 0.5 * (1 + Math.max(-30, Math.min(40, rep)) * 0.003)));
+  const base = s ? unitValue(s) : ITEMS[id].price;
+  return Math.max(0, Math.floor(base * priceMult(sim, place, id) * 0.5 * (1 + Math.max(-30, Math.min(40, rep)) * 0.003)));
 }
 
 const STOCK: Record<string, [string, number, number][]> = {
-  bazar: [['hongosSecos', 6, 16], ['vendas', 3, 8], ['tela', 4, 12], ['tablones', 6, 16], ['chatarra', 10, 30], ['piezas', 4, 12], ['balas', 40, 120], ['linterna', 1, 2], ['farol', 1, 2], ['mochila', 0, 2], ['cuchillo', 1, 2], ['martillo', 1, 2], ['palanca', 0, 2], ['agua', 6, 14], ['te', 3, 8], ['samogon', 1, 4], ['ganzuas', 0, 1], ['pico', 0, 1]],
-  comida: [['hongos', 12, 30], ['hongosSecos', 10, 24], ['guiso', 4, 12], ['carneAsada', 2, 8], ['carne', 2, 8], ['te', 4, 10], ['agua', 8, 20], ['conserva', 0, 3], ['samogon', 2, 6]],
+  bazar: [['hongosSecos', 6, 16], ['vendas', 3, 8], ['tela', 4, 12], ['tablones', 6, 16], ['chatarra', 10, 30], ['piezas', 4, 12], ['balas', 40, 120], ['linterna', 1, 2], ['farol', 1, 2], ['mochila', 0, 2], ['cuchillo', 1, 2], ['martillo', 1, 2], ['palanca', 0, 2], ['agua', 6, 14], ['te', 3, 8], ['samogon', 1, 4], ['ganzuas', 0, 1], ['pico', 0, 1], ['guantes', 0, 1], ['botas', 0, 1]],
+  comida: [['hongos', 12, 30], ['hongosSecos', 10, 24], ['guiso', 4, 12], ['carneAsada', 2, 8], ['carne', 2, 8], ['cecina', 1, 4], ['te', 4, 10], ['agua', 8, 20], ['conserva', 0, 3], ['samogon', 2, 6]],
   armas: [['balas', 80, 240], ['cartuchosEscopeta', 16, 50], ['cuchillo', 1, 3], ['machete', 1, 2], ['hacha', 0, 1], ['lanza', 0, 2], ['maza', 0, 1], ['pala', 1, 2], ['pistola', 0, 2], ['escopeta', 0, 2], ['fusilTunel', 1, 2], ['cerrojo', 0, 1], ['subfusil', 0, 1], ['ak', 0, 1], ['neumatico', 0, 1]],
-  ropa: [['ushanka', 1, 3], ['pasamontanas', 1, 2], ['casco', 0, 2], ['chaleco', 1, 2], ['petoCuero', 0, 2], ['chalecoPlacas', 0, 1], ['mochila', 1, 2], ['mochilaGrande', 0, 1], ['mascaraGas', 0, 2], ['respirador', 1, 2], ['filtros', 3, 8], ['tela', 4, 10], ['cuero', 2, 6]],
-  medico: [['vendas', 8, 20], ['botiquin', 2, 6], ['antibioticos', 0, 3], ['filtros', 2, 6], ['respirador', 0, 1]],
+  ropa: [['ushanka', 1, 3], ['pasamontanas', 1, 2], ['casco', 0, 2], ['chaleco', 1, 2], ['petoCuero', 0, 2], ['chalecoPlacas', 0, 1], ['mochila', 1, 2], ['mochilaGrande', 0, 1], ['mascaraGas', 0, 2], ['respirador', 1, 2], ['filtros', 3, 8], ['tela', 4, 10], ['cuero', 2, 6], ['guantes', 1, 2], ['guantesCuero', 0, 1], ['manoplas', 0, 1], ['pantalonGuata', 1, 2], ['perneras', 0, 1], ['grebas', 0, 1], ['botas', 1, 2], ['botasMilitares', 0, 1], ['valenki', 0, 1]],
+  medico: [['vendas', 8, 20], ['botiquin', 2, 6], ['antibioticos', 0, 3], ['filtros', 2, 6], ['respirador', 0, 1], ['protesisBrazo', 0, 1], ['protesisPierna', 0, 1]],
   chatarrero: [['chatarra', 30, 80], ['piezas', 10, 30], ['acero', 2, 10], ['tablones', 10, 30], ['componentes', 1, 6], ['salitre', 4, 14], ['polvora', 2, 8], ['combustible', 2, 10], ['cuero', 2, 6], ['tela', 4, 12], ['pico', 1, 1], ['martillo', 1, 2], ['palanca', 1, 2]],
-  bar: [['guiso', 6, 14], ['carneAsada', 3, 8], ['te', 6, 12], ['samogon', 6, 14], ['hongosSecos', 4, 10]],
-  negro: [['balas', 60, 160], ['samogon', 4, 10], ['ganzuas', 1, 2], ['escopeta', 0, 2], ['subfusil', 0, 1], ['petoCuero', 0, 1], ['conserva', 1, 5], ['componentes', 1, 5], ['libros', 0, 2], ['planos', 0, 1], ['mascaraGas', 0, 1], ['filtros', 2, 6]],
+  bar: [['guiso', 6, 14], ['carneAsada', 3, 8], ['te', 6, 12], ['samogon', 6, 14], ['hongosSecos', 4, 10], ['cecina', 0, 3]],
+  negro: [['balas', 60, 160], ['samogon', 4, 10], ['ganzuas', 1, 2], ['escopeta', 0, 2], ['subfusil', 0, 1], ['petoCuero', 0, 1], ['conserva', 1, 5], ['componentes', 1, 5], ['libros', 0, 2], ['planos', 0, 1], ['mascaraGas', 0, 1], ['filtros', 2, 6], ['manoplas', 0, 1], ['botasMilitares', 0, 1]],
   libros: [['libros', 1, 4], ['planos', 0, 2], ['componentes', 2, 8], ['filtros', 4, 10], ['radioPiezas', 0, 1], ['mascaraGas', 1, 2], ['linterna', 1, 3]],
-  caravana: [['hongosSecos', 8, 20], ['tela', 4, 12], ['piezas', 6, 16], ['balas', 40, 100], ['vendas', 2, 6], ['samogon', 2, 6], ['combustible', 1, 5], ['salitre', 2, 8], ['componentes', 0, 3]],
+  caravana: [['hongosSecos', 8, 20], ['tela', 4, 12], ['piezas', 6, 16], ['balas', 40, 100], ['vendas', 2, 6], ['samogon', 2, 6], ['combustible', 1, 5], ['salitre', 2, 8], ['componentes', 0, 3], ['cecina', 0, 4]],
 };
+
+/** Calidad media de lo que vende cada clase de tienda. */
+const SHOP_QUALITY: Record<string, number> = { armas: 2.3, ropa: 2, negro: 2.3, bazar: 1.2, chatarrero: 0.8, medico: 2, caravana: 1.5, libros: 2 };
 
 function restock(sim: Sim, shop: Shop) {
   const table = STOCK[shop.kind] ?? STOCK.bazar;
@@ -341,6 +369,7 @@ function restock(sim: Sim, shop: Shop) {
     const n = sim.rng.int(a, b);
     if (n > 0) addItem({ inv: shop.stock }, id, n);
   }
+  gradeStacks(sim.rng, shop.stock, SHOP_QUALITY[shop.kind] ?? 1.5, 0.2);
   shop.money = sim.rng.int(120, 320) * (shop.kind === 'armas' || shop.kind === 'negro' ? 2 : 1);
   shop.restock = sim.state.time + 1440 * (0.8 + sim.rng.next() * 0.6);
 }
@@ -369,11 +398,11 @@ export function buyItem(sim: Sim, buyer: Char, vendor: Char, index: number, n: n
   const s = shop.stock[index];
   if (!s) return 'Ya no queda';
   n = Math.min(n, s.n);
-  const price = buyPrice(sim, vendor.ai.place, s.id, vendor.side) * n;
+  const price = buyPrice(sim, vendor.ai.place, s.id, vendor.side, s) * n;
   if (price > sim.state.money) return 'No tienes cartuchos suficientes';
   sim.state.money -= price;
   shop.money += price;
-  addItem(buyer, s.id, n, { mag: s.mag, fil: s.fil });
+  addItem(buyer, s.id, n, stackState(s));
   s.n -= n;
   if (s.n <= 0) shop.stock.splice(index, 1);
   sim.emit({ t: 'sonido', k: 'moneda', x: buyer.x, z: buyer.z });
@@ -390,19 +419,20 @@ export function sellItem(sim: Sim, seller: Char, vendor: Char, index: number, n:
   if (s.hot && s.hot === vendor.ai.place && shop.kind !== 'negro') return 'Aquí reconocen la mercancía robada';
   n = Math.min(n, s.n);
   // Nadie regala nada, y nadie lo acepta regalado: lo que no vale ni un cartucho no se vende
-  if (sellPrice(sim, vendor.ai.place, s.id, vendor.side) <= 0) return 'Aquí no te dan nada por eso';
-  let price = sellPrice(sim, vendor.ai.place, s.id, vendor.side) * n;
+  const unit = sellPrice(sim, vendor.ai.place, s.id, vendor.side, s);
+  if (unit <= 0) return 'Aquí no te dan nada por eso';
+  let price = unit * n;
   if (price > shop.money) {
     if (shop.money <= 0) return 'El vendedor no tiene cartuchos';
-    n = Math.max(1, Math.floor(shop.money / Math.max(1, sellPrice(sim, vendor.ai.place, s.id, vendor.side))));
-    price = sellPrice(sim, vendor.ai.place, s.id, vendor.side) * n;
+    n = Math.max(1, Math.floor(shop.money / Math.max(1, unit)));
+    price = unit * n;
     if (price > shop.money) return 'El vendedor no tiene cartuchos';
   }
   shop.money -= price;
   sim.state.money += price;
   sim.state.stats.earned += price;
   sim.state.flags.tComercio = 1;
-  addItem({ inv: shop.stock }, s.id, n, { mag: s.mag, fil: s.fil });
+  addItem({ inv: shop.stock }, s.id, n, { ...stackState(s), hot: undefined });
   s.n -= n;
   if (s.n <= 0) seller.inv.splice(index, 1);
   // Vender comida en la estación sitiada es romper el embargo
@@ -559,17 +589,11 @@ export function renameChar(c: Char, name: string): string | null {
 // Sucesos periódicos
 // ---------------------------------------------------------------------------
 
-function baseCenter(sim: Sim): { x: number; z: number; n: number } | null {
-  let x = 0;
-  let z = 0;
-  let n = 0;
-  for (const b of sim.state.buildings) {
-    if (b.prog < 1) continue;
-    x += b.x;
-    z += b.z;
-    n++;
-  }
-  return n ? { x: x / n, z: z / n, n } : null;
+/** Asentamiento que sufre el próximo asalto: los grandes atraen más. */
+function raidTarget(sim: Sim): Base | null {
+  const list = playerBases(sim).filter((b) => b.n >= 3);
+  if (!list.length) return null;
+  return sim.rng.weighted(list, (b) => b.n);
 }
 
 function timer(sim: Sim, key: string, first: number): boolean {
@@ -636,13 +660,27 @@ export function stepWorldEvents(sim: Sim, dt: number) {
     setTimer(sim, 'chatarra', 600);
     for (const n of st.nodes) if ((n.kind === 'chatarra' || n.kind === 'salitre') && n.amount < 120) n.amount += 4;
   }
-  // Asaltos a la base
-  const base = baseCenter(sim);
-  if (base && base.n >= 3) {
+  // Asaltos a la base (o a un puesto avanzado)
+  const base = raidTarget(sim);
+  if (base) {
     if (timer(sim, 'asalto', 3 * 1440)) {
       setTimer(sim, 'asalto', (1.6 + sim.rng.next() * 1.8) * 1440);
       raid(sim, base);
     }
+  }
+  // Una facción ofendida no espera a que le toque: manda su castigo
+  const pend = punishPending(sim);
+  if (base && pend.length) {
+    const vhlAlive = st.stations.VHL.owner === 'VHL' && !st.flags.muerto_rybak;
+    launchRaid(sim, base, raidStrength(sim.day, base.n, defenders(sim)), raidGrade(sim.day), vhlAlive, pend[0]);
+  }
+  // Visitas de las facciones vecinas, cazarrecompensas y llegadas
+  stepVisits(sim);
+  stepBountyHunters(sim);
+  for (const sq of st.squads) if (sq.kind === 'visita') stepVisitArrival(sim, sq);
+  const main = playerBases(sim)[0];
+  if (main && main.n >= 3) {
+    const base = main;
     // Caravanas que paran en el puesto de comercio
     if (st.buildings.some((b) => b.prog >= 1 && BUILDS[b.def].trade) && timer(sim, 'visita', 900)) {
       setTimer(sim, 'visita', 1100 + sim.rng.next() * 900);
@@ -752,36 +790,11 @@ export const RAID_MAX = 14;
 /** A partir de cuántos asaltantes viene un cabecilla al mando. */
 export const RAID_LEADER = 5;
 
-function raid(sim: Sim, base: { x: number; z: number; n: number }) {
+function raid(sim: Sim, base: Base) {
   const st = sim.state;
   const vhlAlive = st.stations.VHL.owner === 'VHL' && !st.flags.muerto_rybak;
-  // Punto de partida: un nodo del grafo a 120-220 m de la base
-  const g = sim.world.graph;
-  const cands = g.nodes.filter((n) => {
-    const d = Math.hypot(n.x - base.x, n.z - base.z);
-    return d > 110 && d < 230;
-  });
-  if (!cands.length) return;
-  const from = sim.rng.pick(cands);
-  if (g.travelDistance(from.x, from.z, base.x, base.z) > 600) return;
   const strength = raidStrength(sim.day, base.n, defenders(sim));
-  const human = vhlAlive && st.rep.VHL < 30 && sim.rng.chance(0.6);
-  // Los primeros asaltos son de muertos de hambre (sin cabecilla) o de ratas; los skrebuns, más adelante
-  const roster = human
-    ? [...(strength >= RAID_LEADER ? ['jefe'] : []), ...Array(strength).fill('bandido')]
-    : strength < 4 || sim.rng.chance(0.5)
-      ? Array(strength + 2).fill('rata')
-      : Array(Math.round(strength * 0.55)).fill('skrebun');
-  const sq = newSquad(sim, human ? 'VHL' : 'MUT', 'asalto', human ? 'Asalto de saqueadores' : 'Jauría hambrienta', roster, from, [], human ? 'VHL' : '');
-  const p = sim.world.nav.nearestPassable(base.x, base.z, 12) ?? base;
-  sq.gx = p.x;
-  sq.gz = p.z;
-  sq.mode = 'asalto';
-  sq.angry = true;
-  if (human) sq.grade = raidGrade(sim.day);
-  sq.life = 1440;
-  sim.log(human ? 'Tus vigías dan la alarma: una banda de saqueadores se acerca a la base.' : 'Algo se mueve en la oscuridad: una jauría viene hacia la base.', 'malo');
-  sim.emit({ t: 'sonido', k: 'alarma', x: base.x, z: base.z });
+  launchRaid(sim, base, strength, raidGrade(sim.day), vhlAlive);
 }
 
 // ---------------------------------------------------------------------------

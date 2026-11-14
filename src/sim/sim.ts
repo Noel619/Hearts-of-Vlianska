@@ -12,6 +12,7 @@ import { updatePopulation } from './population';
 import { stepWorldEvents } from './events';
 import { stepBuildings } from './build';
 import { stepGas } from './gas';
+import { stepSpoil } from './food';
 import type { Char, Container, LogEntry, ResNode, SimEvent, SimState, Squad } from './types';
 import { SAVE_VERSION } from './types';
 import type { World } from './world';
@@ -252,6 +253,7 @@ export class Sim {
         if (c.st === 'muerto' && c.rot <= 0 && !c.carriedBy) this.removeChar(c);
       }
       stepBuildings(this, sdt);
+      stepSpoil(this, sdt);
       stepWorldEvents(this, sdt);
       for (let i = st.drops.length - 1; i >= 0; i--) {
         st.drops[i].t -= sdt;

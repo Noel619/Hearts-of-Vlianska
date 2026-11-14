@@ -1371,4 +1371,256 @@ void E;
 void Ef;
 void WH;
 
+// ---------------------------------------------------------------------------
+// Comida curada y comida podrida
+// ---------------------------------------------------------------------------
+
+const strip = (x: number, y: number, len: number, rot: number, c1: string, c2: string) =>
+  G(
+    `rotate(${rot} ${x} ${y})`,
+    P(`M${x} ${y - 3.4} Q${x + len * 0.3} ${y - 5.6} ${x + len * 0.6} ${y - 3.6} Q${x + len * 0.85} ${y - 2.2} ${x + len} ${y - 3.4} L${x + len - 0.6} ${y + 3.6} Q${x + len * 0.7} ${y + 5} ${x + len * 0.4} ${y + 3.4} Q${x + len * 0.18} ${y + 2.4} ${x} ${y + 3.8} Z`, c1, 1.3),
+    S(`M${x + 2} ${y - 1} Q${x + len * 0.4} ${y - 2.6} ${x + len - 3} ${y - 0.8}`, c2, 1.1, 0.85),
+    S(`M${x + 4} ${y + 1.6} Q${x + len * 0.5} ${y + 0.4} ${x + len - 5} ${y + 1.8}`, '#2a0e08', 0.9, 0.7),
+  );
+
+def(
+  'cecina',
+  shadow(32, 54, 22, 4),
+  strip(8, 44, 44, -24, '#6a2618', '#b0644a'),
+  strip(10, 36, 42, -18, '#5a1e12', '#a65a40'),
+  strip(14, 28, 38, -12, '#742c1c', '#c0745a'),
+  // Bramante que las ata
+  S('M28 18 Q31 30 30 46', CV.d, 2.4),
+  S('M28 18 Q31 30 30 46', CV.l, 1.1),
+  P('M26 14 Q30 10 33 14 Q31 18 28 18 Z', CV.m, 1.2),
+  S('M27 15 Q24 8 20 9 M32 14 Q37 9 40 11', CV.m, 1.3),
+  // Granos de sal
+  Cf(20, 36, 0.9, WH.l),
+  Cf(38, 30, 0.8, WH.l),
+  Cf(44, 26, 0.9, WH.l),
+  Cf(16, 44, 0.8, WH.l),
+);
+
+def(
+  'podrido',
+  shadow(32, 56, 22, 4),
+  // Escudilla abollada
+  P('M8 36 Q10 54 32 54 Q54 54 56 36 Z', IR.m),
+  F('M10 38 Q14 50 30 51 Q16 48 12 38 Z', IR.l, 0.6),
+  E(32, 36, 24, 6, IR.d, 1.4),
+  // Montón verdoso con moho
+  P('M12 36 Q14 26 24 27 Q28 18 38 22 Q48 20 52 30 Q54 35 52 37 Q32 42 12 36 Z', '#5a5a2a'),
+  F('M16 33 Q18 28 24 29 Q28 22 36 24 Q30 26 28 30 Q22 30 16 33 Z', '#7a7a3a'),
+  Cf(24, 31, 2.2, '#9aa65a', 0.9),
+  Cf(40, 28, 2.8, '#b4b880', 0.8),
+  Cf(46, 33, 1.6, '#9aa65a', 0.9),
+  Cf(31, 34, 1.4, '#2e2a14'),
+  S('M20 35 Q26 33 30 36 M36 31 Q42 30 46 34', '#3a3818', 1.1, 0.8),
+  // Moscas
+  Cf(16, 16, 1.4, K),
+  Ef(16.8, 14.6, 1.5, 0.8, '#cfe2ea', 0.8),
+  Cf(46, 12, 1.3, K),
+  Ef(45.2, 10.8, 1.4, 0.7, '#cfe2ea', 0.8),
+  S('M18 20 q3 -2 4 1 M44 16 q-3 -1 -2 3', '#2a2a2a', 0.7, 0.6),
+);
+
+// ---------------------------------------------------------------------------
+// Prótesis
+// ---------------------------------------------------------------------------
+
+def(
+  'protesisBrazo',
+  shadow(32, 56, 24, 4),
+  diag(
+    -32,
+    // Muñequera de cuero con correas
+    P('M4 25 Q4 21 8 21 H20 V43 H8 Q4 43 4 39 Z', LE.m),
+    F('M6 23 H18 V27 H6 Z', LE.l, 0.7),
+    R(10, 20, 3, 24, LE.d, 0.6, 1.1),
+    R(15, 20, 3, 24, LE.d, 0.6, 1.1),
+    Cf(11.5, 25, 1.1, BR.m),
+    Cf(16.5, 39, 1.1, BR.m),
+    // Tubo de acero con su muelle
+    P('M20 29 H42 V35 H20 Z', ST.m),
+    F('M20 29 H42 V31 H20 Z', ST.l),
+    S('M24 28 q1.4 4 0 8 M28 28 q1.4 4 0 8 M32 28 q1.4 4 0 8 M36 28 q1.4 4 0 8', IR.d, 1.1),
+    // Muñeca y garra de tres dedos
+    C(44, 32, 4.2, IR.m, 1.3),
+    Cf(43, 31, 1.4, ST.l),
+    P('M47 29 Q54 22 60 24 Q56 26 52 31 Z', ST.m, 1.2),
+    P('M48 32 Q57 31 61 34 Q56 35 50 34 Z', ST.d, 1.2),
+    P('M47 35 Q53 42 59 41 Q55 38 51 33 Z', ST.m, 1.2),
+    Cf(47.6, 30, 0.9, IR.k),
+    Cf(47.6, 34.4, 0.9, IR.k),
+  ),
+);
+
+def(
+  'protesisPierna',
+  shadow(32, 58, 16, 3.4),
+  // Cuja de cuero para el muñón
+  P('M20 6 Q32 2 44 6 L41 24 Q32 28 23 24 Z', LE.m),
+  F('M22 8 Q30 5 36 6 Q28 9 25 22 L23 21 Z', LE.l, 0.7),
+  R(18.6, 9, 26.8, 3.4, LE.d, 1, 1.1),
+  R(19.6, 17, 24.8, 3.4, LE.d, 1, 1.1),
+  Cf(42, 10.7, 1.2, BR.m),
+  Cf(41.6, 18.7, 1.2, BR.m),
+  // Rodillera articulada
+  R(25, 24, 14, 6, IR.m, 1.5),
+  C(32, 27, 2.6, ST.l, 1.1),
+  // Tubo
+  P('M28.6 30 H35.4 V49 H28.6 Z', ST.m),
+  F('M28.6 30 H30.6 V49 H28.6 Z', ST.l),
+  S('M29 36 H35 M29 42 H35', IR.d, 0.9),
+  // Taco de goma
+  P('M24 49 H40 Q42 54 40 56 H24 Q22 54 24 49 Z', BK.m),
+  F('M25 50 H32 V52 H25 Z', BK.l, 0.8),
+);
+
+// ---------------------------------------------------------------------------
+// Manos: guantes y guanteletes
+// ---------------------------------------------------------------------------
+
+/** Silueta de un guante con la palma hacia nosotros (pulgar a la derecha), de pie en (cx, cy). */
+const gloveShape = (cx: number, cy: number) =>
+  `M${cx - 9} ${cy + 10} L${cx - 10} ${cy - 4} Q${cx - 10} ${cy - 8} ${cx - 7.4} ${cy - 8} L${cx - 7.4} ${cy - 15} Q${cx - 7.4} ${cy - 18.4} ${cx - 5} ${cy - 18.4} Q${cx - 2.8} ${cy - 18.4} ${cx - 2.8} ${cy - 16} L${cx - 2.6} ${cy - 18} Q${cx - 2.4} ${cy - 21} ${cx} ${cy - 21} Q${cx + 2.6} ${cy - 21} ${cx + 2.6} ${cy - 18} L${cx + 2.8} ${cy - 16} Q${cx + 3} ${cy - 19} ${cx + 5.4} ${cy - 19} Q${cx + 7.8} ${cy - 19} ${cx + 7.6} ${cy - 15} L${cx + 7.6} ${cy - 5} L${cx + 11} ${cy - 9.6} Q${cx + 14} ${cy - 10.6} ${cx + 13.4} ${cy - 6.6} L${cx + 9} ${cy + 2} L${cx + 9} ${cy + 10} Z`;
+
+const glove = (cx: number, cy: number, rot: number, base: string, light: string, dark: string, cuff: string, extra = '') =>
+  G(
+    `rotate(${rot} ${cx} ${cy})`,
+    P(gloveShape(cx, cy), base, 1.4),
+    F(`M${cx - 8} ${cy - 3} Q${cx - 8} ${cy - 7} ${cx - 6} ${cy - 7} L${cx - 6} ${cy - 15} Q${cx - 5} ${cy - 17} ${cx - 4} ${cy - 16} L${cx - 4} ${cy + 6} Z`, light, 0.8),
+    S(`M${cx - 2.6} ${cy - 15} V${cy - 7} M${cx + 2.6} ${cy - 15} V${cy - 7}`, dark, 0.9, 0.8),
+    P(`M${cx - 9.6} ${cy + 9} H${cx + 9.6} V${cy + 17} H${cx - 9.6} Z`, cuff, 1.3),
+    S(`M${cx - 9} ${cy + 13} H${cx + 9}`, dark, 0.8, 0.7),
+    extra,
+  );
+
+def(
+  'guantes',
+  shadow(32, 57, 22, 3.4),
+  glove(22, 30, -14, CV.m, CV.l, CV.d, CV.d),
+  glove(41, 32, 12, CV.m, CV.l, CV.d, CV.d, P('M33 28 Q41 25 48 28 L47 37 Q41 39 34 37 Z', LE.m, 1.1)),
+);
+
+def(
+  'guantesCuero',
+  shadow(32, 57, 22, 3.4),
+  glove(22, 30, -14, LE.d, LE.m, LE.k, LE.k),
+  glove(41, 32, 12, LE.d, LE.m, LE.k, LE.k, S('M34 33 Q41 30 48 33 M35 25 V36', LE.l, 0.8, 0.8)),
+  Cf(41, 46, 1.1, BR.m),
+  Cf(22, 44, 1.1, BR.m),
+);
+
+def(
+  'manoplas',
+  shadow(32, 57, 22, 3.4),
+  glove(22, 30, -14, LE.d, LE.m, LE.k, IR.m, P('M13.4 18 H30.6 V26 H13.4 Z', ST.m, 1.2) + P('M13 26.6 H31 V33 H13 Z', ST.d, 1.2)),
+  glove(41, 32, 12, LE.d, LE.m, LE.k, IR.m, P('M32.4 20 H49.6 V28 H32.4 Z', ST.m, 1.2) + P('M32 28.6 H50 V35 H32 Z', ST.d, 1.2) + Cf(35, 24, 0.9, IR.k) + Cf(47, 24, 0.9, IR.k)),
+);
+
+// ---------------------------------------------------------------------------
+// Piernas
+// ---------------------------------------------------------------------------
+
+const TROUSERS = 'M14 7 H50 L54 57 H38.6 L32 24 L25.4 57 H10 Z';
+
+def(
+  'pantalonGuata',
+  shadow(32, 59, 22, 2.6),
+  P(TROUSERS, '#4e5440'),
+  F('M14.6 8 H24 L18 56 H11 Z', '#686e56', 0.8),
+  F('M43 9 H50 L53.6 56 H47 Z', '#363a2c', 0.7),
+  // Pespuntes del acolchado
+  S('M12 15 H52 M11.4 23 H30 M34 23 H52.6 M11 31 H28 M36 31 H53 M10.6 39 H27 M37 39 H53.4 M10.2 47 H26 M38 47 H53.8', '#2e3224', 1.1, 0.85),
+  Rf(14, 7, 36, 4, '#3a3e30'),
+  S('M32 11 V22', K, 1.2),
+  Cf(32, 9, 1.2, BR.m),
+);
+
+def(
+  'perneras',
+  shadow(32, 59, 22, 2.6),
+  // Dos perneras de cuero con su rodillera
+  P('M10 8 H28 L27 56 H12 Z', LE.m),
+  P('M36 8 H54 L52 56 H37 Z', LE.m),
+  F('M11 9 H17 L15 55 H12.6 Z', LE.l, 0.7),
+  F('M37 9 H43 L41 55 H38.4 Z', LE.l, 0.7),
+  E(19.5, 30, 7, 6.4, BK.m, 1.3),
+  E(45, 30, 7, 6.4, BK.m, 1.3),
+  Ef(18, 28.6, 3, 2.2, BK.l, 0.8),
+  Ef(43.6, 28.6, 3, 2.2, BK.l, 0.8),
+  // Correas
+  R(9, 15, 20, 3, LE.d, 0.5, 1.1),
+  R(35, 15, 20, 3, LE.d, 0.5, 1.1),
+  R(10.6, 44, 17.6, 3, LE.d, 0.5, 1.1),
+  R(36.4, 44, 17.6, 3, LE.d, 0.5, 1.1),
+  Cf(25, 16.5, 1, BR.m),
+  Cf(51, 16.5, 1, BR.m),
+);
+
+def(
+  'grebas',
+  shadow(32, 59, 22, 2.6),
+  // Muslera, rodillera y espinillera de chapa
+  P('M10 6 H28 L27 24 H11 Z', ST.m),
+  P('M36 6 H54 L53 24 H37 Z', ST.m),
+  C(19, 28, 6, IR.m, 1.4),
+  C(45, 28, 6, IR.m, 1.4),
+  Cf(17.6, 26.6, 2, ST.l),
+  Cf(43.6, 26.6, 2, ST.l),
+  P('M12 33 H26 L25 56 Q19 58 13 56 Z', ST.m),
+  P('M38 33 H52 L51 56 Q45 58 39 56 Z', ST.m),
+  F('M11 7 H16 L15 23 H12 Z', ST.l, 0.8),
+  F('M13 34 H17 L16 55 H14 Z', ST.l, 0.8),
+  F('M37 7 H42 L41 23 H38 Z', ST.l, 0.8),
+  F('M39 34 H43 L42 55 H40 Z', ST.l, 0.8),
+  Cf(13.4, 9, 1, IR.k),
+  Cf(24.6, 9, 1, IR.k),
+  Cf(39.4, 9, 1, IR.k),
+  Cf(50.6, 9, 1, IR.k),
+  Cf(14.6, 52, 1, IR.k),
+  Cf(23.4, 52, 1, IR.k),
+  Cf(40.6, 52, 1, IR.k),
+  Cf(49.4, 52, 1, IR.k),
+);
+
+// ---------------------------------------------------------------------------
+// Pies
+// ---------------------------------------------------------------------------
+
+/** Bota de perfil con la puntera a la derecha; `h` es la altura de la caña. */
+const boot = (x: number, y: number, h: number, base: string, light: string, dark: string, sole: string, laces = true) =>
+  P(`M${x - 6} ${y - h} H${x + 5} L${x + 6} ${y} Q${x + 8} ${y + 2} ${x + 15} ${y + 3.6} Q${x + 19.6} ${y + 5} ${x + 19} ${y + 9.6} H${x - 7.4} L${x - 7} ${y - h} Z`, base, 1.4) +
+  F(`M${x - 5.6} ${y - h + 1} H${x - 2} L${x - 2.6} ${y + 8} H${x - 6.4} Z`, light, 0.75) +
+  F(`M${x + 6} ${y + 1} Q${x + 12} ${y + 4} ${x + 18} ${y + 5.6} L${x + 18} ${y + 8.4} H${x + 6} Z`, dark, 0.6) +
+  P(`M${x - 7.6} ${y + 9.6} H${x + 19.4} Q${x + 20} ${y + 13} ${x + 18} ${y + 13} H${x - 7.6} Z`, sole, 1.2) +
+  (laces ? S(`M${x + 4} ${y - h + 4} L${x + 1} ${y - h + 7} M${x + 4.4} ${y - h + 9} L${x + 1.4} ${y - h + 12} M${x + 5} ${y - 4} L${x + 2} ${y - 1}`, WH.d, 0.9, 0.8) : '');
+
+def(
+  'botas',
+  shadow(32, 58, 24, 3),
+  boot(18, 38, 16, '#5a3e26', '#7a5838', '#3a2614', BK.m),
+  boot(37, 42, 16, '#4c3420', '#6c4c30', '#2e1e10', BK.m),
+  Cf(43, 42.6, 1.4, ST.m),
+);
+
+def(
+  'botasMilitares',
+  shadow(32, 58, 24, 3),
+  boot(18, 38, 24, BK.m, BK.l, BK.k, '#1a1612'),
+  boot(37, 42, 24, '#2a2a2a', BK.l, BK.k, '#1a1612'),
+  S('M12 18 H23 M31 22 H42', BK.l, 1, 0.8),
+);
+
+def(
+  'valenki',
+  shadow(32, 58, 24, 3),
+  boot(18, 38, 22, '#7a7468', '#9a9488', '#5a5448', '#4a443a', false),
+  boot(37, 42, 22, '#6c665a', '#8c867a', '#4e4840', '#4a443a', false),
+  // Textura del fieltro y remiendo
+  S('M14 22 l2 1 M16 28 l-2 1 M20 32 l2 1 M33 26 l2 1 M35 32 l-2 1 M39 36 l2 1', '#4e4840', 0.9, 0.7),
+  R(32, 29, 6, 5, '#8a5a3a', 0.6, 1),
+);
+
 export const ITEM_SPRITES: Record<string, string> = S_;

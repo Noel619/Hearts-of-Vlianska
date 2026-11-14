@@ -2,11 +2,11 @@
 // curas, hambre, cuerpo a cuerpo con paradas y armas de fuego con puntería.
 
 import { CREATURES } from '../data/criaturas';
-import { ITEMS } from '../data/items';
+import { ITEMS, Q_POWER, Q_SPREAD, condOf, itemPower, qualityOf, stackState, type Stack } from '../data/items';
 import { PART_HIT, type SkillId } from '../data/skills';
 import type { FactionId, SideId } from '../data/tipos';
 import { clamp, clamp01 } from '../core/math';
-import { armorAt, armorBulk, BULK_WEIGHT, countItem, crawling, gainXp, sneakMult, takeItem, weaponDef } from './chars';
+import { addItem, armorAt, armorBulk, armorOn, BULK_WEIGHT, countItem, crawling, gainXp, gearBonus, isFlesh, isLost, LIMB_NAMES, loseLimb, partWork, prosOf, sneakMult, takeItem, weaponDef, wear, wieldProblem } from './chars';
 import { clearDest, faceTo, setDest } from './move';
 import type { Sim } from './sim';
 import type { Char } from './types';
@@ -32,12 +32,16 @@ export function relation(sim: Sim, a: SideId, b: SideId): number {
 
 export function hostile(sim: Sim, a: Char, b: Char): boolean {
   if (a === b || a.side === b.side) return false;
+  // Los presos ni atacan ni son atacados (si se fugan, ya es otra cosa)
+  if (a.captive || b.captive) return false;
   if (a.kind !== 'humano' && !CREATURES[a.kind].hostile) return false;
   if (b.kind !== 'humano' && !CREATURES[b.kind].hostile) return false;
   if (a.side === 'MUT' || b.side === 'MUT') return true;
   // Escuadras enfadadas con el jugador y estaciones en alarma
   if (a.side === 'JUG' || b.side === 'JUG') {
     const npc = a.side === 'JUG' ? b : a;
+    const pc = a.side === 'JUG' ? a : b;
+    if (pc.fled && pc.fled.by === npc.side && sim.state.time < pc.fled.until) return true;
     if (npc.squad) {
       const sq = sim.squad(npc.squad);
       if (sq?.angry) return true;
@@ -141,17 +145,41 @@ function dropCarried(sim: Sim, c: Char) {
 
 export function damage(sim: Sim, t: Char, part: number, amount: number, kind: 'corte' | 'contusion' | 'bala', by: Char | null): number {
   if (t.st === 'muerto') return 0;
+  // Donde ya no hay brazo ni pierna el golpe da en el cuerpo
+  if (isLost(t, part) && !prosOf(t, part)) part = part <= 4 ? 1 : 2;
   const res = armorAt(t, part, kind === 'corte' ? 'cut' : kind === 'contusion' ? 'blunt' : 'pierce');
   const dmg = Math.max(amount * 0.1, amount * (1 - res));
+  // La armadura que para el golpe se gasta
+  const absorbed = amount - dmg;
+  if (absorbed > 0.5 && t.kind === 'humano') for (const s of armorOn(t, part)) wear(sim, t, s, absorbed * (kind === 'bala' ? 0.0011 : 0.0007));
+  t.sinceHit = 0;
+  t.hitSide = by ? Math.sign(Math.sin(Math.atan2(by.z - t.z, by.x - t.x) - t.face)) || 1 : 1;
+  if (t.player || t.sk.aguante < 60) gainXp(sim, t, 'aguante', dmg * 0.05 + 0.2);
+  const lim = t.hpMax[part];
+  if (isLost(t, part)) {
+    // Prótesis: ni sangra ni duele, pero se abolla y acaba rompiéndose
+    const p = prosOf(t, part)!;
+    const before = t.hp[part];
+    t.hp[part] = Math.max(0, t.hp[part] - dmg * 0.8);
+    p.dur = t.hp[part] / lim;
+    if (before > 0 && t.hp[part] <= 0) {
+      sim.emit({ t: 'mundo', k: 'miembro', id: t.id, a: part });
+      if (t.player) sim.log(`La prótesis de ${t.name} se ha partido. Hay que repararla en un banco de trabajo.`, 'malo');
+      const w = t.eq.arma;
+      if (w && wieldProblem(t, ITEMS[w.id])) {
+        delete t.eq.arma;
+        addItem(t, w.id, 1, stackState(w));
+      }
+    }
+    if (by && t.st === 'ok') provoke(sim, t, by);
+    return dmg;
+  }
+  const before = t.hp[part];
   t.hp[part] -= dmg;
   if (kind === 'corte') t.wound[part] += dmg * 0.55;
   else if (kind === 'bala') t.wound[part] += dmg * 0.45;
   else t.wound[part] += dmg * 0.06;
-  t.sinceHit = 0;
-  t.hitSide = by ? Math.sign(Math.sin(Math.atan2(by.z - t.z, by.x - t.x) - t.face)) || 1 : 1;
-  if (t.player || t.sk.aguante < 60) gainXp(sim, t, 'aguante', dmg * 0.05 + 0.2);
   // Muerte o inconsciencia
-  const lim = t.hpMax[part];
   if (part <= 2) {
     if (t.hp[part] <= -lim) {
       kill(sim, t, by ?? undefined);
@@ -162,6 +190,23 @@ export function damage(sim: Sim, t: Char, part: number, amount: number, kind: 'c
     } else if (kind === 'contusion' && t.st === 'ok' && part === 0 && dmg > 14 && sim.rng.chance(clamp01(dmg / 70 - t.sk.aguante * 0.004))) {
       // Un buen golpe en la cabeza aturde
       knockOut(sim, t, 6 + sim.rng.next() * 8);
+    }
+  } else if (t.kind === 'humano') {
+    // Un miembro destrozado: si el golpe es brutal se pierde; una pierna rota puede dejar cojera para siempre
+    const over = -lim - t.hp[part];
+    t.hp[part] = Math.max(t.hp[part], -lim);
+    if (over > 0) {
+      const beast = !!by && by.kind !== 'humano';
+      const p = (kind === 'corte' ? 0.18 : kind === 'bala' ? 0.06 : 0.02) + over / lim + (beast ? 0.12 : 0);
+      if (sim.rng.chance(Math.min(0.85, p))) {
+        loseLimb(sim, t, part, beast ? 'entre las fauces de una fiera' : kind === 'bala' ? 'de un balazo' : kind === 'corte' ? 'de un tajo' : '');
+        if (by && t.st === 'ok') provoke(sim, t, by);
+        return dmg;
+      }
+    }
+    if (part >= 5 && before > -lim && t.hp[part] <= -lim && !t.limp && sim.rng.chance(0.35)) {
+      t.limp = part;
+      if (t.player) sim.log(`A ${t.name} le han destrozado ${LIMB_NAMES[part]}: aunque cure, cojeará para siempre.`, 'malo');
     }
   } else {
     t.hp[part] = Math.max(t.hp[part], -lim);
@@ -225,7 +270,7 @@ export function stepNeeds(sim: Sim, c: Char, dt: number): void {
   const rest = c.pose === 'tumbado' ? 5 : c.st === 'ko' ? 1.6 : c.pose === 'sentado' || c.pose === 'sentadoSuelo' ? 1.5 : 1;
   const fed = c.hunger > 25 ? 1 : 0.4;
   for (let i = 0; i < 7; i++) {
-    if (c.hp[i] < c.hpMax[i] && c.wound[i] < 1.5) c.hp[i] = Math.min(c.hpMax[i], c.hp[i] + dt * 0.035 * rest * fed);
+    if (c.hp[i] < c.hpMax[i] && c.wound[i] < 1.5 && isFlesh(c, i)) c.hp[i] = Math.min(c.hpMax[i], c.hp[i] + dt * 0.035 * rest * fed);
   }
   // Inconsciencia
   if (c.st === 'ko') {
@@ -259,6 +304,12 @@ function tryEat(sim: Sim, c: Char): void {
       best = i;
       bestN = f;
     }
+  }
+  // Primero lo que está a punto de estropearse
+  for (let i = 0; i < c.inv.length; i++) {
+    const s = c.inv[i];
+    const f = ITEMS[s.id]?.food ?? 0;
+    if (f > 0 && s.id !== 'samogon' && (s.fresh ?? 1) < 0.35 && f <= 100 - c.hunger + 20 && (best < 0 || (s.fresh ?? 1) < (c.inv[best].fresh ?? 1))) best = i;
   }
   if (best < 0 && c.hunger < 30) {
     // Con hambre de verdad come lo que haya; si no tiene, pide a un compañero cercano
@@ -304,6 +355,7 @@ export function treat(sim: Sim, medic: Char, p: Char, dt: number): boolean {
   if (part < 0) {
     let low = 0.92;
     for (let i = 0; i < 7; i++) {
+      if (!isFlesh(p, i)) continue;
       const f = p.hp[i] / p.hpMax[i];
       if (f < low) {
         low = f;
@@ -324,7 +376,7 @@ export function treat(sim: Sim, medic: Char, p: Char, dt: number): boolean {
   takeItem(medic, item, 1);
   const q = 0.55 + medic.sk.medicina * 0.006;
   if (med.bleed) p.wound[part] = Math.max(0, p.wound[part] * (1 - q) - 2);
-  p.hp[part] = Math.min(p.hpMax[part], p.hp[part] + med.heal * q);
+  if (isFlesh(p, part)) p.hp[part] = Math.min(p.hpMax[part], p.hp[part] + med.heal * q);
   gainXp(sim, medic, 'medicina', 1.4);
   sim.emit({ t: 'sonido', k: 'venda', x: p.x, z: p.z });
   return true;
@@ -416,7 +468,8 @@ export function stepFight(sim: Sim, c: Char, dt: number): boolean {
   }
   const w = weaponDef(c);
   const creature = c.kind !== 'humano' ? CREATURES[c.kind] : null;
-  const ranged = !!w?.ranged && hasAmmo(c) && c.hp[4] > 0;
+  // Un arma de fuego rota no dispara: se usa de maza
+  const ranged = !!w?.ranged && hasAmmo(c) && partWork(c, 4) > 0 && condOf(c.eq.arma!) > 0;
   c.cd -= dt;
   // --- Ataque cuerpo a cuerpo en curso -------------------------------------------
   if (c.atkT >= 0) {
@@ -464,7 +517,8 @@ export function stepFight(sim: Sim, c: Char, dt: number): boolean {
         // La gente del metro apunta con menos prisa que la tuya: un tercio más lenta con cualquier arma
         c.cd = r.rof * (1 + sim.rng.next() * 0.25) * (c.player ? 1 : 1.35);
         c.sinceFire = 0;
-        fire(sim, c, t, dist, r, w!.pierce);
+        fire(sim, c, t, dist, r, w!.pierce * Q_POWER[qualityOf(st)], gunSpread(st));
+        if (c.player) wear(sim, c, st, r.ammo === 'aire' ? 0.0009 : 0.0012);
       }
       return true;
     }
@@ -501,15 +555,15 @@ function resolveMelee(sim: Sim, c: Char, t: Char, dist: number): void {
   const reach = (creature ? creature.reach : (w?.reach ?? 1.15)) + 0.5;
   if (dist > reach || t.st === 'muerto') return;
   const wsk = weaponSkill(c);
-  const atk = c.sk.ataque * 0.6 + c.sk[wsk] * 0.4 + c.sk.destreza * 0.1;
+  const atk = c.sk.ataque * 0.6 + c.sk[wsk] * 0.4 + c.sk.destreza * 0.1 + (creature ? 0 : gearBonus(c, 'grip'));
   const tw = weaponDef(t);
   let def = 0;
   if (t.st === 'ok') {
     // Sin arma con la que parar, se esquiva: el equipo pesado estorba
-    def = tw ? t.sk.defensa * 0.75 + tw.parry * 2 + t.sk[weaponSkill(t)] * 0.15 : t.sk.esquiva * 0.6 * Math.max(0, 1 - armorBulk(t) * BULK_WEIGHT) + t.sk.defensa * 0.25;
+    def = tw ? t.sk.defensa * 0.75 + tw.parry * 2 * Q_POWER[qualityOf(t.eq.arma!)] + t.sk[weaponSkill(t)] * 0.15 : t.sk.esquiva * 0.6 * Math.max(0, 1 - armorBulk(t) * BULK_WEIGHT) + t.sk.defensa * 0.25;
     if (t.atkT >= 0 && t.atkT < 0.6) def *= 0.55;
     if (t.target !== c.id) def *= 0.5;
-    if (t.hp[3] <= 0 || t.hp[4] <= 0) def *= 0.6;
+    if (partWork(t, 3) <= 0 || partWork(t, 4) <= 0) def *= 0.6;
     // Varios atacantes a la vez saturan la defensa
     let others = 0;
     sim.forNear(t.x, t.z, 3, (o) => {
@@ -523,6 +577,8 @@ function resolveMelee(sim: Sim, c: Char, t: Char, dist: number): void {
     t.sinceBlock = 0;
     gainXp(sim, t, tw ? 'defensa' : 'esquiva', 0.5 + atk * 0.02);
     gainXp(sim, c, 'ataque', 0.25);
+    // Parar con el arma la mella
+    if (tw && t.player) wear(sim, t, t.eq.arma!, 0.0012);
     sim.emit({ t: 'golpe', id: c.id, target: t.id, part, dmg: 0, kind: 'contusion', block: true });
     if (t.st === 'ok') provoke(sim, t, c);
     return;
@@ -532,7 +588,13 @@ function resolveMelee(sim: Sim, c: Char, t: Char, dist: number): void {
   let pierce = creature ? 0 : (w?.pierce ?? 0);
   // Las armas de fuego usadas como maza solo golpean
   if (w?.ranged) pierce = 0;
-  const skill = 1 + c.sk[wsk] * 0.009;
+  let skill = 1 + c.sk[wsk] * 0.009;
+  if (!creature) {
+    // La calidad y el estado del arma, y la mano que la empuña (una prótesis pega menos)
+    if (w && c.eq.arma) skill *= itemPower(c.eq.arma);
+    if (isLost(c, 4)) skill *= Math.max(0.5, partWork(c, 4));
+    if (c.player && w && c.eq.arma) wear(sim, c, c.eq.arma, w.ranged ? 0.004 : 0.0022);
+  }
   const rnd = sim.rng.range(0.8, 1.2);
   cut *= (0.7 + c.sk.destreza * 0.007) * skill * rnd;
   blunt *= (0.7 + c.sk.fuerza * 0.009) * skill * rnd;
@@ -548,13 +610,26 @@ function resolveMelee(sim: Sim, c: Char, t: Char, dist: number): void {
   sim.emit({ t: 'golpe', id: c.id, target: t.id, part, dmg: total, kind: cut >= blunt ? 'corte' : 'contusion', block: false });
 }
 
-function fire(sim: Sim, c: Char, t: Char, dist: number, r: NonNullable<ReturnType<typeof weaponDef>>['ranged'] & object, pierce: number): void {
+/** Dispersión que añade un arma de fuego según su calidad y su estado. */
+export function gunSpread(s: Stack): number {
+  const dur = condOf(s);
+  return Q_SPREAD[qualityOf(s)] * (dur < 0.5 ? 1 + (0.5 - dur) * 1.2 : 1);
+}
+
+type Ranged = NonNullable<ReturnType<typeof weaponDef>>['ranged'] & object;
+
+/**
+ * Un disparo de `c` contra `t`. `extra` multiplica la dispersión (calidad del
+ * arma); `from` es la boca del arma si no es la del tirador (un nido de
+ * ametralladora).
+ */
+export function fire(sim: Sim, c: Char, t: Char, dist: number, r: Ranged, pierce: number, extra = 1, from?: { x: number; z: number; w: string }): void {
   const pellets = r.pellets ?? 1;
-  let spread = r.spread * (1.7 - c.sk.punteria * 0.012);
+  let spread = r.spread * (1.7 - c.sk.punteria * 0.012) * extra;
   if (t.speed > 1.5) spread *= 1.3;
   if (c.sinceHit < 1) spread *= 1.5;
   spread *= 1.5 - 0.5 * Math.min(1, t.lit * 1.6 + (t.lamp ? 0.6 : 0));
-  if (c.hp[3] <= 0) spread *= 1.5;
+  if (!from && partWork(c, 3) <= 0.05) spread *= 1.5;
   // Medio ancho del blanco: un cuerpo con los brazos
   const ang = Math.atan(0.42 / Math.max(1, dist));
   let any = false;
@@ -570,7 +645,7 @@ function fire(sim: Sim, c: Char, t: Char, dist: number, r: NonNullable<ReturnTyp
   gainXp(sim, c, 'punteria', any ? 1.2 : 0.5);
   gainXp(sim, c, 'percepcion', 0.2);
   const miss = any ? 0 : (sim.rng.next() - 0.5) * 2.2;
-  sim.emit({ t: 'tiro', id: c.id, x: c.x, z: c.z, tx: t.x + miss, tz: t.z + miss, hit: any, w: c.eq.arma?.id ?? '' });
+  sim.emit({ t: 'tiro', id: c.id, x: from?.x ?? c.x, z: from?.z ?? c.z, tx: t.x + miss, tz: t.z + miss, hit: any, w: from?.w ?? c.eq.arma?.id ?? '' });
   sim.noise(c, r.noise);
   if (!any && t.st === 'ok') provoke(sim, t, c);
 }

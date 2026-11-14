@@ -1,13 +1,13 @@
 // Acciones que la interfaz ejecuta sobre la simulación: mover objetos entre
 // inventarios, usar y equipar, recetas, investigación, robos y servicios.
 
-import { BUILDS, RECIPES, TECHS } from '../data/edificios';
+import { BUILDS, RECIPES, REPAIR_RECIPE, TECHS } from '../data/edificios';
 import { FILTER_LIFE } from '../data/gases';
 import { ITEMS, stackState, type EquipSlot, type Stack } from '../data/items';
 import type { FactionId } from '../data/tipos';
 import { hasTech, stored, storeWeight } from './build';
 import { filterMask, fitFilter } from './gas';
-import { addItem, countItem, equip, invWeight, maxCarry, sneakMult, takeItem, unequip } from './chars';
+import { addItem, countItem, equip, fitProsthesis, invWeight, isFlesh, maxCarry, sneakMult, takeItem, unequip, wieldProblem } from './chars';
 import type { Sim } from './sim';
 import type { Building, Char, Container } from './types';
 
@@ -96,6 +96,11 @@ export function useItem(sim: Sim, c: Char, index: number): string | null {
     c.order = { t: 'curar', id: c.id };
     return null;
   }
+  if (def.pros) return fitProsthesis(sim, c, index);
+  if (def.weapon) {
+    const why = wieldProblem(c, def);
+    if (why) return why;
+  }
   if (s.id === 'filtros') {
     // Cambia el filtro de la máscara puesta por uno nuevo
     const mask = filterMask(c);
@@ -144,7 +149,7 @@ export function dropItem(sim: Sim, c: Char, index: number, n: number) {
 // --- Talleres e investigación ---------------------------------------------------
 
 export function setRecipe(sim: Sim, b: Building, recipe: string | null, count: number, loop: boolean) {
-  if (recipe && !RECIPES[recipe]) return;
+  if (recipe && !RECIPES[recipe] && !(recipe === REPAIR_RECIPE && BUILDS[b.def].repair)) return;
   if (b.recipe !== recipe) b.craft = 0;
   b.recipe = recipe;
   b.count = count;
@@ -195,8 +200,8 @@ export function startResearch(sim: Sim, id: string): string | null {
 export function healCost(sim: Sim, around: Char): number {
   let cost = 0;
   sim.forNear(around.x, around.z, 25, (o) => {
-    if (!o.player || o.st === 'muerto') return;
-    for (let i = 0; i < 7; i++) cost += Math.max(0, o.hpMax[i] - o.hp[i]) * 0.35 + o.wound[i] * 0.5;
+    if (!o.player || o.st === 'muerto' || o.captive) return;
+    for (let i = 0; i < 7; i++) cost += (isFlesh(o, i) ? Math.max(0, o.hpMax[i] - o.hp[i]) * 0.35 : 0) + o.wound[i] * 0.5;
   });
   return Math.ceil(cost);
 }
@@ -207,14 +212,33 @@ export function payHeal(sim: Sim, around: Char): string | null {
   if (cost > sim.state.money) return 'No tienes cartuchos suficientes';
   sim.state.money -= cost;
   sim.forNear(around.x, around.z, 25, (o) => {
-    if (!o.player || o.st === 'muerto') return;
+    if (!o.player || o.st === 'muerto' || o.captive) return;
     for (let i = 0; i < 7; i++) {
-      o.hp[i] = o.hpMax[i];
+      if (isFlesh(o, i)) o.hp[i] = o.hpMax[i];
       o.wound[i] = 0;
     }
     o.blood = Math.max(o.blood, 85);
     if (o.st === 'ko') o.koT = 0;
   });
   sim.log(`Los médicos atienden a tu gente (${cost} cartuchos).`, 'bueno');
+  return null;
+}
+
+/** Precio de operar una cojera crónica en el hospital. */
+export const SURGERY_COST = 220;
+
+/** ¿Hay un cirujano de verdad? Solo en el Hospital de la Esperanza (Ubezhishche Nadezhdy). */
+export function isSurgeon(doc: Char): boolean {
+  return (doc.role === 'medico' || doc.vendor === 'medico') && doc.ai.place === 'UBE';
+}
+
+/** Opera la cojera crónica de alguien de la escuadra. */
+export function payLimpSurgery(sim: Sim, doc: Char, p: Char): string | null {
+  if (!isSurgeon(doc)) return 'Aquí no saben hacer eso';
+  if (!p.limp) return 'No cojea';
+  if (sim.state.money < SURGERY_COST) return 'No tienes cartuchos suficientes';
+  sim.state.money -= SURGERY_COST;
+  delete p.limp;
+  sim.log(`En el quirófano de Nadezhdy le recolocan los huesos a ${p.name}. Ya no cojeará (${SURGERY_COST} cartuchos).`, 'bueno');
   return null;
 }

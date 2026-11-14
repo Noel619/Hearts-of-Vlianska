@@ -38,8 +38,8 @@ export interface BuildDef {
   recipes?: string[];
   skill?: SkillId;
   anim?: 'martillo' | 'operar' | 'cocinar' | 'rebuscar' | 'escribir' | 'pico';
-  /** Cultivo: lo que da, cuánto, cada cuánto (s) y qué consume por ciclo. */
-  farm?: { out: [string, number][]; time: number; needs?: [string, number][] };
+  /** Cultivo: lo que da, cuánto, cada cuánto (s) y qué consume por ciclo (o, si no hay, lo alternativo). */
+  farm?: { out: [string, number][]; time: number; needs?: [string, number][]; alt?: [string, number][] };
   /** Produce sin atención (colector de agua). */
   passive?: { out: [string, number]; time: number };
   research?: boolean;
@@ -47,6 +47,12 @@ export interface BuildDef {
   /** Atrae caravanas. */
   trade?: boolean;
   radio?: boolean;
+  /** Banco donde se reparan armas, armaduras y prótesis. */
+  repair?: boolean;
+  /** Despensa: multiplica lo que tarda en estropearse la comida guardada (menos es mejor). */
+  cold?: number;
+  /** Arma fija que dispara sola mientras alguien la sirve. */
+  turret?: { range: number; rof: number; spread: number; pierce: number; arc: number; noise: number };
 }
 
 const B: BuildDef[] = [
@@ -55,22 +61,24 @@ const B: BuildDef[] = [
   { id: 'tiendaJ', name: 'Tienda de campaña', desc: 'Lona y palos: dos camas a cubierto.', cat: 'Refugio', hx: 1.45, hz: 1.2, tall: true, cost: [['tela', 8], ['tablones', 4]], work: 30, hp: 60, prop: 'tienda', beds: 2, heal: 1.3 },
   { id: 'barraconJ', name: 'Barracón', desc: 'Chapa y tablones. Cuatro literas y sitio para guardar cosas.', cat: 'Refugio', hx: 1.9, hz: 1.5, tall: true, cost: [['chatarra', 20], ['tablones', 12], ['piezas', 6]], work: 90, hp: 220, tech: 'construccion', prop: 'barracon', beds: 4, heal: 1.5, store: 60 },
   { id: 'camillaJ', name: 'Camilla médica', desc: 'Una cama limpia y un gotero: los heridos se recuperan mucho antes.', cat: 'Refugio', hx: 1.0, hz: 0.45, cost: [['tela', 6], ['piezas', 4], ['tablones', 4]], work: 40, hp: 40, tech: 'medicina1', prop: 'camilla', beds: 1, heal: 2.6 },
-  { id: 'hogueraJ', name: 'Hoguera', desc: 'Luz, calor y un sitio donde asar carne.', cat: 'Refugio', hx: 0.62, hz: 0.62, cost: [['chatarra', 2], ['tablones', 3]], work: 10, hp: 30, prop: 'hoguera', light: { color: 0xff8a3c, intensity: 1.25, radius: 14, y: 0.7, flicker: 1, kind: 'fire' }, recipes: ['asar'], skill: 'cocina', anim: 'cocinar' },
+  { id: 'hogueraJ', name: 'Hoguera', desc: 'Luz, calor y un sitio donde asar carne… o ahumarla para que dure.', cat: 'Refugio', hx: 0.62, hz: 0.62, cost: [['chatarra', 2], ['tablones', 3]], work: 10, hp: 30, prop: 'hoguera', light: { color: 0xff8a3c, intensity: 1.25, radius: 14, y: 0.7, flicker: 1, kind: 'fire' }, recipes: ['asar', 'cecina'], skill: 'cocina', anim: 'cocinar' },
   // --- Supervivencia
   { id: 'bancalJ', name: 'Bancal de hongos', desc: 'Cajones de tierra y estiércol. Cada ciclo da hongos; necesita agua.', cat: 'Supervivencia', hx: 1.5, hz: 0.6, cost: [['tablones', 6], ['chatarra', 4]], work: 35, hp: 40, prop: 'bancal', skill: 'cultivo', anim: 'rebuscar', farm: { out: [['hongos', 7]], time: 420, needs: [['agua', 1]] } },
-  { id: 'corralJ', name: 'Corral de cerdos', desc: 'Comen de todo y se reproducen rápido. Dan carne y cuero.', cat: 'Supervivencia', hx: 2.0, hz: 1.5, cost: [['tablones', 10], ['chatarra', 6]], work: 60, hp: 80, tech: 'cerdos', prop: 'corral', skill: 'cultivo', anim: 'rebuscar', farm: { out: [['carne', 5], ['cuero', 1]], time: 900, needs: [['hongos', 4]] } },
+  { id: 'corralJ', name: 'Corral de cerdos', desc: 'Comen de todo, hasta la comida podrida, y se reproducen rápido. Dan carne y cuero.', cat: 'Supervivencia', hx: 2.0, hz: 1.5, cost: [['tablones', 10], ['chatarra', 6]], work: 60, hp: 80, tech: 'cerdos', prop: 'corral', skill: 'cultivo', anim: 'rebuscar', farm: { out: [['carne', 5], ['cuero', 1]], time: 900, needs: [['hongos', 4]], alt: [['podrido', 6]] } },
   { id: 'colectorJ', name: 'Colector de filtraciones', desc: 'Recoge y filtra el agua que rezuma de la bóveda.', cat: 'Supervivencia', hx: 1.1, hz: 1.1, tall: true, cost: [['chatarra', 8], ['tela', 2], ['piezas', 2]], work: 45, hp: 80, prop: 'deposito', store: 40, passive: { out: ['agua', 1], time: 110 } },
-  { id: 'cocinaJ', name: 'Cocina de campaña', desc: 'Una estufa de bidón y una olla: comida caliente.', cat: 'Supervivencia', hx: 0.5, hz: 0.5, cost: [['chatarra', 10], ['piezas', 4]], work: 40, hp: 60, prop: 'olla', light: { color: 0xff8a3c, intensity: 0.6, radius: 9, y: 0.4, flicker: 1, kind: 'fire' }, recipes: ['guiso', 'asar', 'secar', 'te'], skill: 'cocina', anim: 'cocinar' },
+  { id: 'cocinaJ', name: 'Cocina de campaña', desc: 'Una estufa de bidón y una olla: comida caliente, y la que sobra se seca o se ahúma.', cat: 'Supervivencia', hx: 0.5, hz: 0.5, cost: [['chatarra', 10], ['piezas', 4]], work: 40, hp: 60, prop: 'olla', light: { color: 0xff8a3c, intensity: 0.6, radius: 9, y: 0.4, flicker: 1, kind: 'fire' }, recipes: ['guiso', 'asar', 'secar', 'cecina', 'te'], skill: 'cocina', anim: 'cocinar' },
   { id: 'hidroJ', name: 'Cultivo hidropónico', desc: 'Lámparas y agua con nutrientes: el doble de comida en el mismo sitio. Necesita energía.', cat: 'Supervivencia', hx: 1.4, hz: 0.5, tall: true, cost: [['piezas', 10], ['componentes', 4], ['acero', 2]], work: 90, hp: 60, tech: 'hidroponia', prop: 'hidroponico', power: 2, skill: 'cultivo', anim: 'rebuscar', farm: { out: [['hongos', 16]], time: 420, needs: [['agua', 2]] }, light: { color: 0xd070ff, intensity: 0.5, radius: 8, y: 1.6, kind: 'glow' } },
   // --- Almacén
   { id: 'cajonJ', name: 'Cajones de almacenaje', desc: 'Donde tu gente deja y coge los materiales.', cat: 'Almacén', hx: 1.0, hz: 0.75, tall: true, cost: [['tablones', 6], ['piezas', 2]], work: 25, hp: 100, prop: 'cajas', variant: 1, store: 220 },
   { id: 'estanteJ', name: 'Estantería', desc: 'Más sitio para guardar cosas pequeñas.', cat: 'Almacén', hx: 0.9, hz: 0.25, tall: true, cost: [['tablones', 5], ['chatarra', 3]], work: 20, hp: 50, prop: 'estanteria', store: 90 },
   { id: 'puestoJ', name: 'Puesto de comercio', desc: 'Un mostrador a la vista: las caravanas que pasen pararán a comerciar.', cat: 'Almacén', hx: 1.3, hz: 0.75, cost: [['tablones', 10], ['tela', 6]], work: 50, hp: 60, prop: 'puesto', variant: 1, trade: true },
+  { id: 'despensaJ', name: 'Despensa', desc: 'Estantes con sal y ceniza en la corriente de un pozo de aire: la comida guardada aguanta el triple sin estropearse.', cat: 'Almacén', hx: 1.0, hz: 0.4, tall: true, cost: [['tablones', 8], ['tela', 2], ['salitre', 4]], work: 35, hp: 60, tech: 'conservacion', prop: 'armario', store: 120, cold: 0.33 },
   // --- Industria
-  { id: 'desguaceJ', name: 'Mesa de desguace', desc: 'Convierte la chatarra en piezas aprovechables.', cat: 'Industria', hx: 0.95, hz: 0.42, cost: [['tablones', 6], ['chatarra', 6]], work: 35, hp: 60, prop: 'bancoTrabajo', variant: 0, recipes: ['piezas', 'tablonesR'], skill: 'chatarreria', anim: 'martillo' },
+  { id: 'desguaceJ', name: 'Mesa de desguace', desc: 'Convierte la chatarra en piezas aprovechables. También se reparan aquí las armas, las armaduras y las prótesis.', cat: 'Industria', hx: 0.95, hz: 0.42, cost: [['tablones', 6], ['chatarra', 6]], work: 35, hp: 60, prop: 'bancoTrabajo', variant: 0, recipes: ['piezas', 'tablonesR'], skill: 'chatarreria', anim: 'martillo', repair: true },
   { id: 'investJ', name: 'Mesa de estudio', desc: 'Libros, planos y una lámpara. Aquí se investiga.', cat: 'Industria', hx: 0.7, hz: 0.4, cost: [['tablones', 8], ['piezas', 4]], work: 40, hp: 40, prop: 'mesa', variant: 1, research: true, skill: 'ciencia', anim: 'escribir', light: { color: 0xffd9a0, intensity: 0.4, radius: 6, y: 1.1 } },
   { id: 'fraguaJ', name: 'Fragua', desc: 'Funde raíles y chatarra en planchas de acero.', cat: 'Industria', hx: 0.8, hz: 0.7, cost: [['chatarra', 20], ['piezas', 8]], work: 80, hp: 150, tech: 'fundicion', prop: 'fragua', recipes: ['acero'], skill: 'armeria', anim: 'martillo', light: { color: 0xff6a20, intensity: 0.8, radius: 9, y: 0.9, flicker: 1, kind: 'fire' } },
-  { id: 'armeroJ', name: 'Banco de armero', desc: 'Tornillo, limas y paciencia: armas y blindajes.', cat: 'Industria', hx: 0.95, hz: 0.42, cost: [['tablones', 8], ['piezas', 10], ['acero', 2]], work: 70, hp: 80, tech: 'armas1', prop: 'bancoTrabajo', variant: 1, recipes: ['cuchillo', 'machete', 'lanza', 'fusilTunel', 'escopeta', 'neumatico', 'carabina', 'casco', 'chalecoPlacas', 'petoCuero', 'chaleco', 'mochila'], skill: 'armeria', anim: 'martillo' },
+  { id: 'armeroJ', name: 'Banco de armero', desc: 'Tornillo, limas y paciencia: armas y blindajes. La calidad depende de la mano de quien trabaje, y aquí se repara lo gastado.', cat: 'Industria', hx: 0.95, hz: 0.42, cost: [['tablones', 8], ['piezas', 10], ['acero', 2]], work: 70, hp: 80, tech: 'armas1', prop: 'bancoTrabajo', variant: 1, recipes: ['cuchillo', 'machete', 'lanza', 'fusilTunel', 'escopeta', 'neumatico', 'carabina', 'casco', 'chalecoPlacas', 'petoCuero', 'chaleco', 'mochila', 'guantes', 'guantesCuero', 'manoplas', 'pantalonGuata', 'perneras', 'grebas', 'botas'], skill: 'armeria', anim: 'martillo', repair: true },
+  { id: 'protesisJ', name: 'Banco de prótesis', desc: 'Tubo, muelles, correas y un torno: brazos y piernas de acero para quien perdió los suyos. También se reparan.', cat: 'Industria', hx: 0.95, hz: 0.42, cost: [['tablones', 6], ['piezas', 10], ['cuero', 2]], work: 60, hp: 60, tech: 'protesis', prop: 'bancoTrabajo', variant: 2, recipes: ['protesisBrazo', 'protesisPierna'], skill: 'ingenieria', anim: 'martillo', repair: true },
   { id: 'prensaJ', name: 'Prensa de munición', desc: 'Casquillos recuperados, pólvora y plomo fundido.', cat: 'Industria', hx: 0.95, hz: 0.42, cost: [['piezas', 10], ['acero', 1], ['tablones', 4]], work: 60, hp: 60, tech: 'municion', prop: 'bancoTrabajo', variant: 2, recipes: ['balas', 'cartuchosEscopeta'], skill: 'armeria', anim: 'operar' },
   { id: 'laboJ', name: 'Laboratorio', desc: 'Matraces, ácido de batería y mucho cuidado.', cat: 'Industria', hx: 0.95, hz: 0.42, cost: [['piezas', 8], ['componentes', 2], ['tablones', 6]], work: 70, hp: 50, tech: 'quimica', prop: 'bancoTrabajo', variant: 2, recipes: ['polvora', 'vendas', 'botiquin', 'antibioticos', 'filtros', 'mascaraGas'], skill: 'medicina', anim: 'operar' },
   { id: 'alambiqueJ', name: 'Alambique', desc: 'Destila samogón… y con otra receta, combustible.', cat: 'Industria', hx: 1.1, hz: 1.1, tall: true, cost: [['chatarra', 14], ['piezas', 8], ['acero', 1]], work: 80, hp: 80, tech: 'destilacion', prop: 'deposito', variant: 1, recipes: ['combustible', 'samogon'], skill: 'cocina', anim: 'operar' },
@@ -81,6 +89,22 @@ const B: BuildDef[] = [
   { id: 'muroJ', name: 'Muro de chapa', desc: 'Planchas soldadas sobre un armazón. Corta el paso y las balas.', cat: 'Defensa', hx: 1.5, hz: 0.25, tall: true, cost: [['chatarra', 10], ['piezas', 3]], work: 45, hp: 400, tech: 'construccion', prop: 'muroChapa' },
   { id: 'portonJ', name: 'Portón', desc: 'Tu gente lo cruza; los demás tendrán que echarlo abajo.', cat: 'Defensa', hx: 1.5, hz: 0.3, tall: true, gate: true, cost: [['chatarra', 14], ['piezas', 8], ['tablones', 6]], work: 70, hp: 500, tech: 'construccion', prop: 'portonChapa' },
   { id: 'alambradaJ', name: 'Alambrada', desc: 'Caballos de Frisia con espino. Frena a quien la cruza.', cat: 'Defensa', hx: 1.3, hz: 0.5, slow: true, cost: [['chatarra', 6], ['piezas', 2]], work: 25, hp: 80, prop: 'alambrada' },
+  {
+    id: 'nidoMGJ',
+    name: 'Nido de ametralladora',
+    desc: 'Una ametralladora sobre trípode tras un anillo de sacos. Dispara sola hacia delante mientras alguien la sirva; las balas, del almacén del nido o de quien la maneja.',
+    cat: 'Defensa',
+    hx: 1.25,
+    hz: 1.25,
+    cost: [['tela', 8], ['chatarra', 6], ['acero', 4], ['piezas', 12], ['componentes', 2]],
+    work: 120,
+    hp: 600,
+    tech: 'torretas',
+    prop: 'nidoMG',
+    store: 25,
+    skill: 'punteria',
+    turret: { range: 46, rof: 0.13, spread: 0.05, pierce: 34, arc: 2.4, noise: 90 },
+  },
   // --- Luz
   { id: 'bidonJ', name: 'Bidón de fuego', desc: 'Luz y calor sin cables.', cat: 'Luz', hx: 0.42, hz: 0.42, cost: [['chatarra', 4], ['tablones', 2]], work: 12, hp: 60, prop: 'bidonFuego', light: { color: 0xff8a3c, intensity: 1.0, radius: 12, y: 1.15, flicker: 1, kind: 'fire' } },
   { id: 'farolaJ', name: 'Farola', desc: 'Dos focos en un poste. Necesita energía.', cat: 'Luz', hx: 0.2, hz: 0.2, cost: [['chatarra', 4], ['componentes', 1]], work: 25, hp: 40, tech: 'generadores', prop: 'farola', power: 1, light: { color: 0xffd9a0, intensity: 1.15, radius: 17, y: 3.3 } },
@@ -133,7 +157,20 @@ const R: Recipe[] = [
   { id: 'petoCuero', name: 'Peto de cuero', in: [['cuero', 5], ['piezas', 1]], out: ['petoCuero', 1], time: 80 },
   { id: 'chaleco', name: 'Chaleco de carga', in: [['tela', 5], ['piezas', 1]], out: ['chaleco', 1], time: 50 },
   { id: 'mochila', name: 'Mochila', in: [['tela', 4], ['cuero', 1]], out: ['mochila', 1], time: 45 },
+  { id: 'guantes', name: 'Guantes de trabajo', in: [['tela', 1], ['cuero', 1]], out: ['guantes', 1], time: 25 },
+  { id: 'guantesCuero', name: 'Guantes de cuero', in: [['cuero', 2]], out: ['guantesCuero', 1], time: 35 },
+  { id: 'manoplas', name: 'Guanteletes de chapa', in: [['acero', 1], ['cuero', 1], ['piezas', 1]], out: ['manoplas', 1], time: 60, tech: 'blindaje' },
+  { id: 'pantalonGuata', name: 'Pantalón de guata', in: [['tela', 4]], out: ['pantalonGuata', 1], time: 35 },
+  { id: 'perneras', name: 'Perneras de cuero', in: [['cuero', 4], ['piezas', 1]], out: ['perneras', 1], time: 60 },
+  { id: 'grebas', name: 'Grebas de chapa', in: [['acero', 3], ['cuero', 1]], out: ['grebas', 1], time: 110, tech: 'blindaje' },
+  { id: 'botas', name: 'Botas de trabajo', in: [['cuero', 2], ['tela', 1], ['piezas', 1]], out: ['botas', 1], time: 45 },
+  { id: 'cecina', name: 'Carne ahumada', in: [['carne', 2], ['salitre', 1]], out: ['cecina', 2], time: 30 },
+  { id: 'protesisBrazo', name: 'Brazo ortopédico', in: [['acero', 2], ['piezas', 6], ['cuero', 2]], out: ['protesisBrazo', 1], time: 140, tech: 'protesis' },
+  { id: 'protesisPierna', name: 'Pierna ortopédica', in: [['acero', 1], ['piezas', 5], ['cuero', 1], ['tablones', 1]], out: ['protesisPierna', 1], time: 110, tech: 'protesis' },
 ];
+
+/** «Receta» de los bancos de reparación: arreglar lo gastado de la base y de quien esté cerca. */
+export const REPAIR_RECIPE = 'reparar';
 export const RECIPES: Record<string, Recipe> = Object.fromEntries(R.map((r) => [r.id, r]));
 
 // --- Investigación ---------------------------------------------------------------
@@ -170,6 +207,9 @@ const T: TechDef[] = [
   { id: 'mascaras', name: 'Máscaras antigás y filtros', desc: 'Filtros fabricados en serie. Los túneles contaminados dejan de ser una sentencia.', cost: 700, req: ['quimica'] },
   { id: 'excavacion', name: 'Excavación de túneles', desc: 'Permite despejar derrumbes y abrir galerías tapiadas.', cost: 1000, needs: [['planos', 1]], req: ['construccion', 'herramientas'] },
   { id: 'mando', name: 'Estructura de mando', desc: 'Oficiales y suboficiales: tu escuadra puede crecer hasta veinte personas.', cost: 800 },
+  { id: 'conservacion', name: 'Conservación de alimentos', desc: 'Sal, humo y corrientes de aire frío. Permite la despensa, donde la comida aguanta el triple.', cost: 260 },
+  { id: 'protesis', name: 'Prótesis caseras', desc: 'Muñones, correas y muelles: un brazo o una pierna de acero para quien perdió el suyo. Permite el banco de prótesis.', cost: 620, needs: [['libros', 1]], req: ['medicina1'] },
+  { id: 'torretas', name: 'Nidos de ametralladora', desc: 'Un arma pesada fija tras los sacos: un buen tirador detiene a una banda entera.', cost: 950, needs: [['planos', 1]], req: ['armas1'] },
   { id: 'radio', name: 'Radio de onda corta', desc: 'Una emisora capaz de llegar más allá de Vlianska.', cost: 1600, needs: [['planos', 2]], req: ['generadores'] },
 ];
 export const TECHS: Record<string, TechDef> = Object.fromEntries(T.map((t) => [t.id, t]));
