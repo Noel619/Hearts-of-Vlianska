@@ -649,7 +649,9 @@ export class MeshBuilder {
     const g = new THREE.BufferGeometry();
     const n = this.vcount;
     g.setAttribute('position', new THREE.BufferAttribute(this.pos.slice(0, n * 3), 3));
-    g.setAttribute('normal', new THREE.BufferAttribute(this.nor.slice(0, n * 3), 3));
+    const nor = this.nor.slice(0, n * 3);
+    fixNormals(nor);
+    g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
     g.setAttribute('color', new THREE.BufferAttribute(this.col.slice(0, n * 3), 3));
     if (this.uv) g.setAttribute('uv', new THREE.BufferAttribute(this.uv.slice(0, n * 2), 2));
     if (this.wall) g.setAttribute('wallN', new THREE.BufferAttribute(this.wall.slice(0, n * 3), 3));
@@ -659,6 +661,22 @@ export class MeshBuilder {
     g.computeBoundingSphere();
     g.computeBoundingBox();
     return g;
+  }
+}
+
+/**
+ * Una normal nula (vértice que solo toca triángulos degenerados) da NaN al
+ * normalizarla en el shader, y el resplandor extiende ese NaN a toda la
+ * pantalla: se sustituye por una normal hacia arriba.
+ */
+export function fixNormals(nor: ArrayLike<number> & { [i: number]: number }) {
+  for (let i = 0; i < nor.length; i += 3) {
+    const l = nor[i] * nor[i] + nor[i + 1] * nor[i + 1] + nor[i + 2] * nor[i + 2];
+    if (!(l > 1e-12)) {
+      nor[i] = 0;
+      nor[i + 1] = 1;
+      nor[i + 2] = 0;
+    }
   }
 }
 

@@ -1,8 +1,11 @@
-// Banco de poses para desarrollo: ?view&poses[=listo|apuntar|ataque|marcha|todo]
+// Banco de poses para desarrollo: ?view&poses[=listo|apuntar|ataque|marcha|correr|sigilo|reposo|caida|giro|varios|modelos]
 // muestra una fila de personajes sobre un suelo neutro, cada uno con un arma,
-// para revisar de cerca cómo la sujetan. Parámetros:
+// para revisar de cerca cómo la sujetan y cómo se mueven. Parámetros:
 //   only=ak,hacha   solo esas armas       t=0.4   fase fija del ataque (0..1)
+//   pick=0,3        solo esos casos del preset
 //   cam=x,z,d,yaw,pitch                    y=1.1   altura a la que mira la cámara
+//   move            avanzan de verdad (los pies que apoyan no deben patinar)
+//   freeze          el tiempo solo avanza con __vl.step(dt) (para capturas)
 
 import * as THREE from 'three';
 import { DEFAULT_LOOK, type Look } from '../data/looks';
@@ -27,6 +30,13 @@ interface Case {
   back?: string;
   lamp?: 'frontal' | 'farol';
   look?: Partial<Look>;
+  /** Tumbarse y levantarse en bucle (prueba de caídas). */
+  fall?: AnimInput['pose'];
+  /** Giro en el sitio (rad/s). */
+  turn?: number;
+  limp?: number;
+  carrying?: boolean;
+  alert?: boolean;
 }
 
 const GUNS: [string, AnimInput['hold']][] = [
@@ -76,6 +86,64 @@ function casesFor(preset: string): Case[] {
       guns(0, { sneak: true, speed: 0.9 });
       two({ sneak: true, speed: 0.9 });
       break;
+    case 'correr':
+      out.push({ weapon: null, hold: 'nada', speed: 3.6 });
+      out.push({ weapon: null, hold: 'nada', speed: 5 });
+      out.push({ weapon: 'ak', hold: 'fusil', speed: 4.2 });
+      out.push({ weapon: 'machete', hold: 'una', speed: 4.2 });
+      out.push({ weapon: 'hacha', hold: 'dos', speed: 4.2 });
+      out.push({ weapon: 'pistola', hold: 'pistola', speed: 4.2 });
+      out.push({ weapon: null, hold: 'nada', speed: 2.6, carrying: true });
+      out.push({ weapon: null, hold: 'nada', speed: 1.3, limp: -1 });
+      break;
+    case 'reposo':
+      out.push({ weapon: null, hold: 'nada' });
+      out.push({ weapon: null, hold: 'nada', look: { female: true, hair: 'largo' } });
+      out.push({ weapon: 'machete', hold: 'una' });
+      out.push({ weapon: 'ak', hold: 'fusil' });
+      out.push({ weapon: null, hold: 'nada', lamp: 'farol' });
+      out.push({ weapon: 'hacha', hold: 'dos', alert: true });
+      out.push({ weapon: 'cuchillo', hold: 'una', alert: true });
+      out.push({ weapon: null, hold: 'nada', alert: true });
+      break;
+    case 'modelos': {
+      // Muestrario de aspectos, de frente y quietos
+      const m = (look: Partial<Look>) => out.push({ weapon: null, hold: 'nada', look: { hat: 'nada', mask: 'nada', ...look } });
+      m({ top: 'guerrera', topColor: 0x4a5a3a, pantsColor: 0x3a3f2e, hair: 'corto', hairColor: 0x3a2a1c, facial: 'nada' });
+      m({ top: 'camisa', topColor: 0x8a8272, pantsColor: 0x3a4250, female: true, hair: 'largo', hairColor: 0x6e2e1a, height: 0.95, build: -0.3 });
+      m({ top: 'abrigo', topColor: 0x5a4632, pantsColor: 0x2e2a26, hair: 'corto', hairColor: 0x9a9a96, age: 2, facial: 'barba', build: 0.6, glasses: true });
+      m({ top: 'chaqueton', topColor: 0x54584a, pantsColor: 0x2e3030, hair: 'rapado', hairColor: 0x1c1612, facial: 'barba3', build: 0.8, skin: 0xa8774f });
+      m({ top: 'cuero', topColor: 0x4a3626, pantsColor: 0x35302a, female: true, hair: 'mono', hairColor: 0x1c1612, scar: true });
+      m({ top: 'traje', topColor: 0x2a2c34, pantsColor: 0x24262c, hair: 'calvo', age: 2, facial: 'bigote', hairColor: 0x5c4028 });
+      m({ top: 'tunica', topColor: 0xd8d2bc, pantsColor: 0x6a6456, facial: 'barbaLarga', skin: 0xc4946c, hairColor: 0x1c1612, hair: 'corto' });
+      m({ top: 'mono', topColor: 0x3d5674, pantsColor: 0x3d5674, hair: 'corto', hairColor: 0x8a6a3c, gloves: 0x5a4a30, build: 0.4 });
+      m({ top: 'harapos', topColor: 0x6a5c4c, pantsColor: 0x4a4238, hair: 'largo', facial: 'barba', build: -0.6, age: 2, hairColor: 0x5c4028 });
+      m({ top: 'guerrera', topColor: 0x2f4263, pantsColor: 0x232a38, hat: 'casco', hatColor: 0x3a4a66, vest: 0x1e2430, pouches: true, armband: 0x2f62d8 });
+      m({ top: 'chaqueton', topColor: 0x4a5a3a, pantsColor: 0x3a3f2e, hat: 'ushanka', hatColor: 0x4a4436, facial: 'bigote', armband: 0x3f8f3a });
+      m({ top: 'abrigo', topColor: 0xd8d8d0, pantsColor: 0x4a4a48, female: true, hair: 'mono', mask: 'respirador', build: -0.4, height: 0.94 });
+      // Sombreros y máscaras
+      m({ top: 'chaqueton', topColor: 0x6a5238, hat: 'gorra', hatColor: 0x7a2a24, facial: 'bigote' });
+      m({ top: 'guerrera', topColor: 0x5a5066, hat: 'plato', hatColor: 0x4a3f5a, medals: true, age: 2, facial: 'bigote' });
+      m({ top: 'cuero', topColor: 0x4a3626, hat: 'boina', hatColor: 0x5a1e1a, female: true, hair: 'corto' });
+      m({ top: 'cuero', topColor: 0x2e2622, hat: 'panuelo', hatColor: 0xe8572a, mask: 'panuelo', scarf: 0x8a3a1c, eyepatch: true, bandolier: true });
+      m({ top: 'tunica', topColor: 0x1f6e58, hat: 'kufi', hatColor: 0xe8e4d8, facial: 'barba', skin: 0xc4946c });
+      m({ top: 'mono', topColor: 0x6a5f44, hat: 'capucha', hatColor: 0x4a4a3c, mask: 'antigas', backpack: 0x4a4636 });
+      m({ top: 'chaqueton', topColor: 0x54584a, hat: 'pasamontanas', hatColor: 0x1e1e1e, vest: 0x2e3326, vestPlates: true, pouches: true });
+      m({ top: 'chaqueton', topColor: 0x4a4a3a, mask: 'gafas', hair: 'corto', scarf: 0x7a6a4a });
+      break;
+    }
+    case 'caida':
+      out.push({ weapon: null, hold: 'nada', fall: 'ko' });
+      out.push({ weapon: 'ak', hold: 'fusil', fall: 'ko', look: { seed: 4 } });
+      out.push({ weapon: 'machete', hold: 'una', fall: 'muerto', look: { seed: 9 } });
+      out.push({ weapon: null, hold: 'nada', fall: 'ko', look: { seed: 7 } });
+      break;
+    case 'giro':
+      out.push({ weapon: null, hold: 'nada', turn: 2.5 });
+      out.push({ weapon: 'ak', hold: 'fusil', turn: -3 });
+      out.push({ weapon: null, hold: 'nada', speed: 1.4, turn: 1.2 });
+      out.push({ weapon: null, hold: 'nada', speed: 4.4, turn: 1.6 });
+      break;
     case 'varios':
       out.push({ weapon: null, hold: 'nada' });
       out.push({ weapon: 'martillo', hold: 'nada', work: 'martillo', back: 'ak' });
@@ -108,8 +176,11 @@ export async function startPoses(root: HTMLElement, params: URLSearchParams) {
   gfx.scene.fog = null;
   gfx.scene.background = new THREE.Color(0x3a3d42);
   const only = (params.get('only') ?? '').split(',').filter(Boolean);
-  let cases = casesFor(params.get('poses') || 'listo');
+  const preset = params.get('poses') || 'listo';
+  let cases = casesFor(preset);
   if (only.length) cases = cases.filter((c) => only.includes(c.weapon ?? 'nada'));
+  const pick = (params.get('pick') ?? '').split(',').filter(Boolean).map(Number);
+  if (pick.length) cases = cases.filter((_, i) => pick.includes(i));
   const gap = Number(params.get('gap') ?? 1.25);
   const W = cases.length * gap;
   const nav = new NavGrid(-20, -20, Math.ceil((W + 40) * 2), 80);
@@ -126,10 +197,12 @@ export async function startPoses(root: HTMLElement, params: URLSearchParams) {
   gfx.scene.add(floor);
   gfx.scene.add(new THREE.HemisphereLight(0xffffff, 0x666666, 0.6));
   const fixedT = params.has('t') ? Number(params.get('t')) : null;
+  const moving = params.has('move');
+  const frozen = params.has('freeze');
   const facing = Number(params.get('face') ?? Math.PI / 2);
   const out = new Float32Array(6);
   const views = cases.map((c, i) => {
-    const look: Look = { ...DEFAULT_LOOK, seed: i * 13 + 5, ...LOOKS[i % LOOKS.length], ...c.look };
+    const look: Look = { ...DEFAULT_LOOK, seed: i * 13 + 5, ...(preset === 'modelos' ? {} : LOOKS[i % LOOKS.length]), ...c.look };
     const v = new HumanView(look);
     const x = (i + 0.5) * gap;
     v.place(x, 0, 0, facing);
@@ -141,13 +214,17 @@ export async function startPoses(root: HTMLElement, params: URLSearchParams) {
     inp.sneak = !!c.sneak;
     inp.pose = c.pose ?? 'normal';
     inp.work = c.work ?? 'nada';
+    inp.limp = c.limp ?? 0;
+    inp.carrying = !!c.carrying;
+    inp.alert = c.alert ? 1 : 0;
+    if (c.alert) inp.look = 0.3;
     v.setWeapon(c.weapon);
     v.setBack(c.back ?? null);
     v.setLamp(c.lamp ?? null);
     gfx.scene.add(v.group);
     field.sample(x, 1.2, 0, 0, 1, 0, false, out);
     v.setProbe(out[0], out[1], out[2], out[3], out[4], out[5]);
-    return { v, c, t: i * 0.31 };
+    return { v, c, t: i * 0.31, x, z: 0, face: facing };
   });
   const rig = new CameraRig(gfx.camera);
   rig.minDist = 1.2;
@@ -192,9 +269,35 @@ export async function startPoses(root: HTMLElement, params: URLSearchParams) {
         }
       }
       if (inp.aim > 0 && fixedT === null) inp.sinceFire = e.t % 1.4;
+      if (e.c.fall) {
+        // Cae, se queda en el suelo y se levanta
+        const cyc = e.t % 5;
+        inp.pose = cyc > 1 && cyc < 3.2 ? e.c.fall : 'normal';
+      }
+      if (e.c.turn) {
+        e.face -= e.c.turn * dt;
+        inp.turn = e.c.turn;
+      }
+      if (moving && inp.speed > 0) {
+        // Avanza de verdad y vuelve al principio tras unos metros
+        const d = inp.speed * dt;
+        e.x += Math.cos(e.face) * d;
+        e.z += Math.sin(e.face) * d;
+        inp.dist = d;
+        if (Math.hypot(e.x - (e.v.group.userData.x0 ?? e.x), e.z) > 3.5) {
+          e.x = e.v.group.userData.x0;
+          e.z = -1.5;
+          inp.dist = 0;
+        }
+      }
+      e.v.place(e.x, 0, e.z, e.face);
       e.v.update(dt);
     }
   };
+  for (const e of views) {
+    e.v.group.userData.x0 = e.x;
+    if (moving) e.z = -1.5;
+  }
   // Deja que las poses se asienten antes del primer fotograma
   for (let i = 0; i < 40; i++) step(1 / 30);
   let last = performance.now();
@@ -203,7 +306,7 @@ export async function startPoses(root: HTMLElement, params: URLSearchParams) {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     rig.update(dt);
-    step(dt);
+    if (!frozen) step(dt);
     gfx.render(dt);
     requestAnimationFrame(loop);
   };

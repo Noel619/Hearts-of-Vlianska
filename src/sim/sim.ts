@@ -208,10 +208,22 @@ export class Sim {
 
   // --- Bucle ------------------------------------------------------------------------
 
+  /** Duración de un paso fijo (s de juego). */
+  static readonly STEP = 1 / 30;
+
+  /**
+   * Fracción del paso fijo siguiente que ya ha transcurrido (0..1). El render
+   * dibuja a cada cual entre su posición del paso anterior y la del último,
+   * así el movimiento sale continuo aunque la simulación vaya a 30 Hz.
+   */
+  get alpha(): number {
+    return Math.min(1, Math.max(0, this.acc / Sim.STEP));
+  }
+
   /** Avanza la simulación `dt` segundos (ya multiplicados por la velocidad de juego). */
   step(dt: number) {
     this.acc += dt;
-    const h = 1 / 30;
+    const h = Sim.STEP;
     let n = 0;
     while (this.acc >= h && n < 12) {
       this.acc -= h;
