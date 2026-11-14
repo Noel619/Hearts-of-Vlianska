@@ -224,6 +224,8 @@ export function healCost(sim: Sim, around: Char): number {
   sim.forNear(around.x, around.z, 25, (o) => {
     if (!o.player || o.st === 'muerto' || o.captive) return;
     for (let i = 0; i < 7; i++) cost += (isFlesh(o, i) ? Math.max(0, o.hpMax[i] - o.hp[i]) * 0.35 : 0) + o.wound[i] * 0.5;
+    // Abrir y coser por dentro sale caro
+    cost += (o.inner ?? 0) * 1.5;
   });
   return Math.ceil(cost);
 }
@@ -239,6 +241,7 @@ export function payHeal(sim: Sim, around: Char): string | null {
       if (isFlesh(o, i)) o.hp[i] = o.hpMax[i];
       o.wound[i] = 0;
     }
+    o.inner = 0;
     o.blood = Math.max(o.blood, 85);
     if (o.st === 'ko') o.koT = 0;
   });

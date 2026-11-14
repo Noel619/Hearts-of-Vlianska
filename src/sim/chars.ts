@@ -90,13 +90,18 @@ export function newChar(sim: Sim, x: number, z: number, side: SideId, kind = 'hu
   return c;
 }
 
-/** Crea una persona de un arquetipo, con aspecto, equipo y pericia coherentes. */
-export function makeHuman(sim: Sim, side: SideId, role: Role, x: number, z: number, seed?: number): Char {
+/**
+ * Crea una persona de un arquetipo, con aspecto, equipo y pericia coherentes.
+ * `people` es la gente de la que viene (su aspecto y su nombre), si no es la de
+ * su bando: los vecinos de una estación conquistada siguen siendo quienes eran
+ * aunque cambie la bandera.
+ */
+export function makeHuman(sim: Sim, side: SideId, role: Role, x: number, z: number, seed?: number, people: SideId = side): Char {
   const rng = seed !== undefined ? new Rng(seed) : sim.rng;
   const c = newChar(sim, x, z, side);
   c.role = role;
-  c.look = makeLook(rng, side, role);
-  c.name = randomName(rng, c.look.female, side === 'CAL' ? 'califato' : side === 'VHL' ? 'bandido' : 'ruso');
+  c.look = makeLook(rng, people, role);
+  c.name = randomName(rng, c.look.female, people === 'CAL' ? 'califato' : people === 'VHL' ? 'bandido' : 'ruso');
   const lo = makeLoadout(rng, side, role);
   const cv = lo.combat;
   const set = (k: SkillId, v: number) => (c.sk[k] = Math.max(1, Math.min(95, v * rng.range(0.75, 1.25))));

@@ -704,7 +704,9 @@ function manTurret(sim: Sim, c: Char, b: Building, def: BuildDef, dt: number): b
   }
   b.craft = T.rof * (1 + sim.rng.next() * 0.2);
   c.sinceFire = 0;
-  fire(sim, c, t, bd, { ammo: 'balas', range: T.range, spread: T.spread, rof: T.rof, mag: 100, reload: 0, noise: T.noise }, T.pierce, 1, { x: b.x, z: b.z, w: 'ametralladora' });
+  // Montada en su trípode tras los sacos, la ametralladora se apunta mucho mejor que a pulso
+  const g = ITEMS[T.gun].weapon!.ranged!;
+  fire(sim, c, t, bd, { ...g, range: T.range, rof: T.rof, noise: T.noise, aim: g.aim * 0.5 }, 1, 1, { x: b.x, z: b.z, w: T.gun });
   return true;
 }
 

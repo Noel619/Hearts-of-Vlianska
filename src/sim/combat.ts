@@ -1,6 +1,8 @@
 // Salud y combate: daño por partes del cuerpo, hemorragias, inconsciencia,
-// curas, hambre, cuerpo a cuerpo con paradas y armas de fuego con puntería.
+// curas, hambre, cuerpo a cuerpo con paradas y armas de fuego con balística
+// real (ver data/balistica.ts).
 
+import { CARTRIDGES, deposited, energy, PATH, section, SKULL, velocityAt, type Cartridge } from '../data/balistica';
 import { CREATURES } from '../data/criaturas';
 import { ITEMS, Q_POWER, Q_SPREAD, condOf, itemPower, qualityOf, stackState, type Stack } from '../data/items';
 import { PART_HIT, type SkillId } from '../data/skills';
@@ -104,8 +106,11 @@ export function kill(sim: Sim, c: Char, by?: Char, cause?: string): void {
   else if (by?.player) {
     sim.state.stats.kills++;
     if (c.kind === 'skrebun') sim.state.flags.tSkrebun = 1;
+    // Cuenta de bajas que tu gente causa en cada bando (los sucesos saben de qué lado luchaste)
+    sim.state.flags['matados_' + c.side] = (sim.state.flags['matados_' + c.side] ?? 0) + 1;
     if (c.unique) sim.onUniqueDeath(c, by);
   }
+  if (c.unique) sim.state.flags['muerto_' + c.unique] = 1;
   // Los caídos en una estación quedan anotados para no reaparecer enseguida
   if (c.slot) {
     const [place] = c.slot.split(':');
@@ -146,15 +151,19 @@ function dropCarried(sim: Sim, c: Char) {
   }
 }
 
-export function damage(sim: Sim, t: Char, part: number, amount: number, kind: 'corte' | 'contusion' | 'bala', by: Char | null): number {
+/**
+ * Daño en una parte del cuerpo. `pre`: la armadura ya se ha tenido en cuenta
+ * (un balazo, que la atraviesa o no según su energía).
+ */
+export function damage(sim: Sim, t: Char, part: number, amount: number, kind: 'corte' | 'contusion' | 'bala', by: Char | null, pre = false): number {
   if (t.st === 'muerto') return 0;
   // Donde ya no hay brazo ni pierna el golpe da en el cuerpo
   if (isLost(t, part) && !prosOf(t, part)) part = part <= 4 ? 1 : 2;
-  const res = armorAt(t, part, kind === 'corte' ? 'cut' : kind === 'contusion' ? 'blunt' : 'pierce');
-  const dmg = Math.max(amount * 0.1, amount * (1 - res));
+  const res = pre ? 0 : armorAt(t, part, kind === 'corte' ? 'cut' : kind === 'contusion' ? 'blunt' : 'pierce');
+  const dmg = pre ? amount : Math.max(amount * 0.1, amount * (1 - res));
   // La armadura que para el golpe se gasta
   const absorbed = amount - dmg;
-  if (absorbed > 0.5 && t.kind === 'humano') for (const s of armorOn(t, part)) wear(sim, t, s, absorbed * (kind === 'bala' ? 0.0011 : 0.0007));
+  if (!pre && absorbed > 0.5 && t.kind === 'humano') for (const s of armorOn(t, part)) wear(sim, t, s, absorbed * (kind === 'bala' ? 0.0011 : 0.0007));
   t.sinceHit = 0;
   t.hitSide = by ? Math.sign(Math.sin(Math.atan2(by.z - t.z, by.x - t.x) - t.face)) || 1 : 1;
   if (t.player || t.sk.aguante < 60) gainXp(sim, t, 'aguante', dmg * 0.05 + 0.2);
@@ -180,7 +189,7 @@ export function damage(sim: Sim, t: Char, part: number, amount: number, kind: 'c
   const before = t.hp[part];
   t.hp[part] -= dmg;
   if (kind === 'corte') t.wound[part] += dmg * 0.55;
-  else if (kind === 'bala') t.wound[part] += dmg * 0.45;
+  else if (kind === 'bala') t.wound[part] += dmg * (pre ? 0.3 : 0.45);
   else t.wound[part] += dmg * 0.06;
   // Muerte o inconsciencia
   if (part <= 2) {
@@ -257,6 +266,11 @@ export function stepNeeds(sim: Sim, c: Char, dt: number): void {
       open += c.wound[i];
       c.wound[i] = Math.max(0, c.wound[i] - dt * (0.035 + c.sk.aguante * 0.0006));
     }
+  }
+  // La hemorragia interna sangra igual, pero solo se cierra sola si es pequeña
+  if (c.inner) {
+    open += c.inner;
+    c.inner = Math.max(0, c.inner - dt * (0.025 + c.sk.aguante * 0.0003));
   }
   c.bleed = open * 0.012;
   if (c.bleed > 0) {
@@ -355,8 +369,10 @@ export function treat(sim: Sim, medic: Char, p: Char, dt: number): boolean {
       part = i;
     }
   }
+  // Sin heridas abiertas que vendar, lo urgente es la hemorragia interna: solo la frena un botiquín
+  const inside = part < 0 && (p.inner ?? 0) > 1 && countItem(medic, 'botiquin') > 0;
   const useKit = part < 0;
-  if (part < 0) {
+  if (part < 0 && !inside) {
     let low = 0.92;
     for (let i = 0; i < 7; i++) {
       if (!isFlesh(p, i)) continue;
@@ -367,7 +383,7 @@ export function treat(sim: Sim, medic: Char, p: Char, dt: number): boolean {
       }
     }
   }
-  if (part < 0) return false;
+  if (part < 0 && !inside) return false;
   const kit = countItem(medic, 'botiquin') > 0 ? 'botiquin' : null;
   const band = countItem(medic, 'vendas') > 0 ? 'vendas' : null;
   if (!useKit && !band && !kit) return false;
@@ -379,17 +395,23 @@ export function treat(sim: Sim, medic: Char, p: Char, dt: number): boolean {
   const med = ITEMS[item].med!;
   takeItem(medic, item, 1);
   const q = 0.55 + medic.sk.medicina * 0.006;
-  if (med.bleed) p.wound[part] = Math.max(0, p.wound[part] * (1 - q) - 2);
-  if (isFlesh(p, part)) p.hp[part] = Math.min(p.hpMax[part], p.hp[part] + med.heal * q);
+  if (inside) {
+    // Sutura, compresión y morfina: la frena, pero solo un médico la cierra del todo
+    p.inner = Math.max(0, (p.inner ?? 0) * (1 - q * 0.45) - 2);
+  } else {
+    if (med.bleed) p.wound[part] = Math.max(0, p.wound[part] * (1 - q) - 2);
+    if (isFlesh(p, part)) p.hp[part] = Math.min(p.hpMax[part], p.hp[part] + med.heal * q);
+  }
   gainXp(sim, medic, 'medicina', 1.4);
   sim.emit({ t: 'sonido', k: 'venda', x: p.x, z: p.z });
   return true;
 }
 
-export function needsCare(p: Char): boolean {
+/** ¿Necesita que lo curen? `kit`: quien cura lleva botiquín (lo único que frena una hemorragia interna). */
+export function needsCare(p: Char, kit = false): boolean {
   if (p.st === 'muerto') return false;
   for (let i = 0; i < 7; i++) if (p.wound[i] > 0.8) return true;
-  return false;
+  return kit && (p.inner ?? 0) > 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -522,7 +544,7 @@ export function stepFight(sim: Sim, c: Char, dt: number): boolean {
         // La gente del metro apunta con menos prisa que la tuya: un tercio más lenta con cualquier arma
         c.cd = r.rof * (1 + sim.rng.next() * 0.25) * (c.player ? 1 : 1.35);
         c.sinceFire = 0;
-        fire(sim, c, t, dist, r, w!.pierce * Q_POWER[qualityOf(st)], gunSpread(st));
+        fire(sim, c, t, dist, r, Q_POWER[qualityOf(st)], gunSpread(st));
         if (c.player) wear(sim, c, st, r.ammo === 'aire' ? 0.0009 : 0.0012);
       }
       return true;
@@ -623,36 +645,182 @@ export function gunSpread(s: Stack): number {
 
 type Ranged = NonNullable<ReturnType<typeof weaponDef>>['ranged'] & object;
 
+// ---------------------------------------------------------------------------
+// Balística: dónde entra la bala y lo que hace dentro
+// ---------------------------------------------------------------------------
+
 /**
- * Un disparo de `c` contra `t`. `extra` multiplica la dispersión (calidad del
- * arma); `from` es la boca del arma si no es la del tirador (un nido de
- * ametralladora).
+ * Silueta de una persona de pie, de frente, en metros desde el punto al que se
+ * apunta (el esternón): [parte, x0, x1, y0, y1].
  */
-export function fire(sim: Sim, c: Char, t: Char, dist: number, r: Ranged, pierce: number, extra = 1, from?: { x: number; z: number; w: string }): void {
-  const pellets = r.pellets ?? 1;
-  let spread = r.spread * (1.7 - c.sk.punteria * 0.012) * extra;
-  if (t.speed > 1.5) spread *= 1.3;
-  if (c.sinceHit < 1) spread *= 1.5;
-  spread *= 1.5 - 0.5 * Math.min(1, t.lit * 1.6 + (t.lamp ? 0.6 : 0));
-  if (!from && partWork(c, 3) <= 0.05) spread *= 1.5;
-  // Medio ancho del blanco: un cuerpo con los brazos
-  const ang = Math.atan(0.42 / Math.max(1, dist));
+const BODY: [number, number, number, number, number][] = [
+  [0, -0.1, 0.1, 0.2, 0.44],
+  [1, -0.18, 0.18, -0.12, 0.2],
+  [2, -0.16, 0.16, -0.42, -0.12],
+  [3, -0.27, -0.18, -0.5, 0.17],
+  [4, 0.18, 0.27, -0.5, 0.17],
+  [5, -0.17, -0.02, -1.28, -0.42],
+  [6, 0.02, 0.17, -1.28, -0.42],
+];
+/** Daño por raíz cuadrada de julio cedido al cuerpo. */
+const WOUND_K = 4.9;
+/** Contusión por raíz cuadrada de julio de una bala que para el blindaje. */
+const BLUNT_K = 0.8;
+
+/** Número al azar con distribución normal (media 0, desviación 1). */
+function gauss(sim: Sim): number {
+  const u = Math.max(1e-9, sim.rng.next());
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * sim.rng.next());
+}
+
+/** Parte del cuerpo de `t` en el punto (x, y), en metros respecto a donde se apunta; -1 si la bala no le da. */
+function partAt(sim: Sim, t: Char, x: number, y: number): number {
+  const cr = t.kind !== 'humano' ? CREATURES[t.kind] : null;
+  const sc = cr ? cr.scale : 1;
+  // Una bestia de cuatro patas es un bulto bajo; dentro, la bala da donde sea
+  if (cr && cr.shape === 'cuadrupedo') {
+    const w = 0.32 * sc;
+    const h = 0.26 * sc;
+    return (x / w) ** 2 + (y / h) ** 2 <= 1 ? pickPart(sim) : -1;
+  }
+  // Quien va agachado o está en el suelo ofrece menos blanco
+  const ky = t.st !== 'ok' ? 0.35 : t.sneak ? 0.72 : 1;
+  for (const [part, x0, x1, y0, y1] of BODY) {
+    if (x >= x0 * sc && x <= x1 * sc && y >= y0 * sc * ky && y <= y1 * sc * ky) return part;
+  }
+  return -1;
+}
+
+/**
+ * Un disparo de `c` contra `t`, a `dist` metros. `power`: calidad del arma
+ * (cuánto aprovecha la pólvora); `extra` multiplica su dispersión propia
+ * (calidad y estado); `from` es la boca del arma si no es la del tirador (un
+ * nido de ametralladora).
+ *
+ * El tirador apunta al pecho. Su error de puntería (pericia, luz, si el blanco
+ * corre o si le acaban de dar) y la dispersión del arma deciden dónde llega la
+ * bala: si cae en la silueta, en qué parte del cuerpo. La posta se abre
+ * alrededor del punto apuntado, perdigón a perdigón.
+ */
+export function fire(sim: Sim, c: Char, t: Char, dist: number, r: Ranged, power = 1, extra = 1, from?: { x: number; z: number; w: string }): void {
+  const k = CARTRIDGES[r.cart];
+  let aim = r.aim * Math.max(0.35, 1.6 - c.sk.punteria * 0.012);
+  if (t.speed > 1.5) aim *= 1.3;
+  if (c.sinceHit < 1) aim *= 1.5;
+  aim *= 1.5 - 0.5 * Math.min(1, t.lit * 1.6 + (t.lamp ? 0.6 : 0));
+  if (!from && partWork(c, 3) <= 0.05) aim *= 1.5;
+  const sigma = Math.hypot(aim, r.spread * extra) * dist;
+  const ax = gauss(sim) * sigma;
+  const ay = gauss(sim) * sigma;
+  // Velocidad en boca: la del cañón según su calidad, con lo que varía una carga hecha a mano
+  const v = velocityAt(k, r.v0 * (0.94 + 0.06 * power) * (1 + gauss(sim) * 0.025), dist);
   let any = false;
-  for (let i = 0; i < pellets; i++) {
-    const p = clamp(ang / (spread * 1.25), 0.04, 0.97);
-    if (t.st !== 'muerto' && sim.rng.chance(p)) {
-      any = true;
-      const part = pickPart(sim);
-      const dmg = damage(sim, t, part, pierce * sim.rng.range(0.8, 1.25), 'bala', c);
-      sim.emit({ t: 'golpe', id: c.id, target: t.id, part, dmg, kind: 'bala', block: false });
-    }
+  for (let i = 0; i < k.pellets && t.st !== 'muerto'; i++) {
+    const x = ax + (r.pattern ? gauss(sim) * r.pattern * dist : 0);
+    const y = ay + (r.pattern ? gauss(sim) * r.pattern * dist : 0);
+    const part = partAt(sim, t, x, y);
+    if (part < 0) continue;
+    any = true;
+    const hit = bulletHit(sim, t, part, k, v, c);
+    sim.emit({ t: 'golpe', id: c.id, target: t.id, part: hit.part, dmg: hit.dmg, kind: 'bala', block: hit.stopped });
   }
   gainXp(sim, c, 'punteria', any ? 1.2 : 0.5);
   gainXp(sim, c, 'percepcion', 0.2);
-  const miss = any ? 0 : (sim.rng.next() - 0.5) * 2.2;
-  sim.emit({ t: 'tiro', id: c.id, x: from?.x ?? c.x, z: from?.z ?? c.z, tx: t.x + miss, tz: t.z + miss, hit: any, w: from?.w ?? c.eq.arma?.id ?? '' });
+  // El trazo va adonde fue la bala de verdad
+  const x0 = from?.x ?? c.x;
+  const z0 = from?.z ?? c.z;
+  const ux = (t.x - x0) / Math.max(0.1, dist);
+  const uz = (t.z - z0) / Math.max(0.1, dist);
+  const off = any ? 0 : ax + Math.sign(ax || 1) * 0.3;
+  sim.emit({ t: 'tiro', id: c.id, x: x0, z: z0, tx: t.x - uz * off, tz: t.z + ux * off, hit: any, w: from?.w ?? c.eq.arma?.id ?? '' });
   sim.noise(c, r.noise);
   if (!any && t.st === 'ok') provoke(sim, t, c);
+}
+
+/**
+ * Una bala de `v` m/s que alcanza `part`: atraviesa (o no) el blindaje que la
+ * cubre, cede en el cuerpo la energía que le da tiempo a soltar y toca lo que
+ * haya dentro. Devuelve el daño, si la paró el blindaje y la parte alcanzada.
+ */
+export function bulletHit(sim: Sim, t: Char, part: number, k: Cartridge, v: number, by: Char | null): { dmg: number; stopped: boolean; part: number } {
+  // Donde ya no hay brazo ni pierna la bala sigue hasta el cuerpo
+  if (isLost(t, part) && !prosOf(t, part)) part = part <= 4 ? 1 : 2;
+  let e = energy(k, v);
+  const area = section(k);
+  let tissue = k.tissue;
+  for (const s of armorOn(t, part)) {
+    const bal = ITEMS[s.id].armor!.bal ?? 0;
+    if (bal <= 0) continue;
+    // Energía que hace falta para abrirse paso: la resistencia de la pieza por la sección de la bala
+    const stop = bal * itemPower(s) * area;
+    if (t.kind === 'humano') wear(sim, t, s, Math.min(e, stop) * 0.00003);
+    if (e <= stop) {
+      // La para, pero el golpe llega: costillas rotas y moratones
+      return { dmg: damage(sim, t, part, BLUNT_K * Math.sqrt(e), 'contusion', by, true), stopped: true, part };
+    }
+    e -= stop;
+    // Tras atravesar una chapa, la bala va deformada y vuelca antes
+    if (bal >= 4) tissue *= 0.7;
+  }
+  const cr = t.kind !== 'humano' ? CREATURES[t.kind] : null;
+  const dep = deposited(k, e, PATH[part] * (cr ? cr.scale : 1), tissue);
+  const dmg = damage(sim, t, part, WOUND_K * Math.sqrt(dep) * sim.rng.range(0.85, 1.15), 'bala', by, true);
+  if (t.st !== 'muerto') vitals(sim, t, part, k, e, dep, by);
+  return { dmg, stopped: false, part };
+}
+
+/**
+ * Lo que toca una bala dentro del cuerpo. El cerebro (si atraviesa el
+ * cráneo), el corazón o la aorta, los pulmones, el hígado o el bazo, la
+ * columna, las arterias de brazos y piernas y los huesos: de eso, y no de la
+ * suma de rasguños, depende que un tiro tumbe o mate.
+ */
+function vitals(sim: Sim, t: Char, part: number, k: Cartridge, e: number, dep: number, by: Char | null): void {
+  if (isLost(t, part)) return;
+  const r = sim.rng.next();
+  switch (part) {
+    case 0: {
+      // Tres de cada cuatro tiros en la cabeza llegan al cerebro, si la bala atraviesa el cráneo
+      if (r >= 0.72) return;
+      const brain = deposited(k, Math.max(0, e - SKULL * section(k)), PATH[0]);
+      if (brain > 45) kill(sim, t, by ?? undefined, 'de un tiro en la cabeza');
+      else knockOut(sim, t, 120 + brain * 4, 'de un balazo en la cabeza');
+      return;
+    }
+    case 1:
+      if (r < 0.13) {
+        // Corazón o aorta: se desangra por dentro en segundos
+        bleedInside(sim, t, 420);
+        if (t.player) sim.log(`${t.name} tiene un balazo en el corazón.`, 'malo');
+      } else if (r < 0.19) knockOut(sim, t, 300, 'con un balazo en la columna');
+      else if (r < 0.75) bleedInside(sim, t, 14 + dep * 0.012); // pulmón
+      return;
+    case 2:
+      if (r < 0.28) bleedInside(sim, t, 20 + dep * 0.015); // hígado, bazo, riñón o un vaso grande
+      else if (r < 0.33) knockOut(sim, t, 300, 'con un balazo en la columna');
+      else bleedInside(sim, t, 6); // intestino
+      return;
+    default: {
+      const leg = part >= 5;
+      // Una arteria (braquial o femoral) sangra a chorro, aunque una venda bien apretada la corta
+      if (r < (leg ? 0.08 : 0.07)) {
+        t.wound[part] += leg ? 130 : 110;
+        if (t.player) sim.log(`A ${t.name} le han abierto una arteria: hay que vendarle ${LIMB_NAMES[part]} ya.`, 'malo');
+      }
+      // Hueso roto: el brazo o la pierna dejan de servir hasta que se cure
+      if (t.kind === 'humano' && t.hp[part] > -0.15 * t.hpMax[part] && sim.rng.chance(Math.min(0.85, dep / (leg ? 450 : 350)))) {
+        t.hp[part] = -0.15 * t.hpMax[part];
+        if (t.player) sim.log(`A ${t.name} le han roto ${LIMB_NAMES[part]} de un balazo.`, 'malo');
+      }
+    }
+  }
+}
+
+/** Hemorragia interna: no la corta una venda. */
+function bleedInside(sim: Sim, t: Char, n: number): void {
+  const before = t.inner ?? 0;
+  t.inner = before + n;
+  if (t.player && before < 5 && n >= 10 && n < 400) sim.log(`${t.name} sangra por dentro: hace falta un botiquín, y pronto un médico.`, 'malo');
 }
 
 /** Recarga fuera de combate. */

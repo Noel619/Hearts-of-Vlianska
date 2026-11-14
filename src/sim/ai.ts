@@ -489,13 +489,13 @@ function idle(sim: Sim, c: Char, dt: number, prevPose: string): void {
         return;
       }
       if (c.autoHeal && (sim.tick + c.id) % 20 === 0 && !c.hasDest) {
-        if (needsCare(c) && hasMeds(c)) {
+        if (needsCare(c, hasKit(c)) && hasMeds(c)) {
           c.order = { t: 'curar', id: c.id };
           return;
         }
         let patient: Char | null = null;
         sim.forNear(c.x, c.z, 14, (o) => {
-          if (!patient && o.player && o !== c && needsCare(o) && !o.carriedBy) patient = o;
+          if (!patient && o.player && o !== c && needsCare(o, hasKit(c)) && !o.carriedBy) patient = o;
         });
         if (patient && hasMeds(c)) {
           c.order = { t: 'curar', id: (patient as Char).id };
@@ -532,7 +532,7 @@ function idle(sim: Sim, c: Char, dt: number, prevPose: string): void {
         // Tras el combate, atiende a los suyos
         if ((sim.tick + c.id) % 45 === 0 && hasMeds(c)) {
           sim.forNear(c.x, c.z, 16, (o) => {
-            if (!c.order && o.side === c.side && o !== c && needsCare(o)) c.order = { t: 'curar', id: o.id };
+            if (!c.order && o.side === c.side && o !== c && needsCare(o, hasKit(c))) c.order = { t: 'curar', id: o.id };
           });
         }
       }
@@ -569,7 +569,7 @@ function idle(sim: Sim, c: Char, dt: number, prevPose: string): void {
       }
       if ((sim.tick + c.id) % 60 === 0 && hasMeds(c) && !c.order) {
         sim.forNear(c.x, c.z, 14, (o) => {
-          if (!c.order && o.side === c.side && o !== c && o.squad === c.squad && needsCare(o)) c.order = { t: 'curar', id: o.id };
+          if (!c.order && o.side === c.side && o !== c && o.squad === c.squad && needsCare(o, hasKit(c))) c.order = { t: 'curar', id: o.id };
         });
       }
       break;
@@ -582,6 +582,11 @@ function idle(sim: Sim, c: Char, dt: number, prevPose: string): void {
 function hasMeds(c: Char): boolean {
   for (const s of c.inv) if (s.id === 'vendas' || s.id === 'botiquin') return true;
   return false;
+}
+
+/** ¿Lleva botiquín? (lo único que frena una hemorragia interna) */
+function hasKit(c: Char): boolean {
+  return c.inv.some((s) => s.id === 'botiquin' && s.n > 0);
 }
 
 /** Vida cotidiana: va de un punto de interés a otro y hace algo en cada uno. */
@@ -617,7 +622,9 @@ function resident(sim: Sim, c: Char, dt: number, prevPose: string): void {
       const d = Math.hypot(sp.x - c.x, sp.z - c.z);
       if (d < 1.1) {
         ai.sub = 'estar';
-        ai.n = 25 + sim.rng.next() * 90;
+        // En la cama de noche se queda hasta el amanecer (más o menos)
+        const h = sim.hour;
+        ai.n = sp.kind === 'cama' && (h >= 22 || h < 6) ? 240 + sim.rng.next() * 360 : 25 + sim.rng.next() * 90;
         c.x += (sp.x - c.x) * 0.5;
         c.z += (sp.z - c.z) * 0.5;
       } else {

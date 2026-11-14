@@ -15,6 +15,7 @@ import { clearDest, faceTo, setDest } from './move';
 import { newSquad, placePos } from './population';
 import { launchRaid, playerBases, punishPending, stepVisitArrival, stepVisits, type Base } from './asaltos';
 import { stepBountyHunters } from './derrota';
+import { stepSiege } from './asedio';
 import type { Sim } from './sim';
 import type { Char, Container, Order, ResNode, Shop } from './types';
 import { placeId } from './world';
@@ -330,6 +331,8 @@ export function priceMult(sim: Sim, place: string, id: string): number {
   if (sim.state.flags.inviernoCrudo && def.kind === 'comida') m *= 1.35;
   if (sim.state.flags.fiebre && def.kind === 'medicina') m *= 1.4;
   if (place === 'MER' && sim.state.flags.galeriaOlvidada && def.kind === 'comida') m = Math.min(m, 1.6);
+  // Sin el Califato no hay embargo: la comida y las medicinas vuelven a entrar en Mertvaya
+  if (place === 'MER' && sim.state.stations.MER?.owner !== 'CAL' && (def.kind === 'comida' || def.kind === 'medicina')) m = Math.min(m, 1.15);
   return m;
 }
 
@@ -439,7 +442,7 @@ export function sellItem(sim: Sim, seller: Char, vendor: Char, index: number, n:
   s.n -= n;
   if (s.n <= 0) seller.inv.splice(index, 1);
   // Vender comida en la estación sitiada es romper el embargo
-  if (vendor.ai.place === 'MER' && def.kind === 'comida' && n >= 3) {
+  if (vendor.ai.place === 'MER' && def.kind === 'comida' && n >= 3 && sim.state.stations.MER?.owner === 'CAL') {
     sim.rep('CAL', Math.min(6, n * 0.25));
     sim.state.flags.contrabando = (sim.state.flags.contrabando ?? 0) + n;
   }
@@ -637,7 +640,8 @@ export function stepWorldEvents(sim: Sim, dt: number) {
   if (timer(sim, 'rumor', 900)) {
     setTimer(sim, 'rumor', 700 + sim.rng.next() * 900);
     const e = sim.rng.pick(FLAVOR);
-    if (e.id !== 'carta' || !st.flags.cartaEntregada) {
+    // (El cerco de Mertvaya acaba si cae la estación)
+    if ((e.id !== 'carta' || !st.flags.cartaEntregada) && (e.id !== 'cerco' || st.stations.MER?.owner === 'CAL')) {
       sim.log(e.text, 'historia');
       if (e.flag) st.flags[e.flag] = st.time + (e.dur ?? 1440);
       if (e.id === 'refugiados') {
@@ -678,6 +682,8 @@ export function stepWorldEvents(sim: Sim, dt: number) {
     const vhlAlive = st.stations.VHL.owner === 'VHL' && !st.flags.muerto_rybak;
     launchRaid(sim, base, raidStrength(sim.day, base.n, defenders(sim)), raidGrade(sim.day), vhlAlive, pend[0]);
   }
+  // El primer suceso de la historia: el Asedio de Mertvaya
+  stepSiege(sim);
   // Visitas de las facciones vecinas, cazarrecompensas y llegadas
   stepVisits(sim);
   stepBountyHunters(sim);

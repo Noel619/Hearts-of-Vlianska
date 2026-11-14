@@ -10,6 +10,7 @@ import { countItem } from './chars';
 import { isCivilDefense } from './events';
 import { playerBases } from './asaltos';
 import { bailCost, captiveText, HUNT_MIN } from './derrota';
+import { mertvayaFallen, siegeEpilogue, siegeThread } from './asedio';
 import { FACTION_LORE } from '../data/historia/facciones';
 import type { FactionId } from '../data/tipos';
 import type { Sim } from './sim';
@@ -39,7 +40,8 @@ export interface Step {
 
 interface StepDef {
   title: string;
-  hint: string;
+  /** Pista (o la pista según cómo vaya la partida). */
+  hint: string | ((sim: Sim) => string);
   done: (sim: Sim) => boolean;
 }
 
@@ -95,11 +97,19 @@ export const STEPS: Record<string, StepDef> = {
   curar: { title: 'Que os curen', hint: 'Cualquier médico os atiende por unos cartuchos (Hablar). El mejor hospital del metro está en Ubezhishche Nadezhdy.', done: (sim) => !!sim.state.flags.tCurado },
   municion: { title: 'Conseguid munición', hint: 'Se compra en los puestos de armas (en Industrialnaya, más barata) o se fabrica en una prensa de munición.', done: (sim) => bullets(sim) >= 80 },
   // El hambre de la Esmeralda
-  hambreCerco: { title: 'Comed algo', hint: 'En Izumrudnaya la comida vale su peso en balas: vended lo que no os haga falta o traedla de fuera, por la galería. Con hambre no se pelea ni se trabaja.', done: (sim) => sim.players.length > 0 && sim.players.every((c) => c.st === 'muerto' || c.hunger >= 45) },
-  muro: { title: 'Encontrad la galería tapiada', hint: 'Sale de Izumrudnaya hacia el este: un túnel viejo que acaba en un tabique de ladrillo.', done: (sim) => !!sim.state.flags.tMuro },
-  tabique: { title: 'Echad abajo el primer tabique', hint: 'Clic derecho sobre el muro: «Derribar el muro». Con el pico se va más deprisa.', done: (sim) => sim.state.nodes.filter((n) => n.kind === 'muro').length < 2 || !!sim.state.flags.galeriaOlvidada },
-  galeria: { title: 'Abrid la Galería Olvidada', hint: 'Cruzadla deprisa: el aire viciado quema el pecho. Al fondo, otro tabique da a Mostovaya.', done: (sim) => !!sim.state.flags.galeriaOlvidada },
-  contrabando: { title: 'Traed comida a Izumrudnaya', hint: 'Vended comida en la estación, tres raciones o más: romper el embargo os hará queridos.', done: (sim) => (sim.state.flags.contrabando ?? 0) >= 3 },
+  hambreCerco: {
+    title: 'Comed algo',
+    hint: (sim) =>
+      mertvayaFallen(sim)
+        ? 'Sin el Califato no hay embargo: la comida vuelve a su precio en los puestos de Izumrudnaya.'
+        : 'En Izumrudnaya la comida vale su peso en balas: vended lo que no os haga falta o traedla de fuera, por la galería. Con hambre no se pelea ni se trabaja.',
+    done: (sim) => sim.players.length > 0 && sim.players.every((c) => c.st === 'muerto' || c.hunger >= 45),
+  },
+  // (Si cae Mertvaya ya no hay cerco que romper: estos pasos dejan de tener sentido)
+  muro: { title: 'Encontrad la galería tapiada', hint: 'Sale de Izumrudnaya hacia el este: un túnel viejo que acaba en un tabique de ladrillo.', done: (sim) => !!sim.state.flags.tMuro || mertvayaFallen(sim) },
+  tabique: { title: 'Echad abajo el primer tabique', hint: 'Clic derecho sobre el muro: «Derribar el muro». Con el pico se va más deprisa.', done: (sim) => sim.state.nodes.filter((n) => n.kind === 'muro').length < 2 || !!sim.state.flags.galeriaOlvidada || mertvayaFallen(sim) },
+  galeria: { title: 'Abrid la Galería Olvidada', hint: 'Cruzadla deprisa: el aire viciado quema el pecho. Al fondo, otro tabique da a Mostovaya.', done: (sim) => !!sim.state.flags.galeriaOlvidada || mertvayaFallen(sim) },
+  contrabando: { title: 'Traed comida a Izumrudnaya', hint: 'Vended comida en la estación, tres raciones o más: romper el embargo os hará queridos.', done: (sim) => (sim.state.flags.contrabando ?? 0) >= 3 || mertvayaFallen(sim) },
 };
 
 /** Primeros pasos genéricos (partidas sin comienzo conocido). */
@@ -108,7 +118,10 @@ const DEFAULT_STEPS = ['hablar', 'comercio', 'chatarra', 'construir', 'estudio',
 /** Los primeros pasos de la escuadra: los de su comienzo, en su orden. */
 export function firstSteps(sim: Sim): Step[] {
   const ids = SCENARIO_BY_ID[sim.state.scenario]?.steps ?? DEFAULT_STEPS;
-  return ids.filter((id) => STEPS[id]).map((id) => ({ id, title: STEPS[id].title, hint: STEPS[id].hint, done: STEPS[id].done(sim) }));
+  return ids.filter((id) => STEPS[id]).map((id) => {
+    const s = STEPS[id];
+    return { id, title: s.title, hint: typeof s.hint === 'function' ? s.hint(sim) : s.hint, done: s.done(sim) };
+  });
 }
 
 /** Los hilos de la historia y el estado de la base. */
@@ -162,8 +175,10 @@ export function storyThreads(sim: Sim): Thread[] {
     });
 
   // --- El califa
-  if (f.baghdadiPreso) out.push({ id: 'califa', title: 'El califa de la Esmeralda', sprite: 'agua', state: 'hecho', text: 'Baghdadi responde ante un tribunal del Levantamiento. El imán Karimov pide el fin del embargo.', hint: '' });
-  else if (f.muerto_baghdadi) out.push({ id: 'califa', title: 'El califa de la Esmeralda', sprite: 'agua', state: 'hecho', text: 'Mohhammed Baghdadi ha muerto. Izumrudnaya decide quién ocupa su sitio.', hint: '' });
+  const fallen = mertvayaFallen(sim);
+  if (f.baghdadiPreso)
+    out.push({ id: 'califa', title: 'El califa de la Esmeralda', sprite: 'agua', state: 'hecho', text: fallen ? 'Baghdadi, capturado en la caída de Mertvaya, espera juicio en Stalingradskaya.' : 'Baghdadi responde ante un tribunal del Levantamiento. El imán Karimov pide el fin del embargo.', hint: '' });
+  else if (f.muerto_baghdadi) out.push({ id: 'califa', title: 'El califa de la Esmeralda', sprite: 'agua', state: 'hecho', text: fallen ? 'Mohhammed Baghdadi ha muerto, y su califato con él.' : 'Mohhammed Baghdadi ha muerto. Izumrudnaya decide quién ocupa su sitio.', hint: '' });
   else
     out.push({
       id: 'califa',
@@ -177,7 +192,8 @@ export function storyThreads(sim: Sim): Thread[] {
   // --- La Galería Olvidada
   const walls = st.nodes.filter((n) => n.kind === 'muro').length;
   if (f.galeriaOlvidada) out.push({ id: 'galeria', title: 'La Galería Olvidada', sprite: 'pico', state: 'hecho', text: 'Los tabiques han caído: una galería une Mostovaya con Izumrudnaya y el embargo ya no es total. La comida vuelve a entrar en Mertvaya.', hint: '' });
-  else
+  // (Con Mertvaya en manos del Levantamiento ya no hay embargo que romper)
+  else if (!fallen)
     out.push({
       id: 'galeria',
       title: 'La Galería Olvidada',
@@ -247,6 +263,10 @@ export function storyThreads(sim: Sim): Thread[] {
           : 'Investiga «Radio de onda corta». Hacen falta planos técnicos y generadores.',
       progress: radio && radio.prog >= 1 ? radio.craft : 0,
     });
+
+  // --- El Asedio de Mertvaya (primer suceso)
+  const siege = siegeThread(sim);
+  if (siege) out.push({ id: 'asedio', title: 'El Asedio de Mertvaya', sprite: 'fusilTunel', ...siege });
 
   // --- Presos y esclavos de tu gente
   for (const c of st.chars) {
@@ -323,10 +343,15 @@ export function epilogue(sim: Sim): string[] {
   if (f.rybakPreso) out.push('El Tuerto está entre rejas y los túneles del este respiran.');
   else if (f.muerto_rybak) out.push('El Tuerto ha muerto, y la Hermandad se desangra buscando heredero.');
   else out.push('El Tuerto sigue en su trono de Vhlainska, cobrando peaje a medio metro.');
-  if (f.baghdadiPreso) out.push('Baghdadi espera juicio. En Izumrudnaya, el imán Karimov pide el fin del embargo.');
-  else if (f.muerto_baghdadi) out.push('El califa ha muerto. Izumrudnaya reza y espera.');
-  if (f.galeriaOlvidada) out.push('La Galería Olvidada rompió el cerco: vuelve a entrar comida en Mertvaya.');
-  else out.push('Mertvaya sigue sitiada. El hambre mata allí más que las balas.');
+  const fallen = mertvayaFallen(sim);
+  if (f.baghdadiPreso) out.push(fallen ? 'Baghdadi espera juicio en Stalingradskaya.' : 'Baghdadi espera juicio. En Izumrudnaya, el imán Karimov pide el fin del embargo.');
+  else if (f.muerto_baghdadi) out.push(fallen ? 'El califa ha muerto, y su califato con él.' : 'El califa ha muerto. Izumrudnaya reza y espera.');
+  if (!fallen) {
+    if (f.galeriaOlvidada) out.push('La Galería Olvidada rompió el cerco: vuelve a entrar comida en Mertvaya.');
+    else out.push('Mertvaya sigue sitiada. El hambre mata allí más que las balas.');
+  }
+  const siegeLine = siegeEpilogue(sim);
+  if (siegeLine) out.push(siegeLine);
   if (f.tunelSur) out.push('El túnel sur está abierto: Chernovodskaya ya no está sola.');
   const vaults = st.containers.filter(isCivilDefense);
   if (vaults.length && vaults.every((c) => c.opened)) out.push('Los almacenes de Tenevskaya, intactos durante veinte años, cambiaron de dueño.');

@@ -285,7 +285,7 @@ export function SelectionPanel() {
               <Icon id="corazon" size={13} />
               <Bar v={totalHpFrac(c)} />
             </div>
-            <div className="meter" title={`Sangre: ${Math.round(c.blood)} %${c.bleed > 0.05 ? ' · sangrando' : ''}`}>
+            <div className="meter" title={`Sangre: ${Math.round(c.blood)} %${c.bleed > 0.05 ? ' · sangrando' : ''}${(c.inner ?? 0) > 1 ? ' · hemorragia interna: hace falta un botiquín o un médico' : ''}`}>
               <Icon id="sangre" size={13} className={c.bleed > 0.05 ? 'bad' : ''} />
               <Bar v={c.blood / 100} cls="blood" />
             </div>

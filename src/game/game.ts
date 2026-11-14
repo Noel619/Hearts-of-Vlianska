@@ -62,6 +62,7 @@ export type Panel =
   | { t: 'taller'; id: number }
   | { t: 'despedir'; id: number }
   | { t: 'visita'; npc: number }
+  | { t: 'suceso'; code: number }
   | null;
 
 /** Recursos compartidos entre partidas: mundo, texturas y mallas estáticas. */
@@ -382,6 +383,10 @@ export class Game {
           } else if (e.k === 'visita' && e.id) {
             this.panel = { t: 'visita', npc: e.id };
             this.paused = true;
+          } else if (e.k === 'suceso' && e.id) {
+            // Los momentos del suceso se cuentan en una ventana y la partida espera
+            this.panel = { t: 'suceso', code: e.id };
+            this.paused = true;
           } else if (e.k === 'miembro' && e.id) {
             const c = sim.char(e.id);
             if (c) this.fx.blood(c.x, nav.heightAt(c.x, c.z) + 1, c.z, 40);
@@ -647,7 +652,7 @@ export class Game {
         if (c.captive) {
           actions.push({ label: 'Forzar sus grilletes', hint: 'Si os ven, es un delito', run: one({ t: 'liberar', id: c.id }), danger: true });
         } else if (c.st === 'ok') {
-          if (needsCare(c) || totalHpFrac(c) < 0.95) actions.push({ label: 'Curar', run: one({ t: 'curar', id: c.id }) });
+          if (needsCare(c, true) || totalHpFrac(c) < 0.95) actions.push({ label: 'Curar', run: one({ t: 'curar', id: c.id }) });
           actions.push({ label: 'Seguir', run: all({ t: 'seguir', id: c.id }) });
         } else {
           actions.push({ label: 'Primeros auxilios', run: one({ t: 'curar', id: c.id }) });
@@ -658,7 +663,7 @@ export class Game {
         if (hs) actions.push({ label: 'Atacar', run: all({ t: 'atacar', id: c.id }), danger: true });
         else {
           if (c.kind === 'humano') actions.push({ label: c.vendor ? 'Hablar y comerciar' : 'Hablar', run: one({ t: 'hablar', id: c.id }) });
-          if (needsCare(c)) actions.push({ label: 'Curar', run: one({ t: 'curar', id: c.id }) });
+          if (needsCare(c, true)) actions.push({ label: 'Curar', run: one({ t: 'curar', id: c.id }) });
           actions.push({ label: 'Atacar', hint: 'Es un crimen', run: all({ t: 'atacar', id: c.id }), danger: true });
         }
       } else {
@@ -805,7 +810,7 @@ export class Game {
       const sq = npc?.squad ? this.sim.squad(npc.squad) : null;
       if (sq && !sq.done) return;
     }
-    if (this.panel && (this.panel.t === 'hablar' || this.panel.t === 'peaje' || this.panel.t === 'comercio' || this.panel.t === 'despedir' || this.panel.t === 'visita')) this.paused = false;
+    if (this.panel && (this.panel.t === 'hablar' || this.panel.t === 'peaje' || this.panel.t === 'comercio' || this.panel.t === 'despedir' || this.panel.t === 'visita' || this.panel.t === 'suceso')) this.paused = false;
     this.panel = null;
     this.bump();
   }

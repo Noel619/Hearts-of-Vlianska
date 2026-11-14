@@ -3,11 +3,12 @@
 
 import { createContext, useContext, useEffect, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { CARTRIDGES, energy, energyDensity, velocityAt } from '../data/balistica';
 import { CREATURES } from '../data/criaturas';
 import { ROLE_NAMES } from '../data/gente';
 import { FACTION_LORE } from '../data/historia/facciones';
 import { FILTER_LIFE } from '../data/gases';
-import { ITEMS, QUALITY_NAMES, condOf, condWord, freshWord, hasQuality, qualityOf, type ItemDef, type Stack } from '../data/items';
+import { ITEMS, QUALITY_NAMES, condOf, condWord, freshWord, hasQuality, itemPower, qualityOf, type ItemDef, type Stack } from '../data/items';
 import type { SideId } from '../data/tipos';
 import type { Game } from '../game/game';
 import { BULK_WEIGHT, effectiveLook, isLost, prosOf } from '../sim/chars';
@@ -151,7 +152,9 @@ export function BodyDoll({ c, size = 118, names }: { c: Char; size?: number; nam
   return (
     <svg className="doll" width={(size * 60) / 120} height={size} viewBox="0 0 60 120">
       {PART_SHAPES.map((d, i) => {
-        const open = c.wound[i] > 0.8;
+        // La hemorragia interna se ve latir en el pecho
+        const inner = i === 1 && (c.inner ?? 0) > 1;
+        const open = c.wound[i] > 0.8 || inner;
         if (isLost(c, i)) {
           const p = prosOf(c, i);
           const v = c.hp[i] / c.hpMax[i];
@@ -165,7 +168,7 @@ export function BodyDoll({ c, size = 118, names }: { c: Char; size?: number; nam
         const limp = c.limp === i;
         return (
           <path key={i} d={d} fill={partColor(v)} className={open ? 'wound' : ''} stroke={limp ? '#d9782a' : undefined} strokeWidth={limp ? 1 : undefined}>
-            <title>{`${names[i]}: ${Math.max(0, Math.round(c.hp[i]))}/${c.hpMax[i]}${open ? ' · herida abierta: sangra hasta que se vende' : ''}${limp ? ' · cojera crónica: solo la arreglan en el quirófano de Nadezhdy' : ''}`}</title>
+            <title>{`${names[i]}: ${Math.max(0, Math.round(c.hp[i]))}/${c.hpMax[i]}${c.wound[i] > 0.8 ? ' · herida abierta: sangra hasta que se vende' : ''}${inner ? ' · sangra por dentro: una venda no sirve; lo frena un botiquín y lo cura un médico' : ''}${limp ? ' · cojera crónica: solo la arreglan en el quirófano de Nadezhdy' : ''}`}</title>
           </path>
         );
       })}
@@ -210,20 +213,50 @@ export function itemName(s: Stack): string {
   return hasQuality(def) ? `${def.name} · ${QUALITY_NAMES[qualityOf(s)].toLowerCase()}` : def.name;
 }
 
+/** Nombre corto de cada arma de fuego en las fichas de blindaje. */
+const GUN_SHORT: Record<string, string> = { pistola: 'pistola', subfusil: 'subfusil', escopeta: 'recortada', fusilTunel: 'fusil del túnel', cerrojo: 'fusil de cerrojo', ak: 'Kaláshnikov', carabina: 'carabina', neumatico: 'fusil neumático', ametralladora: 'ametralladora' };
+
+/** Qué balas para un blindaje (a 10 m) y cuánta fuerza les quita a las que lo atraviesan. */
+function ballisticTip(bal: number): string[] {
+  if (bal < 1.5) return ['Contra balas: no para ninguna'];
+  const stops: string[] = [];
+  const through: string[] = [];
+  for (const d of Object.values(ITEMS)) {
+    const r = d.weapon?.ranged;
+    if (!r) continue;
+    const k = CARTRIDGES[r.cart];
+    const ed = energyDensity(k, velocityAt(k, r.v0, 10));
+    const name = GUN_SHORT[d.id] ?? d.name.toLowerCase();
+    if (ed <= bal) stops.push(name);
+    else through.push(`${name} (−${Math.round((100 * bal) / ed)} % de su energía)`);
+  }
+  return [stops.length ? `Para, a 10 m: ${stops.join(', ')}` : 'No para ninguna bala', ...(through.length ? [`La atraviesan: ${through.join(', ')}`] : [])];
+}
+
 export function itemTip(s: Stack): string {
   const def = ITEMS[s.id];
   if (!def) return s.id;
   const lines = [def.name, def.desc];
   if (hasQuality(def)) lines.push(`Calidad: ${QUALITY_NAMES[qualityOf(s)].toLowerCase()} · estado: ${condWord(condOf(s)).toLowerCase()} (${Math.round(condOf(s) * 100)} %)${condOf(s) <= 0 ? ' · hay que repararlo' : ''}`);
   const w = def.weapon;
-  if (w) {
-    const dmg = [w.cut ? `corte ${w.cut}` : '', w.blunt ? `contusión ${w.blunt}` : '', w.pierce ? `perforación ${w.pierce}` : ''].filter(Boolean).join(' · ');
+  if (w?.ranged) {
+    // La balística: cartucho, velocidad y energía en boca
+    const r = w.ranged;
+    const k = CARTRIDGES[r.cart];
+    const e = Math.round(energy(k, r.v0));
+    lines.push(k.pellets > 1 ? `${k.name}: ${k.pellets} perdigones de ${e} J a ${r.v0} m/s` : `${k.name} · ${r.v0} m/s · ${e} J en boca`);
+    lines.push(`Alcance ${r.range} m · cargador ${r.mag}${s.mag !== undefined ? ` (${s.mag} dentro)` : ''} · ruido ${r.noise} m`);
+    lines.push(`A quemarropa, a culatazos: contusión ${w.blunt}`);
+  } else if (w) {
+    const dmg = [w.cut ? `corte ${w.cut}` : '', w.blunt ? `contusión ${w.blunt}` : '', w.pierce ? `punta ${w.pierce}` : ''].filter(Boolean).join(' · ');
     lines.push(`Daño: ${dmg}`);
-    if (w.ranged) lines.push(`Alcance ${w.ranged.range} m · cargador ${w.ranged.mag}${s.mag !== undefined ? ` (${s.mag} dentro)` : ''} · ruido ${w.ranged.noise} m`);
-    else lines.push(`Alcance ${w.reach} m · ${w.speed.toFixed(1)} s por golpe`);
+    lines.push(`Alcance ${w.reach} m · ${w.speed.toFixed(1)} s por golpe`);
   }
   const a = def.armor;
-  if (a && a.cover.length) lines.push(`Protección: corte ${Math.round(a.cut * 100)} % · golpes ${Math.round(a.blunt * 100)} % · balas ${Math.round(a.pierce * 100)} %`);
+  if (a && a.cover.length) {
+    lines.push(`Protección: corte ${Math.round(a.cut * 100)} % · golpes ${Math.round(a.blunt * 100)} % · punta ${Math.round(a.pierce * 100)} %`);
+    lines.push(...ballisticTip((a.bal ?? 0) * (hasQuality(def) ? itemPower(s) : 1)));
+  }
   if (a?.carry) lines.push(`+${a.carry} kg de carga`);
   if (a?.bulk) lines.push(`Estorbo: −${Math.round(a.bulk * BULK_WEIGHT * 100)} % al sigilo y a la esquiva`);
   if (a?.speed) lines.push(`${a.speed > 0 ? '+' : ''}${Math.round(a.speed * 100)} % de velocidad al correr`);

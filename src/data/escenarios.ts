@@ -200,6 +200,8 @@ export const SCENARIOS: Scenario[] = [
       { role: 'obrero', from: 'CAL', weapon: 'pico', items: [['agua', 3], ['vendas', 1]] },
     ],
     rep: { CAL: 15, LEV: -55 },
+    // El Levantamiento os dispara por salir de la estación sitiada (si cae Mertvaya, se acaba)
+    flags: { sitiados: 1 },
     hungry: true,
     steps: ['muro', 'tabique', 'hambreCerco', 'galeria', 'contrabando', 'construir'],
   },

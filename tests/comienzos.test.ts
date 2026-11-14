@@ -12,6 +12,7 @@ import { sellPrice } from '../src/sim/events';
 import { firstSteps, STEPS } from '../src/sim/hilos';
 import { newGame } from '../src/sim/newGame';
 import { newSquad } from '../src/sim/population';
+import { resolveBattle, SIEGE_NEWS_DAY, siegeState, stepSiege } from '../src/sim/asedio';
 import { deserialize, serialize } from '../src/sim/save';
 import type { Sim } from '../src/sim/sim';
 import { standingLines } from '../src/sim/situacion';
@@ -47,6 +48,12 @@ describe('todos los comienzos', () => {
       for (const c of sim.players) {
         expect(world.nav.passableAt(c.x, c.z, true), `${sc.id}: ${c.name} en un sitio transitable`).toBe(true);
         expect(placeId(world, c.x, c.z), `${sc.id}: ${c.name} en ${sc.place}`).toBe(sc.place);
+        if (sc.at && 'spot' in sc.at) {
+          const { spot, data } = sc.at;
+          const sp = world.decor.spots.filter((q) => q.place === sc.place && q.kind === spot && (data === undefined || q.data === data));
+          expect(sp.length, `${sc.id}: hay ${spot}${data ? ':' + data : ''} en ${sc.place}`).toBeGreaterThan(0);
+          expect(Math.min(...sp.map((q) => Math.hypot(q.x - c.x, q.z - c.z))), `${sc.id}: ${c.name} junto a su rincón`).toBeLessThan(4);
+        }
         if (f && sc.at && 'annex' in sc.at) {
           const id = sc.at.annex;
           const a = f.annexes.find((q) => q.id === id);
@@ -87,12 +94,10 @@ describe('todos los comienzos', () => {
   it('los primeros pasos existen, tienen teclas de verdad y no empiezan hechos', () => {
     for (const sc of SCENARIOS) {
       expect(sc.steps.length, sc.id).toBeGreaterThanOrEqual(4);
-      for (const id of sc.steps) {
-        expect(STEPS[id], `${sc.id}: paso ${id}`).toBeTruthy();
-        for (const m of STEPS[id].hint.matchAll(/\{tecla:(\w+)\}/g)) expect(keyFor(m[1]), `${sc.id}: tecla ${m[1]}`).toBeTruthy();
-      }
+      for (const id of sc.steps) expect(STEPS[id], `${sc.id}: paso ${id}`).toBeTruthy();
       const sim = newGame(world, { scenario: sc.id, seed: 24 });
       const steps = firstSteps(sim);
+      for (const s of steps) for (const m of s.hint.matchAll(/\{tecla:(\w+)\}/g)) expect(keyFor(m[1]), `${sc.id}: tecla ${m[1]}`).toBeTruthy();
       expect(steps.map((s) => s.id)).toEqual(sc.steps);
       for (const s of steps) expect(s.done, `${sc.id}: ${s.id} ya hecho al empezar`).toBe(false);
     }
@@ -259,6 +264,34 @@ describe('cada comienzo', () => {
     sim.reindex();
     run(sim, 2);
     expect(firstSteps(sim).find((s) => s.id === 'muro')?.done).toBe(true);
+  });
+});
+
+describe('el Asedio de Mertvaya y los vecinos de la Esmeralda', () => {
+  it('si cae Mertvaya y no habéis luchado contra la brigada, el Levantamiento deja de dispararos', () => {
+    const sim = newGame(world, { scenario: 'esmeralda', seed: 51 });
+    const p = sim.players[0];
+    const lev = { ...p, side: 'LEV' } as Char;
+    expect(hostile(sim, lev, p)).toBe(true);
+    sim.state.time = (SIEGE_NEWS_DAY - 1) * 1440;
+    stepSiege(sim);
+    resolveBattle(sim, siegeState(sim), 'conquista');
+    expect(sim.state.stations.MER.owner).toBe('LEV');
+    expect(hostile(sim, lev, p)).toBe(false);
+    // Los pasos del cerco ya no quedan pendientes
+    const steps = firstSteps(sim);
+    for (const id of ['muro', 'tabique', 'galeria', 'contrabando']) expect(steps.find((s) => s.id === id)?.done, id).toBe(true);
+    expect(steps.find((s) => s.id === 'hambreCerco')?.hint).toContain('Sin el Califato no hay embargo');
+  });
+
+  it('quien luchó contra la brigada sigue siendo su enemigo', () => {
+    const sim = newGame(world, { scenario: 'esmeralda', seed: 52 });
+    sim.state.time = (SIEGE_NEWS_DAY - 1) * 1440;
+    stepSiege(sim);
+    const s = siegeState(sim);
+    sim.state.flags.matados_LEV = (s.killsLEV0 ?? 0) + 3;
+    resolveBattle(sim, s, 'conquista');
+    expect(sim.state.rep.LEV).toBeLessThanOrEqual(-50);
   });
 });
 
