@@ -2,7 +2,7 @@
 
 RPG de escuadra y supervivencia en mundo abierto, en 3D, ambientado en el metro de Vlianska.
 
-**Versión 0.2 (beta).** El juego se puede jugar de principio a fin: todos los hilos de la trama se pueden cerrar y la emisora de onda corta lleva al final abierto. Los cambios de cada versión están en [`CHANGELOG.md`](CHANGELOG.md).
+**Versión 0.3 (beta).** El juego se puede jugar de principio a fin: todos los hilos de la trama se pueden cerrar y la emisora de onda corta lleva al final abierto. Los cambios de cada versión están en [`CHANGELOG.md`](CHANGELOG.md).
 
 Enero de 2033. Veinte años después de las bombas, ocho facciones se reparten las dieciséis estaciones del metro. Tú no eres ninguna de ellas: empiezas con un puñado de supervivientes, un cuchillo y sesenta cartuchos, y nadie te espera ni te debe nada. Comercia, rebusca chatarra, caza lo que vive en los túneles, contrata gente en las cantinas y levanta tu propia estación donde nadie mande.
 
@@ -17,6 +17,9 @@ Este repositorio contenía antes *Hearts of Vlianska* (gran estrategia en 2D). E
 - **Economía.** Cartuchos por moneda, tiendas con existencias y dinero limitados, precios distintos en cada estación, mercado negro, peajes («cinco túneles, cinco peajes»), médicos y gente de alquiler.
 - **Tu propia base.** Tiendas, barracones, bancales de hongos, corrales, colectores de agua, talleres, fragua, armero, laboratorio, generador, muros, portones y alambradas. Recetas, almacenes, energía, turnos de trabajo automáticos, asaltos a la base y un árbol de investigación con las técnicas de la historia.
 - **Hilos de la trama.** La carta perdida de Bessmertny, el embargo de Mertvaya y la Galería Olvidada, el derrumbe del Túnel Sur, las cabezas con precio, los almacenes blindados de Tenevskaya y una emisora de onda corta que quizá alcance más allá de Vlianska. La pantalla de hilos (`J`) dice en qué punto está cada uno y qué se puede hacer; quien empieza tiene unos primeros pasos a la vista.
+- **Personajes que se mueven como personas.** Los pies se plantan en el suelo y no patinan: cada paso apoya el talón, rueda y despega sobre la punta, y las piernas se doblan por cinemática inversa, así que se puede embestir, agacharse o recular sin que los pies resbalen. Quien espera cambia el peso de pierna, respira, mira alrededor y a veces se rasca la nuca o se estira; en una pelea mira al enemigo y abre los pies; al caer, primero ceden las rodillas. Todos se dibujan entre los pasos de la simulación, así que se mueven sin tirones a cualquier frecuencia de pantalla.
+- **Cuerpos y caras con forma.** Anatomía (pecho, espalda, hombros), caras con ojos, párpados, nariz, labios y orejas, pelo con su nacimiento, barbas, botas con suela y tacón, y ropa con botones, bolsillos, solapas y cremalleras.
+- **Bestias con su propio cuerpo.** Ratas, skrebuns y cerdos tienen esqueleto de cuadrúpedo con patas de tres segmentos y cola articulada; pasan del paso al trote y al galope, saltan sobre la presa y caen de costado al morir. El glubinnik y el sheptun se mueven cada uno a su manera.
 - **Armas que se empuñan de verdad.** Las manos tienen dedos y cierran el puño; fusiles, hachas y lanzas se sujetan a dos manos con cinemática inversa: la culata va al hombro al apuntar, el arma se lleva terciada al andar y se cuelga a la espalda o al cinto cuando las manos están ocupadas.
 - **Interfaz con sprites.** Cada objeto tiene su propio dibujo, cada personaje un retrato generado a partir de su aspecto, cada facción su emblema y cada obra una miniatura de su modelo 3D. Paneles de chapa remachada, muñeco de salud por partes del cuerpo e iconos propios para cada orden.
 - **Todo generado por código.** Geometría, texturas, personajes con esqueleto, animación, sprites, música, ambiente y efectos de sonido se sintetizan o se dibujan en el propio código: el repositorio no contiene ni un solo archivo de imagen, modelo o audio.
@@ -110,7 +113,8 @@ Con el servidor de desarrollo en marcha:
 - `/?view&at=TSE&d=50` recorre el mundo sin partida (`at` admite cualquier estación o cruce; `q=baja|media|alta`).
 - `/?view&kit` muestra el catálogo de piezas del atrezo (`kit=tienda,puesto` para elegir cuáles).
 - `/?view&chars` añade una fila de personajes de prueba.
-- `/?view&poses` es un banco de poses: una fila de personajes con cada arma para revisar cómo la sujetan (`poses=listo|apuntar|ataque|marcha|sigilo|varios`, `only=ak,hacha`, `t=0.4` para congelar un golpe).
+- `/?view&poses` es un banco de poses: una fila de personajes con cada arma para revisar cómo la sujetan y cómo se mueven (`poses=listo|apuntar|ataque|marcha|correr|sigilo|reposo|caida|giro|varios|modelos`, `only=ak,hacha`, `pick=0,3`, `t=0.4` para congelar un golpe, `move` para que avancen de verdad y `freeze` para avanzar fotograma a fotograma con `__vl.step`).
+- `/?view&criaturas` es el banco de criaturas (`criaturas=todas|marcha|ataque|muerte`, con los mismos parámetros).
 - `/?sprites` muestra el catálogo de sprites: objetos, iconos, emblemas y retratos.
 - `/?escenario=colonos&seed=7` salta directamente a una partida.
 
