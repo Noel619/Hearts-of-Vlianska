@@ -129,9 +129,10 @@ function buildGround(layout: Layout, B: (x: number, z: number, mat: string) => B
     const z = sb.z0 + gj * CELL;
     const d = sdf.sample(x, z);
     const b = bk.b;
-    const tone = 0.9 + noise2(x * 0.03, z * 0.03, 5) * 0.2;
-    b.color([tone, tone, tone], lerp(0.72, 1, smoothstep(0, 3, -d)));
-    id = b.v(x, surfaceGroundY(layout, x, z), z, 0, 1, 0, x / 4, z / 4);
+    // La variación de tono va en el vértice (sin repetirse), la textura solo da el grano
+    const tone = 0.86 + noise2(x * 0.03, z * 0.03, 5) * 0.18 + noise2(x * 0.11, z * 0.11, 6) * 0.08;
+    b.color([tone, tone, tone * 1.01], lerp(0.72, 1, smoothstep(0, 3, -d)));
+    id = b.v(x, surfaceGroundY(layout, x, z), z, 0, 1, 0, x / 7, z / 7);
     // Mezcla: asfalto en calles, nieve en patios y plazas (y amontonada junto a los muros), barro en fábricas y ruinas
     const kind = kindAt(x, z);
     let wa = kind === 'avenida' || kind === 'calle' ? 1 : kind === 'plaza' || kind === 'pabellon' || kind === 'boca' ? 0.45 : 0;
