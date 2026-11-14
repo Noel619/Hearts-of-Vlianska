@@ -493,6 +493,7 @@ export function canDismiss(sim: Sim, c: Char): string | null {
   if (!c.player) return 'No es de tu escuadra';
   if (c.st === 'muerto') return 'Ha muerto';
   if (c.st === 'ko') return 'Está inconsciente: espera a que se despierte';
+  if (c.captive) return 'Está preso: primero hay que sacarle';
   if (c.carriedBy) return 'Lo llevan a hombros';
   if (!sim.players.some((o) => o !== c && o.st !== 'muerto')) return 'Es lo único que queda de tu escuadra';
   return null;

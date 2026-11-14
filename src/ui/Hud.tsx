@@ -12,7 +12,7 @@ import type { FactionId } from '../data/tipos';
 import { dropItem, hasLamp, unequipSlot, useItem } from '../sim/actions';
 import { armorBulk, BULK_WEIGHT, invWeight, LIMB_NAMES, maxCarry, NAME_MAX, totalHpFrac, weaponDef } from '../sim/chars';
 import { hostile, relation } from '../sim/combat';
-import { bailCost, captiveText, PRISONS, setEscape } from '../sim/derrota';
+import { bailCost, captiveText, guardsWatching, PRISONS, setEscape } from '../sim/derrota';
 import { assignTeam, createTeam, teamMembers, teamOf, teams } from '../sim/escuadras';
 import { nameError, renameChar, squadCap } from '../sim/events';
 import { filterMask, spareFilters } from '../sim/gas';
@@ -453,6 +453,7 @@ function CaptiveBox({ c }: { c: Char }) {
   const cap = c.captive!;
   const pr = PRISONS[cap.by as FactionId];
   const slave = cap.kind === 'esclavo';
+  const watched = guardsWatching(sim, c, cap.by);
   return (
     <div className="captive">
       <Icon id="candado" size={22} className="bad" />
@@ -463,6 +464,11 @@ function CaptiveBox({ c }: { c: Char }) {
           : slave
             ? `Para sacarle: forzar sus grilletes (un compañero, clic derecho sobre él), que escape solo o comprar su libertad a ${pr ? 'quien manda allí' : 'sus amos'} (${bailCost(sim, c)} cartuchos).`
             : `Fianza: ${bailCost(sim, c)} cartuchos (habla con un oficial o un guardia de ${sideName(cap.by)}). O que intente escapar.`}
+        {c.st === 'ok' && (
+          <div className={watched ? 'bad' : 'good'} style={{ fontSize: 11.5, marginTop: 2 }}>
+            {watched ? 'Ahora le vigilan: mejor esperar.' : 'Ahora no le mira nadie.'}
+          </div>
+        )}
         {cap.pick > 0 && <Bar v={cap.pick} cls="thin amber" />}
       </div>
       {c.st === 'ok' && (

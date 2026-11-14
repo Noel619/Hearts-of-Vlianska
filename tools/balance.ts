@@ -254,14 +254,15 @@ function larga(days = 30, scenario = 'colonos') {
     for (let k = 0; k < 1440 * 30; k++) {
       sim.step(1 / 30);
       for (const e of sim.events) if (e.t === 'sonido' && e.k === 'alarma') raids++;
-      for (const e of sim.events) if (e.t === 'aviso' && /vigías|jauría/.test(e.msg)) kinds.push(`día ${d}: ${/jauría/.test(e.msg) ? 'jauría' : 'saqueadores'}`);
+      for (const e of sim.events) if (e.t === 'aviso' && /vigías|jauría|castigo|desesperada|recaudadores|inspección|cazarrecompensas/.test(e.msg)) kinds.push(`día ${d}: ${/jauría/.test(e.msg) ? 'jauría' : /castigo/.test(e.msg) ? 'castigo' : /desesperada/.test(e.msg) ? 'hambrientos' : /recaudadores/.test(e.msg) ? 'tributo' : /inspección/.test(e.msg) ? 'registro' : /cazarrecompensas/.test(e.msg) ? 'cazarrecompensas' : 'saqueadores'}`);
       sim.events.length = 0;
     }
     const st = sim.state;
     if (d % 5 === 0 || d === 1)
       console.log(
-        `  día ${String(d).padStart(3)} · escuadra ${sim.players.filter((c) => c.st !== 'muerto').length} (salud ${pct(sim.players.reduce((a, c) => a + totalHpFrac(c), 0) / Math.max(1, sim.players.length))}) · personajes ${st.chars.length} · escuadras ${st.squads.length} · bultos ${st.drops.length} · registro ${st.log.length} · asaltos ${raids} · ${((performance.now() - t0) / d / 1000).toFixed(1)} s/día`,
+        `  día ${String(d).padStart(3)} · escuadra ${sim.players.filter((c) => c.st !== 'muerto').length} (salud ${pct(sim.players.reduce((a, c) => a + totalHpFrac(c), 0) / Math.max(1, sim.players.length))}, presos ${sim.players.filter((c) => c.captive).length}, mancos o cojos ${sim.players.filter((c) => c.lost?.length || c.limp).length}) · obras ${st.buildings.length} · personajes ${st.chars.length} · escuadras ${st.squads.length} · bultos ${st.drops.length} · asaltos ${raids} · ${((performance.now() - t0) / d / 1000).toFixed(1)} s/día`,
       );
+    if (d === days) console.log(`  Sucesos: ${kinds.join(', ') || 'ninguno'}.`);
     if (!sim.players.length) {
       console.log(`  La colonia cae el día ${d}. Asaltos: ${kinds.join(', ')}. Lo último del registro:`);
       for (const l of st.log.slice(-12)) console.log(`    [día ${Math.floor(l.t / 1440) + 1}] ${l.msg}`);

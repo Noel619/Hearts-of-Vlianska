@@ -459,7 +459,8 @@ function hasLoot(v: Char): boolean {
  */
 export function defeatIntent(sim: Sim, c: Char, v: Char): Order | null {
   if (c.kind !== 'humano' || c.player || c.captive || c.st !== 'ok' || c.carry) return null;
-  if (PEACEFUL.has(c.role)) return null;
+  // Los civiles no se meten; las figuras de la historia no dejan su sitio por esto
+  if (PEACEFUL.has(c.role) || c.unique) return null;
   if (!v.player || v.st !== 'ko' || v.captive || v.carriedBy) return null;
   if (!hostile(sim, c, v) && c.ai.sub !== 'enfadado') return null;
   const sq = c.squad ? sim.squad(c.squad) : null;
@@ -724,22 +725,38 @@ function listWords(w: string[]): string {
   return u.slice(0, -1).join(', ') + ' y ' + u[u.length - 1];
 }
 
-/** ¿Le ve algún guardia del bando `by` haciendo algo que no debe? */
-export function spotted(sim: Sim, c: Char, by: SideId): boolean {
-  if ((sim.tick + c.id) % 30 !== 0) return false;
+/**
+ * ¿Está atento este guardia? Nadie vigila sin parar: cada uno mira un rato y
+ * se distrae otro (de noche, más), y el ritmo de cada cual es distinto.
+ */
+export function attentive(sim: Sim, o: Char): boolean {
+  const h = sim.hour;
+  const night = h >= 22 || h < 6;
+  const phase = (sim.state.time + o.id * 37) % 90;
+  return phase < (night ? 30 : 55);
+}
+
+/** ¿Hay algún guardia del bando `by` que pueda ver ahora mismo a `c`? */
+export function guardsWatching(sim: Sim, c: Char, by: SideId): boolean {
   let seen = false;
   sim.forNear(c.x, c.z, 18, (o) => {
     if (seen || o.side !== by || o.st !== 'ok' || o.player || o.kind !== 'humano' || o.captive) return;
-    if (PEACEFUL.has(o.role)) return;
+    if (PEACEFUL.has(o.role) || !attentive(sim, o)) return;
     const d = Math.hypot(o.x - c.x, o.z - c.z);
     if (d > sightRange(sim, o, c) * 0.75) return;
     // Solo ve lo que tiene delante
     const a = Math.atan2(c.z - o.z, c.x - o.x) - o.face;
     if (Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) > 1.9 && d > 2.2) return;
     if (d > 2.5 && sim.world.nav.sightLine(o.x, o.z, c.x, c.z) < 0.97) return;
-    seen = sim.rng.chance(0.6);
+    seen = true;
   });
   return seen;
+}
+
+/** ¿Le pillan haciendo algo que no debe? (una vez por segundo, si alguien mira) */
+export function spotted(sim: Sim, c: Char, by: SideId): boolean {
+  if ((sim.tick + c.id) % 30 !== 0) return false;
+  return guardsWatching(sim, c, by) && sim.rng.chance(0.5);
 }
 
 // ---------------------------------------------------------------------------

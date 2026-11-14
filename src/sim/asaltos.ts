@@ -40,8 +40,21 @@ const LINK = 40;
  * Asentamientos del jugador: grupos de obras terminadas a menos de 40 m unas
  * de otras. El mayor es la base; los demás, puestos avanzados.
  */
+const BASES = new WeakMap<Sim, { key: string; list: Base[] }>();
+
 export function playerBases(sim: Sim): Base[] {
+  // Se recalcula solo cuando cambian las obras terminadas
   const done = sim.state.buildings.filter((b) => b.prog >= 1);
+  let key = '';
+  for (const b of done) key += b.id + ',';
+  const hit = BASES.get(sim);
+  if (hit && hit.key === key) return hit.list;
+  const list = computeBases(sim, done);
+  BASES.set(sim, { key, list });
+  return list;
+}
+
+function computeBases(sim: Sim, done: Building[]): Base[] {
   const group = new Map<number, number>();
   let g = 0;
   for (const b of done) {

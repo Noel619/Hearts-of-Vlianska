@@ -1,5 +1,56 @@
 # Cambios
 
+## 0.4 beta
+
+Caer tiene consecuencias, las heridas dejan marca, el equipo se gasta y las bases son más que un campamento. También llegan a esta versión las estaciones con forma y la superficie.
+
+### Lo que pasa cuando caes
+
+- **Los saqueadores despojan a los caídos**: se llevan el arma, las mejores piezas de armadura y lo que más vale de la mochila. Lo robado viaja con la banda; si vuelve a casa, acaba en su depósito (el de Vhlainska, en el botín de la Hermandad), de donde se puede recuperar.
+- **Cárceles de verdad.** Con la cabeza a precio, los guardias y las patrullas se llevan a hombros a los tuyos que caen hasta sus calabozos: la comisaría de Tsentral'naya (la Unión), los calabozos de Rubezh (los Seguidores) y los de la junta de Chernovodskaya. Allí les quitan todo al depósito de decomisos, les vendan y cumplen condena (de uno a cinco días, según lo que se debía). La cárcel salda la deuda. Staraya y la República del Norte no tienen calabozos: multan y sueltan.
+- **Esclavitud y trabajos forzados.** Los de Vhlainska encierran a sus esclavos en las jaulas y los sacan a trabajar de día; el Califato los encadena junto al manantial; el Levantamiento manda a reeducarse a las granjas de Rassvetnaya. El trabajo forzado endurece (fuerza y aguante).
+- **Fugas y rescates.** Un preso puede forzar los grilletes cuando ningún guardia mira (la cerradura, la luz, el sigilo y hacia dónde mira el guardia cuentan); si le pillan, paliza y más condena. Un compañero puede forzárselos desde fuera, aunque si le ven es un delito. Quien escapa queda marcado un tiempo y la recompensa sube.
+- **Fianzas y rescates por las buenas.** Con un oficial o un guardia de quien lo tiene preso se paga la fianza (y se recupera lo decomisado) o se compra la libertad de un esclavo.
+- **Las fieras se comen a los caídos.** Las ratas roen a quien cae donde cae (si no hay luz); los skrebuns y otras bestias grandes lo arrastran por el suelo hasta su nido. Cada mordisco desgarra brazos y piernas, que pueden perderse.
+- **Cazarrecompensas.** Cuando una facción paga 60 cartuchos o más por vuestras cabezas, cada día o dos sale una partida de cazarrecompensas que os sigue el rastro, os tumba y os lleva a la cárcel de quien paga (o se cobra la deuda de vuestra bolsa).
+- **Saldar la deuda.** La recompensa se paga hablando con un oficial o un guardia de esa facción, o en Staraya, que arregla cuentas con todo el metro a cambio de una comisión.
+
+### Heridas que no se curan
+
+- **Miembros perdidos.** Un brazo o una pierna destrozados pueden perderse de un tajo, de un balazo o entre las fauces de una fiera. El muñón sangra a chorros hasta que se venda; lo que empuñaba esa mano cae al suelo.
+- Sin brazo derecho no se empuña un arma; sin uno de los dos, nada de armas de dos manos. Sin una pierna (y sin prótesis) se va a gatas. Los brazos que faltan, o los de acero, trabajan más despacio.
+- **Prótesis.** Brazos y piernas ortopédicos que se compran a los médicos o se fabrican en el nuevo **banco de prótesis** (técnica «Prótesis caseras»). Se ponen usándolas desde el inventario; rinden según su calidad, se abollan con los golpes y se reparan.
+- **Cojera crónica.** Una pierna destrozada puede dejar cojera para siempre: corre menos y se ve al andar. Solo la arreglan en el quirófano del Hospital de la Esperanza (Ubezhishche Nadezhdy).
+- En el modelo 3D se ven el muñón vendado bajo la manga o la pernera, la garra de acero y la pierna ortopédica con su taco de goma; en el muñeco de salud, el miembro que falta y la prótesis.
+
+### Equipo con calidad y desgaste
+
+- **Cinco grados de calidad**, de chatarra a militar, en armas, armaduras y prótesis: cambian el daño, la puntería, la protección y el precio. La gente del metro va equipada según su oficio y su facción; las tiendas, los almacenes y los arsenales tienen lo suyo.
+- **Se gastan con el uso**: las armas al golpear, parar y disparar; las armaduras al parar golpes. Por debajo de la mitad rinden menos; un arma de fuego rota no dispara.
+- **Reparación.** La mesa de desguace, el banco de armero y el de prótesis tienen la opción «Reparar»: arreglan lo gastado de los almacenes cercanos y lo que lleve tu gente al lado, gastando piezas, cuero, tela o tablones. Quien sabe poco no lo deja como nuevo.
+- Lo que sale de un taller tiene la calidad de la mano de quien lo hace (lo militar, solo con mucha Armería y la técnica de la carabina).
+- **Huecos nuevos: manos, piernas y pies**, con guantes de trabajo (se trabaja más deprisa), guantes de cuero (mejor agarre), guanteletes de chapa, pantalón de guata, perneras de cuero, grebas de chapa, botas de trabajo, botas militares (se corre más) y botas de fieltro (silenciosas).
+
+### Bases más profundas
+
+- **Asentamientos y puestos avanzados.** Las obras alejadas forman asentamientos aparte; los asaltos eligen uno (los grandes atraen más) y la pantalla de hilos los enumera.
+- **Las obras se dañan y se reparan.** Los asaltantes rompen portones, muros y nidos; los derribados quedan en escombros. Clic derecho: «Reparar» (gasta el material principal de la obra); quien tiene el trabajo «Construir obras» repara solo lo dañado.
+- **Nido de ametralladora** (técnica «Nidos de ametralladora»): dispara solo hacia delante mientras alguien lo sirva, con las balas de su almacén o de quien lo maneja; se puede asignar como guardia fija.
+- **Asaltos variados.** Además de la Hermandad y las jaurías: expediciones de castigo de las facciones con las que estáis en guerra (o a las que les negasteis el tributo) y gente hambrienta que viene a por la comida en los inviernos crudos y las fiebres. Rompen obras y saquean los almacenes, y se retiran cuando van cargados.
+- **Visitas de las facciones vecinas.** Cada pocos días, recaudadores que piden tributo «por la protección» (pagar, pagar la mitad o negarse y esperar el castigo) o inspecciones que buscan lo robado a esa facción y lo prohibido (dejar registrar o sobornar). Si no hay nadie en la base, se cobran del almacén.
+- **Escuadras propias.** «+ Nueva escuadra» separa a los seleccionados en un grupo que va por su cuenta; pestañas para verlas y cambiar de una a otra, y selector de escuadra en la ficha.
+- **La comida se estropea.** Hongos frescos, carne y guisos se pudren en pocos días; lo seco, lo ahumado, las latas y el samogón aguantan. Se come primero lo que está a punto de pasarse. La **despensa** (técnica «Conservación de alimentos») la hace durar el triple, y la **carne ahumada** (en la hoguera o la cocina) aguanta semanas. La comida podrida no se come, pero los cerdos del corral sí.
+
+### El metro
+
+- **Estaciones con forma**: naves de pilones o de columnas, salas anejas (calabozos, jaulas, hospitales, talleres, consejos…), vestíbulos y escaleras mecánicas.
+- **La superficie**: las escaleras de Severnyy, la rampa de Industrialnaya y el pozo de Kholodnogo Vozduha suben a un barrio en ruinas con su luz del día, su noche, su niebla y su nieve, y con botín que nadie ha bajado en veinte años. El aire de arriba pide máscara.
+
+### Desarrollo
+
+- Pruebas nuevas de la derrota, el equipo y las bases (`tests/derrota.test.ts`, `tests/equipo.test.ts`, `tests/bases.test.ts`) y mallas con todas las combinaciones de miembros perdidos y prótesis.
+- La partida larga del banco de equilibrio cuenta presos, mancos y cojos, obras y el tipo de cada asalto y visita.
+
 ## 0.3 beta
 
 Animaciones y modelos 3D nuevos para las personas y para las bestias de los túneles.
