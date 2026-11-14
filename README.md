@@ -6,7 +6,7 @@ RPG de escuadra y supervivencia en mundo abierto, en 3D, ambientado en el metro 
 
 Enero de 2033. Veinte años después de las bombas, ocho facciones se reparten las dieciséis estaciones del metro. Tú no eres ninguna de ellas: empiezas con un puñado de supervivientes, un cuchillo y sesenta cartuchos, y nadie te espera ni te debe nada. Comercia, rebusca chatarra, caza lo que vive en los túneles, contrata gente en las cantinas y levanta tu propia estación donde nadie mande.
 
-Este repositorio contenía antes *Hearts of Vlianska* (gran estrategia en 2D). El juego nuevo parte de la misma historia, que se conserva íntegra en [`docs/historia/`](docs/historia/): crónica, facciones, líderes, estaciones, túneles, sucesos y tecnología.
+Este repositorio contenía antes *Hearts of Vlianska* (gran estrategia en 2D). El juego nuevo parte de la misma historia, que se conserva íntegra en [`docs/historia/`](docs/historia/): crónica, facciones, líderes, estaciones, túneles, sucesos y tecnología. Aquel juego sigue entero, en su última versión, en [`legado/hearts-of-vlianska/`](legado/README.md): se arranca desde su carpeta y no forma parte de este.
 
 ## Qué hay dentro
 

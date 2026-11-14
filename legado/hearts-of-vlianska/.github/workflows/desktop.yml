@@ -1,0 +1,68 @@
+name: Ejecutables
+
+# Compila la versión de escritorio para Windows, Linux y macOS en cada push.
+# Los ejecutables quedan como artefactos del run (pestaña Actions).
+# Al subir una etiqueta vX.Y.Z se publican además en una Release de GitHub.
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows
+            os: windows-latest
+            args: --win --x64
+            files: release/*.exe
+          - name: linux
+            os: ubuntu-latest
+            args: --linux --x64
+            files: release/*.AppImage
+          - name: macos
+            os: macos-latest
+            args: --mac --x64 --arm64
+            files: release/*.dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx electron-builder ${{ matrix.args }} --publish never
+        env:
+          # Sin certificado de firma: el ejecutable no va firmado.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hearts-of-vlianska-${{ matrix.name }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+          compression-level: 0
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true

@@ -35,6 +35,7 @@ Comienzos que cuentan la verdad, órdenes que obedecen al instante y un golpe de
 ### Desarrollo
 
 - Esta versión reúne en una sola rama todo el trabajo hecho en paralelo: la 0.5 (el Asedio de Mertvaya y la balística real), las estaciones organizadas por zonas y la nieve y el asfalto sin repetición.
+- El juego anterior, *Hearts of Vlianska* (gran estrategia en 2D), se guarda entero y en su última versión en `legado/hearts-of-vlianska/`, con su historia. Se arranca desde su carpeta; no se compila ni se prueba con este.
 - Pruebas nuevas: `tests/ordenes.test.ts` (cambiar de rumbo, encadenar), `tests/remate.test.ts` (cada forma de rematar, asesinato, venganza, fieras que comen y arrastran) y `tests/comienzos.test.ts` (cada comienzo empieza donde dice, con lo que dice, sin peajes absurdos y con un informe que coincide con la partida); pruebas de animación del arrastrado, la marcha hacia atrás y el comer.
 
 ## 0.5 beta
