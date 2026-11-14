@@ -78,6 +78,17 @@ export function stepChar(sim: Sim, c: Char, dt: number): void {
 
   // --- Combate --------------------------------------------------------------------------
   const mayFight = !(c.order && (c.order.t === 'mover' || c.order.t === 'cargar') && c.player && c.stance !== 'agresivo' && c.order.data !== 'ataque');
+  // La gente del metro y las fieras sueltan lo que llevan a cuestas para pelear (luego vuelven a por ello)
+  if (c.target && c.carry && !c.player) {
+    const o = sim.char(c.carry);
+    if (o) {
+      o.carriedBy = 0;
+      o.x = c.x + Math.cos(c.face) * 0.6;
+      o.z = c.z + Math.sin(c.face) * 0.6;
+      o.pose = o.st === 'ok' ? 'normal' : 'ko';
+    }
+    c.carry = 0;
+  }
   if (c.target && (mayFight || c.order?.t === 'atacar')) {
     if (stepFight(sim, c, dt)) {
       stepMove(sim, c, dt);

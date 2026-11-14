@@ -2,7 +2,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { makeCreature, makeHuman } from '../src/sim/chars';
 import { knockOut } from '../src/sim/combat';
-import { bailCost, imprison, payBail, payBounty, prisonCells, PRISONS, release, setEscape, stepBountyHunters } from '../src/sim/derrota';
+import { bailCost, defeatIntent, imprison, payBail, payBounty, prisonCells, PRISONS, release, setEscape, stepBountyHunters } from '../src/sim/derrota';
 import { newGame } from '../src/sim/newGame';
 import type { Sim } from '../src/sim/sim';
 import type { Char } from '../src/sim/types';
@@ -192,6 +192,28 @@ describe('caer ante el enemigo', () => {
     const d0 = Math.hypot(v.x - nest.x, v.z - nest.z);
     run(sim, 40);
     expect(Math.hypot(v.x - nest.x, v.z - nest.z)).toBeLessThan(d0 - 3);
+  });
+});
+
+describe('multas', () => {
+  it('las facciones sin calabozos cobran la deuda de vuestra bolsa y sueltan', () => {
+    const sim = newGame(world, { scenario: 'nadie', seed: 40 });
+    const v = aloneInTunnel(sim);
+    sim.state.bounty.STA = 120;
+    sim.state.money = 1000;
+    const p = world.nav.nearestPassable(v.x + 2, v.z, 4)!;
+    const guard = makeHuman(sim, 'STA', 'mercenario', p.x, p.z);
+    guard.ai.mode = 'escuadra';
+    sim.addChar(guard);
+    knockOut(sim, v, 600);
+    const o = defeatIntent(sim, guard, v);
+    expect(o?.t).toBe('despojar');
+    expect(o?.data).toBe('multa:STA');
+    guard.order = o!;
+    run(sim, 30, () => sim.state.bounty.STA === 0);
+    expect(sim.state.bounty.STA).toBe(0);
+    expect(sim.state.money).toBe(1000 - Math.round(120 * 1.2 + 20));
+    expect(v.captive).toBeUndefined();
   });
 });
 
