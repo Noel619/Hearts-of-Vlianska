@@ -71,6 +71,7 @@ export function decorateWalls(ctx: DecorCtx) {
       sinceSign += seg;
       const region = layout.regions[c.owner[i]];
       if (c.owner[j] !== c.owner[i]) continue;
+      if (region.kind === 'surface') continue;
       let rule: WallRule;
       let station: string | null = null;
       if (region.kind === 'station') {

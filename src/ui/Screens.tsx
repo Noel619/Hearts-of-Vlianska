@@ -206,6 +206,7 @@ function gasLayer(gas: GasField, W: number, H: number, sx: (x: number) => number
   const ctx = cv.getContext('2d')!;
   const r = Math.max(1.5, sx(2) - sx(0));
   for (const gp of gas.pockets) {
+    if (gp.def.hidden) continue;
     for (let j = 0; j < gp.rows; j += 2) {
       for (let i = 0; i < gp.cols; i += 2) {
         const d = gp.dens[j * gp.cols + i];
@@ -260,6 +261,34 @@ export function MapScreen({ close }: { close: () => void }) {
     }
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    // La superficie del barrio norte: calles y patios claros, edificios en gris
+    const box = (bx: { cx: number; cz: number; rot: number; hl: number; hw: number }) => {
+      const c = Math.cos(bx.rot);
+      const sn = Math.sin(bx.rot);
+      ctx.beginPath();
+      [
+        [-bx.hl, -bx.hw],
+        [bx.hl, -bx.hw],
+        [bx.hl, bx.hw],
+        [-bx.hl, bx.hw],
+      ].forEach(([u, v], i) => {
+        const x = sx(bx.cx + c * u - sn * v);
+        const z = sz(bx.cz + sn * u + c * v);
+        if (i) ctx.lineTo(x, z);
+        else ctx.moveTo(x, z);
+      });
+      ctx.closePath();
+    };
+    ctx.fillStyle = 'rgba(205, 214, 224, 0.13)';
+    for (const o of layout.surface.open) {
+      box(o.box);
+      ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(120, 128, 138, 0.55)';
+    for (const bd of layout.surface.buildings) {
+      box(bd.box);
+      ctx.fill();
+    }
     // Río Vlia (en superficie)
     for (const r of layout.rivers) {
       ctx.strokeStyle = 'rgba(70,120,180,0.2)';
@@ -332,7 +361,12 @@ export function MapScreen({ close }: { close: () => void }) {
             </span>
           );
         })}
-        {sim.world.gas.pockets.map((gp) => (
+        {layout.surface.zones.map((zn) => (
+          <span key={zn.id} className="mk zona" style={{ left: px(zn.x), top: pz(zn.z) }} title={zn.desc}>
+            {zn.name}
+          </span>
+        ))}
+        {sim.world.gas.pockets.filter((gp) => !gp.def.hidden).map((gp) => (
           <span key={gp.def.id} className="mk gas" style={{ left: px(gp.x), top: pz(gp.z) }} title={`${gp.def.name} · ${gp.def.peak > GAS_DENSE ? 'gas denso: hace falta máscara antigás' : 'gas ligero: basta un respirador'}\n${gp.def.desc}`}>
             <Icon id="gas" size={11} />
           </span>

@@ -14,6 +14,8 @@ import { buildTextures, type TextureSet } from '../render/textures';
 import { buildGasMesh } from '../render/gasMesh';
 import { buildWaterMesh } from '../render/waterMesh';
 import { buildWorldMesh } from '../render/worldMesh';
+import { buildSurfaceMesh } from '../render/surfaceMesh';
+import { Sky } from '../render/sky';
 import { building, buildingLight, canPlace, placeBuilding, restoreBuildings } from '../sim/build';
 import { applyNodes, isCivilDefense } from '../sim/events';
 import { totalHpFrac } from '../sim/chars';
@@ -64,6 +66,9 @@ export interface Shared {
   tex: TextureSet;
   worldGroup: THREE.Group;
   propsGroup: THREE.Group;
+  /** La superficie: edificios, suelo nevado y su atrezo. */
+  surfaceGroup: THREE.Group;
+  propsSurfaceGroup: THREE.Group;
 }
 
 const ray = new THREE.Raycaster();
@@ -73,6 +78,7 @@ const tmp = new THREE.Vector3();
 export class Game {
   readonly gfx: Gfx;
   readonly rig: CameraRig;
+  readonly sky: Sky;
   sim!: Sim;
   views!: CharViews;
   things!: ThingViews;
@@ -121,6 +127,9 @@ export class Game {
     this.rig = new CameraRig(this.gfx.camera);
     this.gfx.scene.add(shared.worldGroup);
     this.gfx.scene.add(shared.propsGroup);
+    this.gfx.scene.add(shared.surfaceGroup);
+    this.gfx.scene.add(shared.propsSurfaceGroup);
+    this.sky = new Sky(this.gfx, shared.tex, [shared.worldGroup, shared.propsGroup], [shared.surfaceGroup, shared.propsSurfaceGroup]);
     const b = shared.world.layout.bounds;
     this.rig.bounds = { minX: b.minX, minZ: b.minZ, maxX: b.maxX, maxZ: b.maxZ };
     this.bindInput();
@@ -140,13 +149,16 @@ export class Game {
       await progress(label, 0.3 + f * 0.6);
       await tick();
     });
-    await progress('Amueblando estaciones', 0.94);
+    await progress('Levantando la superficie', 0.92);
+    await tick();
+    const surface = buildSurfaceMesh(world.layout, world.field, tex);
+    await progress('Amueblando estaciones', 0.95);
     await tick();
     const props = buildPropsView(world.decor.props, world.field);
     mesh.group.add(buildWaterMesh(world.nav, world.field, tex));
     mesh.group.add(buildGasMesh(world.gas, world.nav, world.field, tex));
     await progress('Listo', 1);
-    return { world, tex, worldGroup: mesh.group, propsGroup: props.group };
+    return { world, tex, worldGroup: mesh.group, propsGroup: props.group, surfaceGroup: surface.group, propsSurfaceGroup: props.surfaceGroup };
   }
 
   static create(canvas: HTMLCanvasElement, shared: Shared, quality: Quality): Game {
@@ -234,8 +246,14 @@ export class Game {
     this.cameraKeys(dt);
     if (!this.paused) this.sim.step(dt * this.speed);
     this.drainEvents();
+    // La cámara sigue la altura del suelo (las escaleras suben a la superficie)
+    {
+      const nav = this.shared.world.nav;
+      if (!this.rig.follow && nav.isFloor(this.rig.tx, this.rig.tz)) this.rig.ty = nav.heightAt(this.rig.tx, this.rig.tz);
+    }
     this.rig.update(dt);
     const f = this.rig.focus;
+    this.sky.update(dt, f, this.sim.hour);
     const adt = this.paused ? 0 : dt * Math.min(this.speed, 2);
     this.views.update(adt, f.x, f.z);
     this.things.update(f.x, f.z);

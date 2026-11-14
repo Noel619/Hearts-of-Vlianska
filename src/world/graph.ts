@@ -21,6 +21,8 @@ interface Edge {
 }
 
 const HASH = 24;
+/** Coste extra de andar por la superficie (aire tóxico, nieve, fieras). */
+const SURFACE_COST = 4;
 
 export class RouteGraph {
   nodes: WayNode[] = [];
@@ -55,9 +57,9 @@ export class RouteGraph {
     return (Math.floor(x / HASH) + 512) * 4096 + Math.floor(z / HASH) + 512;
   }
 
-  private connect(a: number, b: number, link = -1) {
+  private connect(a: number, b: number, link = -1, cost = 1) {
     if (a === b) return;
-    const d = Math.hypot(this.nodes[a].x - this.nodes[b].x, this.nodes[a].z - this.nodes[b].z);
+    const d = Math.hypot(this.nodes[a].x - this.nodes[b].x, this.nodes[a].z - this.nodes[b].z) * cost;
     if (this.adj[a].some((e) => e.to === b)) return;
     this.adj[a].push({ to: b, d, link });
     this.adj[b].push({ to: a, d, link });
@@ -198,10 +200,84 @@ export class RouteGraph {
         }
       }
     }
+    this.buildSurface();
     const n = this.nodes.length;
     this.dist = new Float32Array(n);
     this.prev = new Int32Array(n);
     this.done = new Uint8Array(n);
+  }
+
+  /** La superficie: una malla de puntos por calles y patios, unida a las salidas del metro. */
+  private buildSurface() {
+    const { layout, nav } = this;
+    const plan = layout.surface;
+    const isSurf = (x: number, z: number) => {
+      const { sdf, owner, regions } = layout;
+      const i = Math.max(0, Math.min(sdf.w - 1, Math.round((x - sdf.ox) / sdf.cell)));
+      const j = Math.max(0, Math.min(sdf.h - 1, Math.round((z - sdf.oz) / sdf.cell)));
+      return regions[owner[j * sdf.w + i]]?.kind === 'surface';
+    };
+    const STEP = 16;
+    const grid = new Map<number, number>();
+    const b = plan.bounds;
+    const nx = Math.ceil((b.x1 - b.x0) / STEP);
+    const nz = Math.ceil((b.z1 - b.z0) / STEP);
+    for (let j = 0; j <= nz; j++) {
+      for (let i = 0; i <= nx; i++) {
+        const x = b.x0 + i * STEP;
+        const z = b.z0 + j * STEP;
+        if (!isSurf(x, z)) continue;
+        const q = nav.nearestPassable(x, z, 5, true);
+        if (!q || !isSurf(q.x, q.z)) continue;
+        grid.set(j * (nx + 1) + i, this.add(q.x, q.z));
+      }
+    }
+    // Vecinos en la malla (ocho direcciones) si hay paso
+    for (const [k, id] of grid) {
+      const i = k % (nx + 1);
+      const j = (k - i) / (nx + 1);
+      for (const [di, dj] of [
+        [1, 0],
+        [0, 1],
+        [1, 1],
+        [1, -1],
+      ]) {
+        const o = grid.get((j + dj) * (nx + 1) + i + di);
+        if (o === undefined) continue;
+        const a = this.nodes[id];
+        const c = this.nodes[o];
+        // Arriba se camina despacio y con máscara: las rutas solo suben si el destino está arriba
+        if (nav.walkLine(a.x, a.z, c.x, c.z, true)) this.connect(id, o, -1, SURFACE_COST);
+        else {
+          const path = nav.findPath(a.x, a.z, c.x, c.z, { gates: true, margin: 10, maxNodes: 3000 });
+          if (path && path.length <= 40) this.connect(id, o, -1, SURFACE_COST);
+        }
+      }
+    }
+    // Las salidas: lo alto de cada escalera con los puntos de superficie más cercanos
+    for (const e of plan.exits) {
+      const top = nav.nearestPassable(e.x - e.dx * 1.2, e.z - e.dz * 1.2, 3, true);
+      if (!top) continue;
+      let best = -1;
+      let bd = Infinity;
+      for (let i = 0; i < this.nodes.length; i++) {
+        const nd = this.nodes[i];
+        const d = Math.hypot(nd.x - top.x, nd.z - top.z);
+        if (d < 3 || d > 26 || d >= bd) continue;
+        if (Math.abs(nav.heightAt(nd.x, nd.z) - nav.heightAt(top.x, top.z)) > 2) continue;
+        if (!nav.findPath(top.x, top.z, nd.x, nd.z, { gates: true, margin: 12, maxNodes: 4000 })) continue;
+        bd = d;
+        best = i;
+      }
+      const t = this.add(top.x, top.z);
+      if (best >= 0) this.connect(t, best);
+      // …y con el último punto de la escalera
+      for (let i = 0; i < this.nodes.length - 1; i++) {
+        const nd = this.nodes[i];
+        const d = Math.hypot(nd.x - top.x, nd.z - top.z);
+        if (d < 12 && Math.abs(nav.heightAt(nd.x, nd.z) - nav.heightAt(top.x, top.z)) < 3 && nav.walkLine(nd.x, nd.z, top.x, top.z, true)) this.connect(t, i);
+      }
+    }
   }
 
   /** Nodo más cercano a un punto (prefiere los que se alcanzan en línea recta). */

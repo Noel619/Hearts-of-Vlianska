@@ -12,11 +12,14 @@ import './kit/basics';
 import './kit/settlement';
 import './kit/landmarks';
 import './kit/interiors';
+import './kit/surface';
 
 const TILE = 96;
 
 export interface PropsView {
   group: THREE.Group;
+  /** Atrezo de la superficie (se muestra cuando la cámara sube). */
+  surfaceGroup: THREE.Group;
   material: THREE.MeshStandardMaterial;
   count: number;
 }
@@ -74,13 +77,17 @@ function sampleProp(field: LightField, p: PropInst, type: string, out: Float32Ar
 export function buildPropsView(props: PropInst[], field: LightField, shared?: { material?: THREE.MeshStandardMaterial; solid?: THREE.MeshStandardMaterial }): PropsView {
   const group = new THREE.Group();
   group.name = 'atrezo';
+  const surfaceGroup = new THREE.Group();
+  surfaceGroup.name = 'atrezo de superficie';
+  /** Capa de una pieza: S (superficie) o M (metro). */
+  const layer = (p: PropInst) => (p.y > 10 ? 'S' : 'M');
   const material = shared?.material ?? propMaterial();
   const solid = shared?.solid ?? solidMaterial();
   const buckets = new Map<string, PropInst[]>();
   const uniques = new Map<string, PropInst[]>();
   for (const p of props) {
     const def = PROPS[p.type];
-    const tile = `${Math.floor(p.x / TILE)},${Math.floor(p.z / TILE)}`;
+    const tile = `${Math.floor(p.x / TILE)},${Math.floor(p.z / TILE)},${layer(p)}`;
     if (def?.unique) {
       let arr = uniques.get(tile);
       if (!arr) uniques.set(tile, (arr = []));
@@ -145,7 +152,7 @@ export function buildPropsView(props: PropInst[], field: LightField, shared?: { 
     mesh.castShadow = !PROPS[type]?.wall;
     mesh.receiveShadow = true;
     mesh.name = key;
-    group.add(mesh);
+    (key.endsWith(',S') ? surfaceGroup : group).add(mesh);
     count += n;
   }
   // Piezas únicas: una malla por baldosa con luz por vértice
@@ -195,8 +202,8 @@ export function buildPropsView(props: PropInst[], field: LightField, shared?: { 
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     mesh.name = 'unicos|' + tile;
-    group.add(mesh);
+    (tile.endsWith(',S') ? surfaceGroup : group).add(mesh);
     count += list.length;
   }
-  return { group, material, count };
+  return { group, surfaceGroup, material, count };
 }

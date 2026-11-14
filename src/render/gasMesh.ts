@@ -82,6 +82,7 @@ export function buildGasMesh(gas: GasField, nav: NavGrid, field: LightField, tex
   // Amarillo verdoso sucio; el brillo propio mínimo para verlo sin lámparas
   const tint = [0.78, 0.86, 0.36];
   for (const p of gas.pockets) {
+    if (p.def.hidden) continue;
     const rng = new Rng(p.def.id.length * 7919 + Math.round(p.x * 13 + p.z * 7));
     for (let z = p.z0; z < p.z0 + p.rows; z += STEP) {
       for (let x = p.x0; x < p.x0 + p.cols; x += STEP) {

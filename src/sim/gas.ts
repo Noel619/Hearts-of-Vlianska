@@ -104,8 +104,9 @@ export function stepGas(sim: Sim, c: Char, dt: number): void {
     if (!((mask.fil ?? 0) > 0)) fitFilter(sim, c, mask);
     if ((mask.fil ?? 0) > 0) {
       dose = Math.max(0, d - ITEMS[mask.id].armor!.filter!);
-      mask.fil = Math.max(0, mask.fil! - dt * d);
-      if (mask.fil <= 0 && !fitFilter(sim, c, mask) && c.player) warn(sim, c, `A ${c.name} se le ha agotado el filtro y no quedan más: el gas ya le pasa.`);
+      // La gente del metro que hace guardia arriba trae filtros de sobra; los tuyos se gastan
+      if (c.player || !c.ai.place.startsWith('SUP')) mask.fil = Math.max(0, mask.fil! - dt * d);
+      if ((mask.fil ?? 0) <= 0 && !fitFilter(sim, c, mask) && c.player) warn(sim, c, `A ${c.name} se le ha agotado el filtro y no quedan más: el gas ya le pasa.`);
     } else if (c.player) warn(sim, c, `${c.name} no tiene filtros: la máscara no le protege del gas.`);
   }
   c.gas = dose;

@@ -175,6 +175,9 @@ function buildWallStyles(layout: Layout): WallStyle[] {
       const mat = look.wall === 'tiles' ? 'w_tiles' : look.wall === 'marble' ? 'w_marble' : look.wall === 'brick' ? 'w_brick' : 'w_concrete';
       const strips = vertWall(look.height, 1.1, base, f.def.owner ? dado : scalec(base, 0.5), 1.25, look.wall === 'concrete' ? null : scalec(base, 0.55));
       st = { mat, strips, uScale: look.wall === 'marble' ? 2.4 : look.wall === 'tiles' ? 1.2 : look.wall === 'brick' ? 1.0 : 4, vScale: look.wall === 'marble' ? 2.4 : look.wall === 'tiles' ? 1.2 : look.wall === 'brick' ? 1.0 : 4, stub: 0.45 };
+    } else if (reg.kind === 'surface') {
+      // La superficie no lleva muros de túnel: la cierran sus edificios (render/surfaceMesh)
+      st = { mat: 'w_concrete', strips: [], uScale: 4, vScale: 4, stub: 0.45 };
     } else if (reg.kind === 'node') {
       const n = layout.nodeById[reg.ref];
       if (!n) {
@@ -448,6 +451,8 @@ function buildFloors(layout: Layout, B: (x: number, z: number, mat: string) => M
       const cz = oz + j + 0.5;
       cellRoom = rooms.cell[k];
       if (cellRoom < 0 && covered(cx, cz)) continue;
+      // La superficie tiene su propio suelo nevado
+      if (regions[owner[k]]?.kind === 'surface' && cellRoom < 0) continue;
       const b = B(cx, cz, cellRoom >= 0 && annexFloorKind(rooms.list[cellRoom].a.use) >= 0 ? 'floorRoom' : 'floor');
       const a = vert(b, i, j);
       const b1 = vert(b, i + 1, j);

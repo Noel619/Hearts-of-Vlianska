@@ -10,7 +10,8 @@ import type { Terrain } from '../data/tipos';
 import { DEG, clamp, distToSegment, hash2, hermite, lerp, noise2, resample, type V2, vdist } from '../core/math';
 import { Rng, seedFrom } from '../core/rng';
 import { CELL, F_WALK, F_WATER, FloatGrid, NavGrid } from './grid';
-import { STATION_ARCH, annexFloorAt, insideAnnex, resolveAnnexes, type Annex, type StationArch } from './arch';
+import { STATION_ARCH, SURFACE_Y, annexFloorAt, annexPoint, insideAnnex, resolveAnnexes, type Annex, type StationArch } from './arch';
+import { planSurface, surfaceHeight, type SExit, type SurfacePlan } from './surface';
 import {
   COLLAPSE_NODES,
   NODE_ROOMS,
@@ -30,11 +31,11 @@ import {
 
 export interface Region {
   id: number;
-  kind: 'station' | 'link' | 'node';
-  /** Id de estación, índice de enlace o id de cruce. */
+  kind: 'station' | 'link' | 'node' | 'surface';
+  /** Id de estación, índice de enlace, id de cruce o id de zona de la superficie. */
   ref: string;
   name: string;
-  terrain: Terrain | 'estacion';
+  terrain: Terrain | 'estacion' | 'superficie';
 }
 
 export interface Lane {
@@ -169,6 +170,10 @@ export interface Layout {
   nav: NavGrid;
   rivers: V2[][];
   bounds: { minX: number; minZ: number; maxX: number; maxZ: number };
+  /** La superficie: calles, manzanas, edificios y pabellones de salida. */
+  surface: SurfacePlan;
+  /** Región de cada zona de la superficie. */
+  surfaceRegion: Record<string, number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -628,6 +633,47 @@ export function buildLayout(): Layout {
   // --- Vías dentro de las estaciones
   for (const f of stations) buildStationTracks(f, links);
 
+  // --- La superficie, al norte del metro
+  const exits: SExit[] = [];
+  for (const f of stations) {
+    for (const a of f.annexes) {
+      if (!a.exit) continue;
+      const [u1, v1] = annexPoint(a, a.depth, 0);
+      const top = stationToWorld(f, u1, v1);
+      const [u0, v0] = annexPoint(a, 0, 0);
+      const bot = stationToWorld(f, u0, v0);
+      const d = Math.hypot(top.x - bot.x, top.z - bot.z) || 1;
+      exits.push({ station: a.exit, x: top.x, z: top.z, dx: (top.x - bot.x) / d, dz: (top.z - bot.z) / d, width: a.width });
+    }
+  }
+  // Perfil norte del metro: el punto más al norte por franjas de 4 m
+  const EB = 4;
+  const edgeBins = new Map<number, number>();
+  const mark = (x: number, z: number, r: number) => {
+    for (let b = Math.floor((x - r) / EB); b <= Math.floor((x + r) / EB); b++) edgeBins.set(b, Math.min(edgeBins.get(b) ?? Infinity, z - r));
+  };
+  for (const f of stations) {
+    const rects = [{ u0: -f.hl, u1: f.hl, v0: -f.hw, v1: f.hw }, ...f.annexes];
+    for (const r of rects) {
+      for (let u = r.u0; u <= r.u1 + 0.01; u += Math.max(1, (r.u1 - r.u0) / 20)) {
+        for (let v = r.v0; v <= r.v1 + 0.01; v += Math.max(1, (r.v1 - r.v0) / 8)) {
+          const p = stationToWorld(f, u, v);
+          mark(p.x, p.z, 1);
+        }
+      }
+    }
+  }
+  for (const n of nodes) mark(n.x, n.z, n.room.r + 3);
+  for (const l of links) for (let i = 0; i < l.pts.length; i += 2) mark(l.pts[i].x, l.pts[i].z, l.hw[i] + 7);
+  const edgeZ = (x0: number, x1: number) => {
+    let m = Infinity;
+    for (let b = Math.floor(x0 / EB); b <= Math.floor(x1 / EB); b++) m = Math.min(m, edgeBins.get(b) ?? Infinity);
+    return m;
+  };
+  const surface = planSurface(exits, edgeZ);
+  const surfaceRegion: Record<string, number> = {};
+  for (const z of surface.zones) surfaceRegion[z.id] = addRegion('surface', z.id, z.name, 'superficie');
+
   // --- Límites del mundo
   let minX = Infinity;
   let minZ = Infinity;
@@ -642,6 +688,11 @@ export function buildLayout(): Layout {
   for (const f of stations) grow(f.x, f.z, f.reach + 4);
   for (const n of nodes) grow(n.x, n.z, n.room.r + 8);
   for (const l of links) for (const p of l.pts) grow(p.x, p.z, 14);
+  grow((surface.bounds.x0 + surface.bounds.x1) / 2, (surface.bounds.z0 + surface.bounds.z1) / 2, 0);
+  minX = Math.min(minX, surface.bounds.x0);
+  minZ = Math.min(minZ, surface.bounds.z0);
+  maxX = Math.max(maxX, surface.bounds.x1);
+  maxZ = Math.max(maxZ, surface.bounds.z1);
   minX = Math.floor(minX - 10);
   minZ = Math.floor(minZ - 10);
   maxX = Math.ceil(maxX + 10);
@@ -781,6 +832,73 @@ export function buildLayout(): Layout {
       carveBox(c.x, c.z, f.rot, (p.u1 - p.u0) / 2, (p.v1 - p.v0) / 2, 0.22);
     }
   }
+  // Superficie: calles y patios abiertos; los edificios se tallan sin tocar nunca el metro
+  const isSurf = new Uint8Array(regions.length);
+  for (const id of Object.values(surfaceRegion)) isSurf[id] = 1;
+  // (cada espacio se ensancha un metro para que calles y patios contiguos se fundan sin costura)
+  for (const o of surface.open) stampBox(o.box.cx, o.box.cz, o.box.rot, o.box.hl + 1, o.box.hw + 1, 0.3, surfaceRegion[o.zone]);
+  const carveSurf = (cx: number, cz: number, rot: number, hl: number, hw: number) => {
+    const c = Math.cos(rot);
+    const s = Math.sin(rot);
+    const ext = Math.hypot(hl, hw) + 2;
+    const x0 = Math.max(0, Math.floor((cx - ext - minX) / SDF_CELL));
+    const x1 = Math.min(gw - 1, Math.ceil((cx + ext - minX) / SDF_CELL));
+    const z0 = Math.max(0, Math.floor((cz - ext - minZ) / SDF_CELL));
+    const z1 = Math.min(gh - 1, Math.ceil((cz + ext - minZ) / SDF_CELL));
+    for (let j = z0; j <= z1; j++) {
+      for (let i = x0; i <= x1; i++) {
+        const k = j * gw + i;
+        if (sdf.data[k] < 0.5 && !isSurf[owner[k]]) continue;
+        const dx = minX + i * SDF_CELL - cx;
+        const dz = minZ + j * SDF_CELL - cz;
+        const qx = Math.abs(dx * c + dz * s) - hl + 0.2;
+        const qz = Math.abs(-dx * s + dz * c) - hw + 0.2;
+        const d = Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0) - 0.2;
+        if (-d > sdf.data[k]) sdf.data[k] = -d;
+      }
+    }
+  };
+  for (const b of surface.buildings) {
+    const B = b.box;
+    if (!b.hollow) {
+      carveSurf(B.cx, B.cz, B.rot, B.hl, B.hw);
+      continue;
+    }
+    // Edificio hueco: cuatro muros con sus puertas
+    const t = b.hollow.wall;
+    const c = Math.cos(B.rot);
+    const s = Math.sin(B.rot);
+    const at = (u: number, v: number) => ({ x: B.cx + c * u - s * v, z: B.cz + s * u + c * v });
+    const sides: { side: 'u+' | 'u-' | 'v+' | 'v-'; len: number }[] = [
+      { side: 'u+', len: B.hw },
+      { side: 'u-', len: B.hw },
+      { side: 'v+', len: B.hl },
+      { side: 'v-', len: B.hl },
+    ];
+    for (const sd of sides) {
+      const doors = b.hollow.doors.filter((d) => d.side === sd.side).map((d) => [d.at - d.w / 2, d.at + d.w / 2] as [number, number]);
+      // Tramos de muro entre puertas
+      let cur = -sd.len;
+      const cuts: [number, number][] = [];
+      for (const [d0, d1] of doors.sort((p, q) => p[0] - q[0])) {
+        if (d0 > cur) cuts.push([cur, d0]);
+        cur = Math.max(cur, d1);
+      }
+      if (cur < sd.len) cuts.push([cur, sd.len]);
+      for (const [a0, a1] of cuts) {
+        const mid = (a0 + a1) / 2;
+        const half = (a1 - a0) / 2;
+        if (half < 0.2) continue;
+        if (sd.side === 'u+' || sd.side === 'u-') {
+          const p = at((sd.side === 'u+' ? 1 : -1) * (B.hl - t / 2), mid);
+          carveSurf(p.x, p.z, B.rot, t / 2, half);
+        } else {
+          const p = at(mid, (sd.side === 'v+' ? 1 : -1) * (B.hw - t / 2));
+          carveSurf(p.x, p.z, B.rot, half, t / 2);
+        }
+      }
+    }
+  }
 
   // Evita ceros exactos (aristas alineadas con la rejilla)
   for (let i = 0; i < sdf.data.length; i++) if (Math.abs(sdf.data[i]) < 1e-4) sdf.data[i] = -1e-4;
@@ -799,6 +917,30 @@ export function buildLayout(): Layout {
   }
   // Alturas de andén, rampas y pasarelas
   for (const f of stations) stampStationHeights(f, nav);
+  // Superficie: nieve amontonada; los pabellones y la boca de la rampa, a ras
+  {
+    const sb = surface.bounds;
+    const flat = surface.open.filter((o) => o.kind === 'pabellon' || o.kind === 'boca');
+    for (let cz = Math.max(0, nav.cz(sb.z0)); cz <= Math.min(nav.h - 1, nav.cz(sb.z1)); cz++) {
+      for (let cx = Math.max(0, nav.cx(sb.x0)); cx <= Math.min(nav.w - 1, nav.cx(sb.x1)); cx++) {
+        const i = cz * nav.w + cx;
+        if (!(nav.flags[i] & F_WALK)) continue;
+        const x = nav.wx(cx);
+        const z = nav.wz(cz);
+        const gi = Math.round((x - minX) / SDF_CELL);
+        const gj = Math.round((z - minZ) / SDF_CELL);
+        if (!isSurf[owner[gj * gw + gi]]) continue;
+        const onFlat = flat.some((o) => {
+          const dx = x - o.box.cx;
+          const dz = z - o.box.cz;
+          const c = Math.cos(o.box.rot);
+          const s = Math.sin(o.box.rot);
+          return Math.abs(dx * c + dz * s) <= o.box.hl + 1.5 && Math.abs(-dx * s + dz * c) <= o.box.hw + 1.5;
+        });
+        nav.height[i] = Math.round((onFlat ? SURFACE_Y : surfaceHeight(x, z)) * 10);
+      }
+    }
+  }
   // Agua: el Cruce del Río y los tramos peligrosos bajo el cauce
   for (const n of nodes) {
     if (n.room.theme === 'inundado') {
@@ -831,7 +973,7 @@ export function buildLayout(): Layout {
   }
   nav.computeNear();
 
-  return { regions, stations, stationById, links, nodes, nodeById, sdf, owner, contours, nav, rivers, bounds: { minX, minZ, maxX, maxZ } };
+  return { regions, stations, stationById, links, nodes, nodeById, sdf, owner, contours, nav, rivers, bounds: { minX, minZ, maxX, maxZ }, surface, surfaceRegion };
 }
 
 /** Normal (izquierda) del eje del túnel en el punto i. */

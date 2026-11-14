@@ -12,6 +12,10 @@ export interface GasDef {
   node?: string;
   /** Densidad en el centro (0..1). Por encima de la mitad, un respirador ya no basta. */
   peak: number;
+  /** Ocupa toda la superficie (y lo alto de las escaleras que suben a ella). */
+  surface?: boolean;
+  /** No se pinta como niebla ni como mancha en el mapa (el aire de arriba se ve por la nieve). */
+  hidden?: boolean;
 }
 
 /** Densidad a partir de la cual se habla de gas denso. */
@@ -48,6 +52,14 @@ export const GASES: GasDef[] = [
     desc: 'Cerca de las escaleras de Severnyy baja el polvo de la superficie con cada ráfaga. Un respirador basta.',
     link: { a: 'SEV', b: 'UBE', at: 0.18, half: 32 },
     peak: 0.45,
+  },
+  {
+    id: 'superficie-norte',
+    name: 'Aire de la superficie',
+    desc: 'Veinte años después, el aire de arriba sigue quemando los pulmones. Sin máscara antigás y filtros de repuesto, nadie aguanta en las calles.',
+    surface: true,
+    hidden: true,
+    peak: 0.62,
   },
   {
     id: 'viciado',

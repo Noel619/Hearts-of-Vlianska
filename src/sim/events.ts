@@ -113,6 +113,54 @@ function makeContainer(sim: Sim, x: number, z: number, place: string, kind: stri
     add('casco', 1, 2);
     add('chaleco', 1, 1, 0.6);
     add('vendas', 3, 6);
+  } else if (kind === 'piso' || kind === 'coche' || kind === 'kiosco' || kind === 'farmacia' || kind === 'militar') {
+    // La superficie: lo que nadie ha bajado al metro en veinte años
+    ckind = kind === 'militar' ? 'almacen' : 'caja';
+    if (kind === 'piso') {
+      label = 'Restos de un piso';
+      add('conserva', 1, 3, 0.6);
+      add('tela', 2, 6, 0.7);
+      add('libros', 1, 3, 0.5);
+      add('componentes', 1, 3, 0.4);
+      add('vendas', 1, 3, 0.4);
+      add('te', 1, 2, 0.3);
+      add('ushanka', 1, 1, 0.12);
+      add('linterna', 1, 1, 0.1);
+    } else if (kind === 'coche') {
+      label = 'Maletero helado';
+      add('combustible', 1, 4, 0.6);
+      add('piezas', 2, 6, 0.7);
+      add('chatarra', 2, 6, 0.5);
+      add('componentes', 1, 2, 0.35);
+      add('martillo', 1, 1, 0.1);
+      add('conserva', 1, 1, 0.2);
+    } else if (kind === 'kiosco') {
+      label = 'Quiosco saqueado';
+      add('libros', 1, 4, 0.7);
+      add('conserva', 1, 2, 0.35);
+      add('te', 1, 3, 0.4);
+      add('samogon', 1, 2, 0.3);
+      add('filtros', 1, 1, 0.15);
+    } else if (kind === 'farmacia') {
+      label = 'Armario de farmacia';
+      lock = rng.int(10, 30);
+      add('botiquin', 1, 3, 0.8);
+      add('antibioticos', 1, 2, 0.6);
+      add('vendas', 2, 6);
+      add('filtros', 1, 3, 0.5);
+      add('respirador', 1, 1, 0.2);
+    } else {
+      label = 'Caja militar de 2013';
+      lock = rng.int(20, 45);
+      add('balas', 30, 90);
+      add('cartuchosEscopeta', 6, 20, 0.5);
+      add('filtros', 2, 6, 0.8);
+      add('mascaraGas', 1, 1, 0.5);
+      add('casco', 1, 1, 0.4);
+      add('chaleco', 1, 1, 0.25);
+      add('ak', 1, 1, 0.25);
+      add('conserva', 2, 5, 0.6);
+    }
   } else {
     // Restos en túneles y cruces
     add('chatarra', 3, 10, 0.7);

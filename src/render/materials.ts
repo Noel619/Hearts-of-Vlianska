@@ -11,6 +11,8 @@ import type { SurfaceTex, TextureSet } from './textures';
 /** Uniformes compartidos por todos los materiales. */
 export const globals = {
   uCam: { value: new THREE.Vector3(0, 50, 0) },
+  /** Punto del suelo al que mira la cámara (corte de los edificios de la superficie). */
+  uFocus: { value: new THREE.Vector3(0, 0, 0) },
   uTime: { value: 0 },
   uCollapse: { value: 1 },
   uGrunge: { value: null as THREE.Texture | null },
@@ -34,6 +36,10 @@ uniform float uCollapse;
 #endif
 #ifdef VL_WALL
   attribute vec3 wallN;
+#endif
+#ifdef VL_BLD
+  attribute vec4 bld;
+  uniform vec3 uFocus;
 #endif
 #ifdef VL_IWALL
   attribute vec3 iWall;
@@ -68,6 +74,22 @@ float vlLowered = 0.0;
     transformed.y = mix( transformed.y, min( transformed.y, wallN.z ), vlK );
     #ifdef USE_COLOR
       vColor.rgb *= 1.0 - 0.72 * vlLowered;
+    #endif
+  }
+#endif
+#ifdef VL_BLD
+  {
+    // Los edificios entre la cámara y el punto que mira se rebajan a su primera planta
+    vec2 vlC = uCam.xz;
+    vec2 vlD = uFocus.xz - vlC;
+    float vlL2 = max( dot( vlD, vlD ), 1.0 );
+    float vlT = clamp( dot( bld.xy - vlC, vlD ) / vlL2, 0.0, 1.0 );
+    float vlDist = length( vlC + vlD * vlT - bld.xy );
+    float vlK = ( 1.0 - smoothstep( bld.z * 0.75 + 4.0, bld.z + 10.0, vlDist ) ) * uCollapse;
+    vlLowered = vlK * step( bld.w + 0.01, transformed.y );
+    transformed.y = mix( transformed.y, min( transformed.y, bld.w ), vlK );
+    #ifdef USE_COLOR
+      vColor.rgb *= 1.0 - 0.55 * vlLowered;
     #endif
   }
 #endif
@@ -249,6 +271,7 @@ const FRAG_LIGHTS_END = /* glsl */ `
 
 function patch(shader: THREE.WebGLProgramParametersWithUniforms, mat: THREE.Material) {
   shader.uniforms.uCam = globals.uCam;
+  shader.uniforms.uFocus = globals.uFocus;
   shader.uniforms.uTime = globals.uTime;
   shader.uniforms.uCollapse = globals.uCollapse;
   shader.uniforms.uGrunge = globals.uGrunge;
@@ -271,7 +294,7 @@ function onCompile(this: THREE.Material, shader: THREE.WebGLProgramParametersWit
   patch(shader, this);
 }
 
-export type Defines = Partial<Record<'VL_BAKE_VERTEX' | 'VL_BAKE_INSTANCE' | 'VL_PROBE' | 'VL_WALL' | 'VL_IWALL' | 'VL_FX' | 'VL_ITINT' | 'VL_SPLAT' | 'VL_GRUNGE', ''>>;
+export type Defines = Partial<Record<'VL_BAKE_VERTEX' | 'VL_BAKE_INSTANCE' | 'VL_PROBE' | 'VL_WALL' | 'VL_IWALL' | 'VL_FX' | 'VL_ITINT' | 'VL_SPLAT' | 'VL_GRUNGE' | 'VL_BLD', ''>>;
 
 function make(params: THREE.MeshStandardMaterialParameters, defines: Defines, uniforms?: Record<string, THREE.IUniform>): THREE.MeshStandardMaterial {
   const m = new THREE.MeshStandardMaterial(params);
@@ -312,6 +335,16 @@ export function worldMaterial(tex: SurfaceTex, o: WorldMatOptions = {}): THREE.M
     m.polygonOffsetFactor = -o.polygonOffset;
     m.polygonOffsetUnits = -o.polygonOffset * 2;
   }
+  return m;
+}
+
+/** Fachadas y azoteas de la superficie: luz horneada, color por vértice y corte junto a la cámara. */
+export function buildingMaterial(tex: SurfaceTex, normalScale = 1): THREE.MeshStandardMaterial {
+  const m = make(
+    { map: tex.map, normalMap: tex.normalMap, roughnessMap: tex.roughnessMap, roughness: 1, metalness: 0, vertexColors: true },
+    { VL_BAKE_VERTEX: '', VL_BLD: '' },
+  );
+  m.normalScale.setScalar(normalScale);
   return m;
 }
 

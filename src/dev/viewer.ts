@@ -10,6 +10,8 @@ import { buildTextures } from '../render/textures';
 import { buildGasMesh } from '../render/gasMesh';
 import { buildWaterMesh } from '../render/waterMesh';
 import { buildWorldMesh } from '../render/worldMesh';
+import { buildSurfaceMesh } from '../render/surfaceMesh';
+import { Sky } from '../render/sky';
 import { decorate } from '../world/decor';
 import { buildGas } from '../world/gas';
 import { buildLayout } from '../world/layout';
@@ -53,6 +55,11 @@ export async function startViewer(root: HTMLElement) {
   const t4 = performance.now();
   const props = buildPropsView(decor.props, field);
   gfx.scene.add(props.group);
+  const surface = buildSurfaceMesh(layout, field, tex);
+  gfx.scene.add(surface.group);
+  gfx.scene.add(props.surfaceGroup);
+  const sky = new Sky(gfx, tex, [world.group, props.group], [surface.group, props.surfaceGroup]);
+  const hour = Number(params.get('hora') ?? 12);
   const t5 = performance.now();
   const rig = new CameraRig(gfx.camera);
   const at = params.get('at');
@@ -98,7 +105,9 @@ export async function startViewer(root: HTMLElement) {
     if (keys.has('KeyD')) rig.pan(sp, 0);
     if (keys.has('KeyQ')) rig.rotate(dt * 1.5, 0);
     if (keys.has('KeyE')) rig.rotate(-dt * 1.5, 0);
+    if (layout.nav.isFloor(rig.tx, rig.tz)) rig.ty = layout.nav.heightAt(rig.tx, rig.tz);
     rig.update(dt);
+    sky.update(dt, rig.focus, hour);
     charTick?.(dt);
     gfx.render(dt);
     frames++;
@@ -113,6 +122,6 @@ export async function startViewer(root: HTMLElement) {
     requestAnimationFrame(loop);
   };
   loop();
-  (window as unknown as Record<string, unknown>).__vl = { gfx, rig, layout, decor, field, THREE };
+  (window as unknown as Record<string, unknown>).__vl = { gfx, rig, layout, decor, field, THREE, sky };
   (window as unknown as Record<string, unknown>).__ready = true;
 }

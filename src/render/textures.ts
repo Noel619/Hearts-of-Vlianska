@@ -594,6 +594,229 @@ function trackBed(seed: number): SurfaceTex {
   );
 }
 
+// --- Superficie ---------------------------------------------------------------
+
+/** Nieve: ondulaciones suaves, brillo granulado y algún pisotón sucio. Cubre 6 x 6 m. */
+function snow(seed: number): SurfaceTex {
+  return synth(512, 512, (u, v, t) => {
+    const big = pfbm(u, v, 2, 4, seed);
+    const mid = pfbm(u, v, 6, 3, seed + 3);
+    const fine = pfbm(u, v, 80, 2, seed + 7);
+    const dirt = smoothstep(0.58, 0.85, pfbm(u, v, 2, 4, seed + 11)) * 0.5;
+    const spark = hash2(Math.floor(u * 512), Math.floor(v * 512), seed + 13) > 0.998 ? 0.2 : 0;
+    const c = 0.72 + (big - 0.5) * 0.12 + (mid - 0.5) * 0.05 + (fine - 0.5) * 0.04 - dirt * 0.16 + spark;
+    t.r = c * 0.97;
+    t.g = c * 0.99;
+    t.b = c * 1.04;
+    t.h = big * 0.7 + mid * 0.25 + fine * 0.05;
+    t.rough = 0.62 - spark * 1.5 + dirt * 0.2;
+  }, 1.2);
+}
+
+/** Asfalto agrietado con nieve en las grietas y placas de hielo. Cubre 4 x 4 m. */
+function asphalt(seed: number): SurfaceTex {
+  return synth(512, 512, (u, v, t) => {
+    const big = pfbm(u, v, 3, 4, seed);
+    const grain = hash2(Math.floor(u * 512), Math.floor(v * 512), seed + 1);
+    const crackN = pfbm(u, v, 5, 4, seed + 21);
+    const crack = 1 - smoothstep(0.0, 0.004, Math.abs(crackN - 0.5));
+    const ice = smoothstep(0.66, 0.8, pfbm(u, v, 2, 3, seed + 31));
+    const dust = smoothstep(0.55, 0.85, pfbm(u, v, 2, 3, seed + 41));
+    let c = 0.24 + (big - 0.5) * 0.06 + (grain - 0.5) * 0.05;
+    c = lerp(c, 0.5, crack * 0.45);
+    c = lerp(c, 0.5, dust * 0.4);
+    c = lerp(c, 0.36, ice * 0.4);
+    t.r = c * 0.98;
+    t.g = c * 1.0;
+    t.b = c * 1.05;
+    t.h = big * 0.3 + grain * 0.12 - crack * 0.4;
+    t.rough = 0.9 - ice * 0.65;
+  }, 2.0);
+}
+
+/** Ventana de fachada en una celda (fu, fv en 0..1): devuelve el color o null si es muro. */
+function windowCell(fu: number, fv: number, w: number, h: number, sill: number, id: number, out: [number, number, number, number]): boolean {
+  const x0 = 0.5 - w / 2;
+  const x1 = 0.5 + w / 2;
+  const y0 = sill;
+  const y1 = sill + h;
+  const frame = 0.035;
+  if (fu < x0 - frame || fu > x1 + frame || fv < y0 - frame || fv > y1 + frame) {
+    // Nieve en el alféizar
+    if (fu > x0 - frame && fu < x1 + frame && fv > y0 - frame - 0.04 && fv < y0 - frame) {
+      out[0] = out[1] = out[2] = 0.9;
+      out[3] = 0.3;
+      return true;
+    }
+    return false;
+  }
+  const inner = fu > x0 && fu < x1 && fv > y0 && fv < y1;
+  if (!inner) {
+    out[0] = out[1] = out[2] = 0.62;
+    out[3] = 0.5;
+    return true;
+  }
+  if (id < 0.12) {
+    // Tapiada con tablones
+    const plank = Math.floor((fv - y0) / (h / 4));
+    const k = 0.32 + hash2(plank, Math.floor(id * 100), 3) * 0.12;
+    out[0] = k * 1.1;
+    out[1] = k * 0.85;
+    out[2] = k * 0.6;
+    out[3] = 0.25;
+    return true;
+  }
+  // Cristal oscuro (o el hueco negro de un cristal roto) con el parteluz
+  const broken = id > 0.7;
+  const mull = Math.abs(fu - 0.5) < 0.012 || Math.abs(fv - (y0 + h * 0.62)) < 0.012;
+  if (mull) {
+    out[0] = out[1] = out[2] = 0.55;
+    out[3] = 0.4;
+    return true;
+  }
+  const g = broken ? 0.03 : 0.08 + (fv - y0) * 0.12;
+  out[0] = g * 0.9;
+  out[1] = g * 1.0;
+  out[2] = g * 1.15;
+  out[3] = -0.6;
+  return true;
+}
+
+const winOut: [number, number, number, number] = [0, 0, 0, 0];
+
+/** Fachada de paneles prefabricados: 2 crujías x 2 plantas (6 x 6 m). */
+function facadePanel(seed: number): SurfaceTex {
+  return synth(512, 512, (u, v, t) => {
+    const bu = u * 2;
+    const bv = v * 2;
+    const cu = bu - Math.floor(bu);
+    const cv = 1 - (bv - Math.floor(bv));
+    const id = hash2(Math.floor(bu), Math.floor(bv), seed);
+    const fine = pfbm(u, v, 48, 3, seed + 3);
+    const stain = smoothstep(0.5, 0.8, pfbm(u * 3, v * 0.6, 3, 3, seed + 6));
+    let c = 0.6 + (fine - 0.5) * 0.08 - stain * 0.14;
+    const joint = Math.max(1 - smoothstep(0.004, 0.012, Math.min(cu, 1 - cu)), 1 - smoothstep(0.004, 0.012, Math.min(cv, 1 - cv)));
+    c -= joint * 0.25;
+    let r = c * 0.98;
+    let g = c * 0.96;
+    let b = c * 0.92;
+    let h = 0.5 + fine * 0.1 - joint * 0.4;
+    // Chorreones de óxido bajo la ventana
+    const rust = (Math.abs(cu - 0.5) < 0.22 ? 1 : 0) * smoothstep(0.32, 0.05, cv) * smoothstep(0.55, 0.8, pn(u * 60, v * 4, 60, 4, seed + 9)) * 0.4;
+    r += rust * 0.12;
+    g -= rust * 0.04;
+    b -= rust * 0.08;
+    if (windowCell(cu, cv, 0.48, 0.44, 0.3, id, winOut)) {
+      r = winOut[0];
+      g = winOut[1];
+      b = winOut[2];
+      h = 0.5 + winOut[3] * 0.5;
+    }
+    t.r = r;
+    t.g = g;
+    t.b = b;
+    t.h = h;
+    t.rough = 0.85;
+  }, 2.4);
+}
+
+/** Fachada de ladrillo con ventanas de marco blanco: 2 crujías x 2 plantas (6 x 6 m). */
+function facadeBrick(seed: number): SurfaceTex {
+  return synth(512, 512, (u, v, t) => {
+    const bu = u * 2;
+    const bv = v * 2;
+    const cu = bu - Math.floor(bu);
+    const cv = 1 - (bv - Math.floor(bv));
+    const id = hash2(Math.floor(bu), Math.floor(bv), seed);
+    const rows = 80;
+    const ry = Math.floor(v * rows);
+    const fv = v * rows - ry;
+    const su = u * 24 + (ry % 2) * 0.5;
+    const bx = Math.floor(su);
+    const fu = su - bx;
+    const bid = hash2(wrap(bx, 24), ry, seed + 1);
+    const mortar = Math.max(1 - smoothstep(0.04, 0.09, Math.min(fu, 1 - fu)), 1 - smoothstep(0.1, 0.2, Math.min(fv, 1 - fv)));
+    const soot = smoothstep(0.45, 0.85, pfbm(u, v, 3, 3, seed + 6));
+    let r = (0.46 + (bid - 0.5) * 0.14) * (1 - soot * 0.35);
+    let g = (0.24 + (bid - 0.5) * 0.07) * (1 - soot * 0.35);
+    let b = (0.18 + (bid - 0.5) * 0.05) * (1 - soot * 0.35);
+    r = lerp(r, 0.5, mortar);
+    g = lerp(g, 0.49, mortar);
+    b = lerp(b, 0.46, mortar);
+    let h = (1 - mortar) * 0.5;
+    if (windowCell(cu, cv, 0.38, 0.5, 0.28, id, winOut)) {
+      const frame = winOut[3] > 0.45 && winOut[3] < 0.55;
+      r = frame ? 0.8 : winOut[0];
+      g = frame ? 0.78 : winOut[1];
+      b = frame ? 0.72 : winOut[2];
+      h = 0.5 + winOut[3] * 0.5;
+    }
+    t.r = r;
+    t.g = g;
+    t.b = b;
+    t.h = h;
+    t.rough = 0.88;
+  }, 2.2);
+}
+
+/** Fachada estalinista: estuco ocre, ventanas altas, impostas y pilastras (6 x 6 m). */
+function facadeStucco(seed: number): SurfaceTex {
+  return synth(512, 512, (u, v, t) => {
+    const bu = u * 2;
+    const bv = v * 2;
+    const cu = bu - Math.floor(bu);
+    const cv = 1 - (bv - Math.floor(bv));
+    const id = hash2(Math.floor(bu), Math.floor(bv), seed);
+    const fine = pfbm(u, v, 40, 3, seed + 3);
+    const peel = smoothstep(0.58, 0.75, pfbm(u, v, 5, 4, seed + 8));
+    let r = 0.78 + (fine - 0.5) * 0.06;
+    let g = 0.66 + (fine - 0.5) * 0.06;
+    let b = 0.46 + (fine - 0.5) * 0.05;
+    // Desconchones que dejan ver el ladrillo
+    r = lerp(r, 0.45, peel);
+    g = lerp(g, 0.27, peel);
+    b = lerp(b, 0.2, peel);
+    let h = 0.5 + fine * 0.08 - peel * 0.25;
+    // Imposta en cada planta y pilastras entre crujías
+    const belt = cv < 0.06 ? 1 : 0;
+    const pil = Math.min(cu, 1 - cu) < 0.06 ? 1 : 0;
+    if (belt || pil) {
+      r = 0.86;
+      g = 0.8;
+      b = 0.64;
+      h = 0.75;
+    }
+    if (windowCell(cu, cv, 0.36, 0.56, 0.24, id, winOut)) {
+      r = winOut[0];
+      g = winOut[1];
+      b = winOut[2];
+      h = 0.5 + winOut[3] * 0.5;
+    }
+    t.r = r;
+    t.g = g;
+    t.b = b;
+    t.h = h;
+    t.rough = 0.8;
+  }, 2.2);
+}
+
+/** Azotea: tela asfáltica con nieve acumulada y algún respiradero. Cubre 6 x 6 m. */
+function roof(seed: number): SurfaceTex {
+  return synth(512, 512, (u, v, t) => {
+    // Casi todo cubierto de nieve: solo asoma la tela asfáltica en alguna calva
+    const drift = 1 - smoothstep(0.78, 0.9, pfbm(u, v, 2, 4, seed)) * 0.7;
+    const fine = pfbm(u, v, 50, 2, seed + 2);
+    const big = pfbm(u, v, 2, 3, seed + 5);
+    const tar = 0.18 + (fine - 0.5) * 0.06;
+    const c = lerp(tar, 0.7 + (big - 0.5) * 0.1 + (fine - 0.5) * 0.04, drift);
+    t.r = c * 0.98;
+    t.g = c;
+    t.b = c * 1.03;
+    t.h = drift * 0.8 + fine * 0.1;
+    t.rough = lerp(0.8, 0.65, drift);
+  }, 1.4);
+}
+
 export interface TextureSet {
   concrete: SurfaceTex;
   concreteWall: SurfaceTex;
@@ -610,6 +833,12 @@ export interface TextureSet {
   dirt: SurfaceTex;
   cloth: SurfaceTex;
   trackBed: SurfaceTex;
+  snow: SurfaceTex;
+  asphalt: SurfaceTex;
+  facadePanel: SurfaceTex;
+  facadeBrick: SurfaceTex;
+  facadeStucco: SurfaceTex;
+  roof: SurfaceTex;
   grunge: THREE.Texture;
   soft: THREE.Texture;
   blob: THREE.Texture;
@@ -701,6 +930,12 @@ export function buildTextures(onStep?: (name: string) => void): TextureSet {
     dirt: step('barro', () => dirt(131)),
     cloth: step('lona', () => canvasCloth(139)),
     trackBed: step('vías', () => trackBed(149)),
+    snow: step('nieve', () => snow(151)),
+    asphalt: step('asfalto', () => asphalt(157)),
+    facadePanel: step('fachadas', () => facadePanel(163)),
+    facadeBrick: step('fachadas de ladrillo', () => facadeBrick(167)),
+    facadeStucco: step('fachadas estalinistas', () => facadeStucco(173)),
+    roof: step('azoteas', () => roof(179)),
     grunge: grungeTex(),
     soft: softTex(1.6),
     blob: softTex(0.9),

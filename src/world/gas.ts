@@ -4,7 +4,8 @@
 
 import { GASES, type GasDef } from '../data/gases';
 import { distToSegment, smoothstep } from '../core/math';
-import { linkPointAt, regionAt, type Layout, type LinkGeom } from './layout';
+import { linkPointAt, regionAt, stationToLocal, stationToWorld, type Layout, type LinkGeom } from './layout';
+import { annexFloorAt, annexPoint, insideAnnex } from './arch';
 
 /** Lado de la celda de densidad (m). */
 const CELL = 1;
@@ -178,10 +179,48 @@ function nodePocket(layout: Layout, def: GasDef): GasPocket | null {
   return { def, place: node.id, x: node.x, z: node.z, r: R, ...g, exits };
 }
 
+/** El aire de la superficie: toda la ciudad y la mitad alta de las escaleras que suben a ella. */
+function surfacePocket(layout: Layout, def: GasDef): GasPocket | null {
+  const b = layout.surface.bounds;
+  const g = grid(b.x0, b.z0, b.x1, b.z1 + 60);
+  const surf = new Set(Object.values(layout.surfaceRegion));
+  const ups = layout.stations.flatMap((f) => f.annexes.filter((a) => a.exit).map((a) => ({ f, a })));
+  for (let j = 0; j < g.rows; j++) {
+    for (let i = 0; i < g.cols; i++) {
+      const x = g.x0 + (i + 0.5) * CELL;
+      const z = g.z0 + (j + 0.5) * CELL;
+      const reg = regionAt(layout, x, z);
+      let v = 0;
+      if (surf.has(reg)) v = def.peak;
+      else {
+        for (const { f, a } of ups) {
+          const [u, w] = stationToLocal(f, x, z);
+          if (!insideAnnex(a, u, w, 1)) continue;
+          // El aire de arriba baja por la escalera y se disipa a media altura
+          v = def.peak * smoothstep(a.y0 + a.rise * 0.45, a.y0 + a.rise * 0.95, annexFloorAt(a, u, w));
+        }
+      }
+      if (v > 0.005) g.dens[j * g.cols + i] = v;
+    }
+  }
+  // Aire limpio: la mitad baja de cada escalera
+  const exits = ups.map(({ f, a }) => {
+    const [u, w] = annexPoint(a, a.depth * 0.25, 0);
+    const p = stationToWorld(f, u, w);
+    return { x: p.x, z: p.z };
+  });
+  // Centro de referencia: la mitad de la avenida
+  const av = layout.surface.streets.find((s) => s.kind === 'avenida') ?? layout.surface.streets[0];
+  const cx = (av.a[0] + av.b[0]) / 2;
+  const cz = (av.a[1] + av.b[1]) / 2;
+  const reg = layout.regions[regionAt(layout, cx, cz)];
+  return { def, place: reg?.kind === 'surface' ? reg.ref : 'SUP', x: cx, z: cz, r: Math.max(b.x1 - b.x0, b.z1 - b.z0) / 2, ...g, exits };
+}
+
 export function buildGas(layout: Layout, defs: GasDef[] = GASES): GasField {
   const pockets: GasPocket[] = [];
   for (const def of defs) {
-    const p = def.node ? nodePocket(layout, def) : linkPocket(layout, def);
+    const p = def.surface ? surfacePocket(layout, def) : def.node ? nodePocket(layout, def) : linkPocket(layout, def);
     if (p) pockets.push(p);
   }
   return new GasField(pockets);

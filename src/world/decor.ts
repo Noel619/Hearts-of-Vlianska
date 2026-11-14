@@ -4,6 +4,7 @@
 import { DecorCtx, type Decor, type Spot } from './decorCore';
 import { decorateStation } from './decorStations';
 import { decorateLink, decorateNode, decorateWalls } from './decorTunnels';
+import { decorateSurface } from './decorSurface';
 import type { Layout } from './layout';
 
 export * from './decorCore';
@@ -52,6 +53,7 @@ export function decorate(layout: Layout): Decor {
   for (const n of layout.nodes) decorateNode(ctx, n);
   for (const l of layout.links) decorateLink(ctx, l);
   decorateWalls(ctx);
+  decorateSurface(ctx);
   settleSpots(ctx);
   layout.nav.computeNear();
   return { props: ctx.props, lights: ctx.lights, spots: ctx.spots };
