@@ -217,7 +217,7 @@ export interface Char {
   team?: number;
 }
 
-export type SquadKind = 'jugador' | 'patrulla' | 'caravana' | 'banda' | 'jauria' | 'asalto' | 'cobradores' | 'refugiados' | 'stalkers' | 'cazadores' | 'visita';
+export type SquadKind = 'jugador' | 'patrulla' | 'caravana' | 'banda' | 'jauria' | 'asalto' | 'cobradores' | 'refugiados' | 'stalkers' | 'cazadores' | 'visita' | 'brigada';
 
 export interface SquadMember {
   /** Arquetipo humano o id de criatura. */
@@ -357,6 +357,37 @@ export interface StationState {
   /** Residentes muertos (índices) hasta su reposición. */
   dead: Record<string, number>;
   visited: boolean;
+  /** Dueño anterior, si la estación ha sido conquistada (sus puestos pasan al nuevo dueño). */
+  from?: SideId;
+}
+
+/**
+ * El Asedio de Mertvaya, primer suceso de la historia: el Levantamiento reúne
+ * una brigada en Vysotnaya y, si nadie lo impide, el día 16 cruza el Túnel de
+ * Mertvaya y asalta la estación del Califato.
+ */
+export interface Siege {
+  phase: 'espera' | 'reunion' | 'marcha' | 'asalto' | 'hecho';
+  /** Momento (tiempo de juego) en que la brigada se pone en marcha. */
+  deadline: number;
+  /** Escuadra de la brigada (0 si aún no existe o ya no está). */
+  squad: number;
+  /** Comienzo de la batalla en Mertvaya. */
+  battleFrom?: number;
+  /** El Califato sabe cuándo y por dónde viene la brigada (lo avisó tu gente). */
+  warned?: boolean;
+  /** Bando al que tu escuadra ofreció sus armas. */
+  ally?: 'LEV' | 'CAL';
+  result?: 'frustrado' | 'conquista' | 'rechazo';
+  /** Cómo se frustró: Belov muerto o desaparecido, Baghdadi fuera (Karimov negocia), el Consejo convencido, o la brigada deshecha. */
+  why?: 'belov' | 'karimov' | 'consejo' | 'brigada' | 'emboscada';
+  /** Figuras del Califato vivas cuando salió la brigada (las que pueden caer o rendirse en la batalla). */
+  leaders?: string[];
+  /** Bajas que tu escuadra había causado en cada bando al empezar la guerra (para saber de qué lado luchó). */
+  killsLEV0?: number;
+  killsCAL0?: number;
+  /** Parte de la batalla. */
+  report?: string[];
 }
 
 export interface LogEntry {
@@ -397,6 +428,10 @@ export interface SimState {
   stats: { kills: number; days: number; earned: number; built: number };
   /** Escuadras propias (la 0, la principal, no se guarda aquí). */
   teams?: Team[];
+  /** El primer suceso: el Asedio de Mertvaya. */
+  asedio?: Siege;
+  /** Figuras de la historia que han cambiado de bando (tras una conquista). */
+  figureSide?: Record<string, SideId>;
 }
 
 /** Sucesos efímeros para el render, el sonido y la interfaz. */

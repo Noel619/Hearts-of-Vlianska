@@ -8,6 +8,7 @@ import { countItem } from './chars';
 import { isCivilDefense } from './events';
 import { playerBases } from './asaltos';
 import { bailCost, captiveText, HUNT_MIN } from './derrota';
+import { mertvayaFallen, siegeEpilogue, siegeThread } from './asedio';
 import { FACTION_LORE } from '../data/historia/facciones';
 import type { FactionId } from '../data/tipos';
 import type { Sim } from './sim';
@@ -100,8 +101,10 @@ export function storyThreads(sim: Sim): Thread[] {
     });
 
   // --- El califa
-  if (f.baghdadiPreso) out.push({ id: 'califa', title: 'El califa de la Esmeralda', sprite: 'agua', state: 'hecho', text: 'Baghdadi responde ante un tribunal del Levantamiento. El imán Karimov pide el fin del embargo.', hint: '' });
-  else if (f.muerto_baghdadi) out.push({ id: 'califa', title: 'El califa de la Esmeralda', sprite: 'agua', state: 'hecho', text: 'Mohhammed Baghdadi ha muerto. Izumrudnaya decide quién ocupa su sitio.', hint: '' });
+  const fallen = mertvayaFallen(sim);
+  if (f.baghdadiPreso)
+    out.push({ id: 'califa', title: 'El califa de la Esmeralda', sprite: 'agua', state: 'hecho', text: fallen ? 'Baghdadi, capturado en la caída de Mertvaya, espera juicio en Stalingradskaya.' : 'Baghdadi responde ante un tribunal del Levantamiento. El imán Karimov pide el fin del embargo.', hint: '' });
+  else if (f.muerto_baghdadi) out.push({ id: 'califa', title: 'El califa de la Esmeralda', sprite: 'agua', state: 'hecho', text: fallen ? 'Mohhammed Baghdadi ha muerto, y su califato con él.' : 'Mohhammed Baghdadi ha muerto. Izumrudnaya decide quién ocupa su sitio.', hint: '' });
   else
     out.push({
       id: 'califa',
@@ -115,7 +118,8 @@ export function storyThreads(sim: Sim): Thread[] {
   // --- La Galería Olvidada
   const walls = st.nodes.filter((n) => n.kind === 'muro').length;
   if (f.galeriaOlvidada) out.push({ id: 'galeria', title: 'La Galería Olvidada', sprite: 'pico', state: 'hecho', text: 'Los tabiques han caído: una galería une Mostovaya con Izumrudnaya y el embargo ya no es total. La comida vuelve a entrar en Mertvaya.', hint: '' });
-  else
+  // (Con Mertvaya en manos del Levantamiento ya no hay embargo que romper)
+  else if (!fallen)
     out.push({
       id: 'galeria',
       title: 'La Galería Olvidada',
@@ -185,6 +189,10 @@ export function storyThreads(sim: Sim): Thread[] {
           : 'Investiga «Radio de onda corta». Hacen falta planos técnicos y generadores.',
       progress: radio && radio.prog >= 1 ? radio.craft : 0,
     });
+
+  // --- El Asedio de Mertvaya (primer suceso)
+  const siege = siegeThread(sim);
+  if (siege) out.push({ id: 'asedio', title: 'El Asedio de Mertvaya', sprite: 'fusilTunel', ...siege });
 
   // --- Presos y esclavos de tu gente
   for (const c of st.chars) {
@@ -261,10 +269,15 @@ export function epilogue(sim: Sim): string[] {
   if (f.rybakPreso) out.push('El Tuerto está entre rejas y los túneles del este respiran.');
   else if (f.muerto_rybak) out.push('El Tuerto ha muerto, y la Hermandad se desangra buscando heredero.');
   else out.push('El Tuerto sigue en su trono de Vhlainska, cobrando peaje a medio metro.');
-  if (f.baghdadiPreso) out.push('Baghdadi espera juicio. En Izumrudnaya, el imán Karimov pide el fin del embargo.');
-  else if (f.muerto_baghdadi) out.push('El califa ha muerto. Izumrudnaya reza y espera.');
-  if (f.galeriaOlvidada) out.push('La Galería Olvidada rompió el cerco: vuelve a entrar comida en Mertvaya.');
-  else out.push('Mertvaya sigue sitiada. El hambre mata allí más que las balas.');
+  const fallen = mertvayaFallen(sim);
+  if (f.baghdadiPreso) out.push(fallen ? 'Baghdadi espera juicio en Stalingradskaya.' : 'Baghdadi espera juicio. En Izumrudnaya, el imán Karimov pide el fin del embargo.');
+  else if (f.muerto_baghdadi) out.push(fallen ? 'El califa ha muerto, y su califato con él.' : 'El califa ha muerto. Izumrudnaya reza y espera.');
+  if (!fallen) {
+    if (f.galeriaOlvidada) out.push('La Galería Olvidada rompió el cerco: vuelve a entrar comida en Mertvaya.');
+    else out.push('Mertvaya sigue sitiada. El hambre mata allí más que las balas.');
+  }
+  const siegeLine = siegeEpilogue(sim);
+  if (siegeLine) out.push(siegeLine);
   if (f.tunelSur) out.push('El túnel sur está abierto: Chernovodskaya ya no está sola.');
   const vaults = st.containers.filter(isCivilDefense);
   if (vaults.length && vaults.every((c) => c.opened)) out.push('Los almacenes de Tenevskaya, intactos durante veinte años, cambiaron de dueño.');

@@ -19,6 +19,7 @@ import { SCENARIOS } from '../data/escenarios';
 import { burnLetter } from '../sim/events';
 import { epilogue, firstSteps, storyThreads } from '../sim/hilos';
 import { HUNT_MIN, PRISONS } from '../sim/derrota';
+import { BRIGADE_NAME, brigade, siegeActive } from '../sim/asedio';
 import { VERSION, VERSION_LABEL } from '../version';
 import { actionLabel, KEY_ACTIONS, KEY_GROUPS, keyFor, keyLabel, keyName, keyProblem, keysCustomized, onKeysChange, resetKeys, setKey, withKeys } from '../game/keys';
 import { Bar, Cost, Face, ItemIcon, Money, Win, hex, useGame, useTick } from './core';
@@ -328,6 +329,8 @@ export function MapScreen({ close }: { close: () => void }) {
   });
   const f = g.rig.focus;
   const squad = sim.players;
+  // La brigada del Levantamiento, mientras dura el asedio
+  const brigadeOnMap = siegeActive(sim) ? brigade(sim) : null;
   const cxm = squad.length ? squad.reduce((a, c) => a + c.x, 0) / squad.length : 0;
   const czm = squad.length ? squad.reduce((a, c) => a + c.z, 0) / squad.length : 0;
   return (
@@ -372,6 +375,11 @@ export function MapScreen({ close }: { close: () => void }) {
             <Icon id="gas" size={11} />
           </span>
         ))}
+        {brigadeOnMap && (
+          <span className="mk brigada" style={{ left: px(brigadeOnMap.x), top: pz(brigadeOnMap.z) }} title={`${BRIGADE_NAME} del Levantamiento`}>
+            <Emblem side="LEV" size={20} />
+          </span>
+        )}
         <span className="mk cam" style={{ left: px(f.x), top: pz(f.z) }} />
         {squad.length > 0 && (
           <span className="mk squad" style={{ left: px(cxm), top: pz(czm) }} title={sim.state.playerName}>

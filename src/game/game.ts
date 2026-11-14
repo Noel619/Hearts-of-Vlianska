@@ -59,6 +59,7 @@ export type Panel =
   | { t: 'taller'; id: number }
   | { t: 'despedir'; id: number }
   | { t: 'visita'; npc: number }
+  | { t: 'suceso'; code: number }
   | null;
 
 /** Recursos compartidos entre partidas: mundo, texturas y mallas estáticas. */
@@ -377,6 +378,10 @@ export class Game {
             this.paused = true;
           } else if (e.k === 'visita' && e.id) {
             this.panel = { t: 'visita', npc: e.id };
+            this.paused = true;
+          } else if (e.k === 'suceso' && e.id) {
+            // Los momentos del suceso se cuentan en una ventana y la partida espera
+            this.panel = { t: 'suceso', code: e.id };
             this.paused = true;
           } else if (e.k === 'miembro' && e.id) {
             const c = sim.char(e.id);
@@ -796,7 +801,7 @@ export class Game {
       const sq = npc?.squad ? this.sim.squad(npc.squad) : null;
       if (sq && !sq.done) return;
     }
-    if (this.panel && (this.panel.t === 'hablar' || this.panel.t === 'peaje' || this.panel.t === 'comercio' || this.panel.t === 'despedir' || this.panel.t === 'visita')) this.paused = false;
+    if (this.panel && (this.panel.t === 'hablar' || this.panel.t === 'peaje' || this.panel.t === 'comercio' || this.panel.t === 'despedir' || this.panel.t === 'visita' || this.panel.t === 'suceso')) this.paused = false;
     this.panel = null;
     this.bump();
   }

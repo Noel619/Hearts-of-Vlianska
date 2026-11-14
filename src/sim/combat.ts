@@ -103,8 +103,11 @@ export function kill(sim: Sim, c: Char, by?: Char, cause?: string): void {
   if (c.player) sim.log(`${c.name} ha muerto${cause ? ' ' + cause : ''}.`, 'malo');
   else if (by?.player) {
     sim.state.stats.kills++;
+    // Cuenta de bajas que tu gente causa en cada bando (los sucesos saben de qué lado luchaste)
+    sim.state.flags['matados_' + c.side] = (sim.state.flags['matados_' + c.side] ?? 0) + 1;
     if (c.unique) sim.onUniqueDeath(c, by);
   }
+  if (c.unique) sim.state.flags['muerto_' + c.unique] = 1;
   // Los caídos en una estación quedan anotados para no reaparecer enseguida
   if (c.slot) {
     const [place] = c.slot.split(':');

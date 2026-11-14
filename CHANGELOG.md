@@ -1,5 +1,35 @@
 # Cambios
 
+## 0.5 beta
+
+Llega el primer suceso de la historia: el Asedio de Mertvaya.
+
+### Primer suceso: el Asedio de Mertvaya
+
+- **El día 6 se sabe.** En Vysotnaya, frente al Túnel de Mertvaya, el Consejo Revolucionario reúne la 2.ª Brigada Roja (un comisario, cuatro de tropa de choque, once fusileros y dos zapadores) para acabar con el Califato de Izumrudnaya tras cuatro años de embargo. Una ventana lo cuenta y la partida se detiene; la pantalla de hilos lleva la cuenta atrás y el mapa marca dónde está la brigada.
+- **Diez días para impedirlo.** El asalto no llega en cualquiera de estos casos:
+  - Anatoli Belov, el estratega del asedio, muere, acaba lejos de Stalingradskaya o queda preso en tu base.
+  - Baghdadi cae preso o muerto: el imán Karimov toma el mando, pide negociar y el Califato y el Levantamiento firman una tregua.
+  - Convencéis a Morozov de que el cerco hará el trabajo sin sangre (hace falta reputación 30 con el Levantamiento).
+  - La brigada queda deshecha en su campamento.
+- **El día 16, si nada lo ha impedido, la brigada cruza el túnel** y asalta Mertvaya. Se la puede emboscar por el camino.
+- **La batalla.** Si tu gente está cerca, se libra de verdad, soldado a soldado. Si no, se decide por las fuerzas de cada bando: la veteranía de la brigada contra la guardia atrincherada del Califato. La defensa aguanta más si alguien avisó al comandante al-Harbi y menos cuanto más hambre pasa; la comida que entra por la Galería Olvidada o de contrabando le da fuerzas. Mueren soldados de los dos bandos y también civiles, y Baghdadi y al-Harbi pueden caer.
+- **Tomar partido.** Se pueden ofrecer las armas a la brigada (a Morozov, a Belov o a un oficial del Levantamiento) o al Califato (a Baghdadi, a al-Harbi, a Karimov o a sus oficiales). Quien lucha en el bando ganador cobra y gana reputación.
+- **Si cae Mertvaya**, pasa a ser una estación del Levantamiento:
+  - Baghdadi y al-Harbi mueren o van presos a Stalingradskaya; Baghdadi, a juicio.
+  - Karimov pacta para que los civiles vivan.
+  - El contrabandista Aliyev se esfuma por una de sus grietas.
+  - Los esclavos del manantial salen libres.
+  - Se acaba el embargo: la comida vuelve a su precio.
+  - Los vecinos de Izumrudnaya siguen siendo los de siempre, con su túnica, bajo la bandera roja.
+- **Si resiste**, la brigada se retira dejando atrás a sus muertos y el cerco sigue.
+- En una partida guardada antes del suceso, los diez días empiezan a contar al cargarla.
+
+### Desarrollo
+
+- Las figuras de la historia que mueren, por la causa que sea, ya no reaparecen.
+- Pruebas del suceso (`tests/asedio.test.ts`): el calendario, cada forma de impedirlo, la marcha, la batalla vista y sin ver, la conquista y el rechazo.
+
 ## 0.4 beta
 
 Caer tiene consecuencias, las heridas dejan marca, el equipo se gasta y las bases son más que un campamento. También llegan a esta versión las estaciones con forma y la superficie.

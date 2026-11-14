@@ -148,7 +148,7 @@ export function spawnFigure(sim: Sim, id: string, x: number, z: number, face: nu
   if (existing) return existing;
   const f = FIGURES.find((q) => q.id === id);
   if (!f) return null;
-  const side = (f.faction ?? 'LIB') as SideId;
+  const side = (sim.state.figureSide?.[id] ?? f.faction ?? 'LIB') as SideId;
   const role: Role = f.ruler ? 'lider' : /Comandante|General|Coronel|mercenarios|Rompehuesos|guardia|stalkers|Cazadora/i.test(f.title) ? 'elite' : /Médic|Hospital|Dr\./i.test(f.title + f.name) ? 'medico' : 'comerciante';
   const c = makeHuman(sim, side, role, x, z, seedFrom(id));
   const patch = figureLook(sim, id, side);
@@ -207,8 +207,11 @@ function spawnPlace(sim: Sim, place: string) {
       continue;
     }
     if (!PEOPLE_SPOTS.has(sp.kind)) continue;
-    const side = (sp.side ?? owner) as SideId | null;
+    // En una estación conquistada, los puestos del dueño anterior son ya del nuevo
+    const side = (sp.side && st?.from && sp.side === st.from ? owner : (sp.side ?? owner)) as SideId | null;
     if (!side) continue;
+    // …pero quien atiende un puesto sigue siendo de la estación, con su aspecto y su nombre
+    const local = (st?.from && (!sp.side || sp.side === st.from) ? st.from : side) as SideId;
     if (!alive(slot)) continue;
     const seed = seedFrom(slot, sim.state.seed + (st?.dead[slot] ?? 0));
     if (sp.kind === 'guardia' || sp.kind === 'peaje') {
@@ -223,7 +226,7 @@ function spawnPlace(sim: Sim, place: string) {
       base(c, slot, sp, 'guardia');
       n++;
     } else if (sp.kind === 'vendedor' || sp.kind === 'bar' || sp.kind === 'medico') {
-      const c = makeHuman(sim, side, sp.kind === 'medico' ? 'medico' : 'comerciante', sp.x, sp.z, seed);
+      const c = makeHuman(sim, side, sp.kind === 'medico' ? 'medico' : 'comerciante', sp.x, sp.z, seed, local);
       c.vendor = sp.data ?? 'bazar';
       base(c, slot, sp, 'vendedor');
       n++;
@@ -249,7 +252,8 @@ function spawnPlace(sim: Sim, place: string) {
       const cand = list.filter((i) => spots[i].kind === 'ocio' || spots[i].kind === 'asiento' || spots[i].kind === 'trabajo' || spots[i].kind === 'cama');
       const sp = cand.length ? spots[cand[seed % cand.length]] : { x: f.x, z: f.z, rot: 0 };
       const p = sim.world.nav.nearestPassable(sp.x + ((seed % 7) - 3) * 0.6, sp.z + ((seed % 5) - 2) * 0.6, 4) ?? sp;
-      const c = makeHuman(sim, owner, role, p.x, p.z, seed);
+      // Los vecinos de una estación conquistada siguen siendo los de siempre
+      const c = makeHuman(sim, owner, role, p.x, p.z, seed, st?.from ?? owner);
       base(c, slot, { x: p.x, z: p.z, rot: (seed % 628) / 100 }, 'residente');
       c.ai.n = (seed % 10) * 0.7;
       n++;
@@ -475,7 +479,7 @@ function stepSquad(sim: Sim, s: Squad, dt: number) {
       }
     } else if (s.mode === 'espera' || s.mode === 'acecho') {
       s.wait -= dt;
-      for (const c of members) if (!c.hasDest && !c.order) c.ai.sub = s.kind === 'banda' || s.kind === 'refugiados' ? 'acampa' : '';
+      for (const c of members) if (!c.hasDest && !c.order) c.ai.sub = s.kind === 'banda' || s.kind === 'refugiados' || s.kind === 'brigada' ? 'acampa' : '';
       if (s.wait <= 0) nextGoal(sim, s);
     }
   } else {

@@ -12,6 +12,7 @@ import { healCost, holderItems, isSurgeon, owned, payHeal, payLimpSurgery, recip
 import { answerVisit, bribeFor, playerBases } from '../sim/asaltos';
 import { building, repairCap, repairQueue } from '../sim/build';
 import { bailCost, bountyCost, canNegotiate, payBail, payBounty } from '../sim/derrota';
+import { brigade, JOIN_REP, joinSide, MUSTER, persuadeCouncil, PERSUADE_LEV, siegeActive, siegeNews, TARGET, warnCaliphate } from '../sim/asedio';
 import { addItem, countItem, hirePrice, invWeight, maxCarry } from '../sim/chars';
 import { relation } from '../sim/combat';
 import { buyItem, buyPrice, canDismiss, deliverLetter, deliverPrisoner, dismiss, hire, nearestHome, payStaToll, sellItem, sellPrice, shopOf, staTollFee, staTollState } from '../sim/events';
@@ -79,6 +80,45 @@ function DialogWin({ p }: { p: Extract<Panel, { t: 'hablar' }> }) {
   const broker = npc.side === 'STA' && (npc.unique === 'orlova' || npc.role === 'comerciante' || npc.bio?.startsWith('Cobrador'));
   const brokered = broker ? (Object.keys(sim.state.bounty) as FactionId[]).filter((f) => f !== 'STA' && sim.state.bounty[f] > 0).map((f) => [f, bountyCost(sim, f, true)] as [FactionId, number]) : [];
   const surgeon = isSurgeon(npc);
+  // El Asedio de Mertvaya: lo que se puede hablar con Morozov, Belov y la gente del Califato
+  const siege = sim.state.asedio;
+  const siegeOpts: { label: string; icon: string; run: () => string | null; reply: string; why?: string }[] = [];
+  if (siege && siegeActive(sim)) {
+    const gathering = siege.phase === 'reunion';
+    const day = Math.floor(siege.deadline / 1440) + 1;
+    if (gathering && npc.unique === 'morozov') {
+      siegeOpts.push({
+        label: 'Convencer al Consejo de que el cerco hará el trabajo sin sangre',
+        icon: 'hablar',
+        why: sim.state.rep.LEV < PERSUADE_LEV ? `hace falta reputación ${PERSUADE_LEV} con el Levantamiento` : undefined,
+        run: () => persuadeCouncil(sim),
+        reply: '«Nuestras guerras son lentas porque son seguras.» Morozov convoca al Consejo y el asalto se vota en contra: el cerco seguirá hasta que Mertvaya se rinda sola.',
+      });
+    }
+    if (gathering && npc.unique === 'lev_belov') {
+      siegeOpts.push({
+        label: '¿Qué se prepara contra Mertvaya?',
+        icon: 'ojo',
+        run: () => null,
+        reply: `Belov extiende sobre la mesa un plano del Túnel de Mertvaya. «Cuatro años de embargo los han dejado en los huesos. El día ${day}, la brigada cruzará el túnel y la Esmeralda será del pueblo.»`,
+      });
+    }
+    if (npc.side === 'LEV' && (npc.unique === 'morozov' || npc.unique === 'lev_belov' || npc.role === 'oficial') && siege.ally !== 'LEV') {
+      siegeOpts.push({ label: 'Ofrecer vuestras armas a la brigada', icon: 'atacar', why: sim.state.rep.LEV < JOIN_REP ? `no se fían de vosotros (reputación ${JOIN_REP})` : undefined, run: () => joinSide(sim, 'LEV'), reply: '«Bienvenidos, camaradas. La brigada se reúne en Vysotnaya: cruzad el túnel con ella.»' });
+    }
+    const caliphate = npc.side === 'CAL' && (npc.unique === 'baghdadi' || npc.unique === 'cal_harbi' || npc.unique === 'karimov' || npc.role === 'oficial');
+    if (caliphate && !siege.warned && siege.phase !== 'asalto') {
+      siegeOpts.push({
+        label: 'Avisar de cuándo y por dónde atacará la brigada',
+        icon: 'aviso',
+        run: () => warnCaliphate(sim),
+        reply: `${npc.name} escucha en silencio y manda llamar a la guardia. «Sacos al túnel, munición a las barricadas, guardia doble. Si vienen el día ${day}, nos encontrarán despiertos.»`,
+      });
+    }
+    if (caliphate && siege.ally !== 'CAL') {
+      siegeOpts.push({ label: 'Ofrecer vuestras armas al Califato', icon: 'atacar', why: sim.state.rep.CAL < JOIN_REP ? `no se fían de vosotros (reputación ${JOIN_REP})` : undefined, run: () => joinSide(sim, 'CAL'), reply: '«Cada fusil cuenta. Quedaos, y que el Levantamiento aprenda lo que cuesta la Esmeralda.»' });
+    }
+  }
   const limping = surgeon ? sim.players.filter((q) => q.limp && !q.captive && Math.hypot(q.x - npc.x, q.z - npc.z) < 25) : [];
   return (
     <Win title={npc.name} icon="hablar" onClose={close} cls="dialog">
@@ -173,6 +213,12 @@ function DialogWin({ p }: { p: Extract<Panel, { t: 'hablar' }> }) {
               <Icon id="comerciar" size={16} /> Que Staraya salde vuestra deuda con {FACTION_LORE[f].shortName} ({cost} cartuchos)
             </button>
           ))}
+        {siegeOpts.map((o) => (
+          <button key={o.label} className="btn" disabled={!!o.why} title={o.why ?? undefined} onClick={() => say(o.run() ?? o.reply)}>
+            <Icon id={o.icon} size={16} /> {o.label}
+            {o.why ? <small className="dim"> · {o.why}</small> : null}
+          </button>
+        ))}
         {surgeon &&
           limping.map((q) => (
             <button key={'l' + q.id} className="btn" disabled={sim.state.money < SURGERY_COST} onClick={() => say(payLimpSurgery(sim, npc, q) ?? 'El cirujano se lava las manos con samogón.')}>
@@ -687,6 +733,47 @@ function VisitWin({ p }: { p: Extract<Panel, { t: 'visita' }> }) {
   );
 }
 
+/** Ventana de un suceso de la historia (el Asedio de Mertvaya). */
+function EventWin({ p }: { p: Extract<Panel, { t: 'suceso' }> }) {
+  const g = useGame();
+  const sim = g.sim;
+  const news = siegeNews(sim, p.code);
+  const close = () => g.closePanel();
+  const look = () => {
+    const sq = brigade(sim);
+    // La brigada mientras se reúne y marcha; después, la estación (o Vysotnaya, si no salió)
+    const at = sq && p.code <= 3 ? { x: sq.x, z: sq.z } : sim.world.layout.stationById[p.code === 4 ? TARGET : MUSTER];
+    if (at) g.rig.jump(at.x, at.z);
+    close();
+  };
+  return (
+    <Win title={news.title} icon="estrella" cls="dialog" onClose={close} width={640}>
+      <div className="talk">
+        <div className="col" style={{ gap: 6, alignItems: 'center' }}>
+          {news.sides.map((sd) => (
+            <Emblem key={sd} side={sd} size={64} />
+          ))}
+        </div>
+        <div className="grow col" style={{ gap: 8 }}>
+          {news.text.map((t, i) => (
+            <p key={i} className={i === 0 ? 'quote' : ''} style={{ margin: 0, lineHeight: 1.45 }}>
+              {t}
+            </p>
+          ))}
+        </div>
+      </div>
+      <div className="opts">
+        <button className="btn" onClick={look}>
+          <Icon id="mapa" size={16} /> Ver dónde
+        </button>
+        <button className="btn" onClick={close}>
+          <Icon id="check" size={16} /> Seguir
+        </button>
+      </div>
+    </Win>
+  );
+}
+
 const SLOT_NAMES: Record<EquipSlot, string> = { arma: 'Arma', arma2: 'Arma', cabeza: 'Cabeza', cara: 'Cara', torso: 'Torso', manos: 'Manos', piernas: 'Piernas', pies: 'Pies', mochila: 'Espalda', luz: 'Luz' };
 
 /** Confirmación para despedir a alguien: qué se lleva, qué deja y adónde va. */
@@ -789,6 +876,8 @@ export function PanelView() {
       return <DismissWin key={'d' + p.id} p={p} />;
     case 'visita':
       return <VisitWin key={'v' + p.npc} p={p} />;
+    case 'suceso':
+      return <EventWin key={'s' + p.code} p={p} />;
     default:
       return null;
   }

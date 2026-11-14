@@ -2392,3 +2392,17 @@ kbd {
   white-space: nowrap;
   pointer-events: auto;
 }
+
+/* La brigada del Levantamiento en el mapa */
+.mk.brigada {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 6px rgba(179, 32, 44, 0.9));
+  animation: brigada 1.6s ease-in-out infinite;
+  pointer-events: auto;
+}
+@keyframes brigada {
+  50% {
+    filter: drop-shadow(0 0 1px rgba(179, 32, 44, 0.4));
+  }
+}
