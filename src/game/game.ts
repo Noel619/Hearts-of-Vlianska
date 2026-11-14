@@ -58,6 +58,7 @@ export type Panel =
   | { t: 'peaje'; npc: number }
   | { t: 'taller'; id: number }
   | { t: 'despedir'; id: number }
+  | { t: 'visita'; npc: number }
   | null;
 
 /** Recursos compartidos entre partidas: mundo, texturas y mallas estáticas. */
@@ -85,6 +86,8 @@ export class Game {
   fx!: Fx;
   // --- Estado para la interfaz
   selected: number[] = [];
+  /** Escuadra propia que se ve en la lista (null = toda la gente). */
+  teamView: number | null = null;
   inspect = 0;
   /** La emisora ha captado la señal: toca mostrar el epílogo. */
   epilogue = false;
@@ -372,6 +375,12 @@ export class Game {
           } else if (e.k === 'peaje' && e.id) {
             this.panel = { t: 'peaje', npc: e.id };
             this.paused = true;
+          } else if (e.k === 'visita' && e.id) {
+            this.panel = { t: 'visita', npc: e.id };
+            this.paused = true;
+          } else if (e.k === 'miembro' && e.id) {
+            const c = sim.char(e.id);
+            if (c) this.fx.blood(c.x, nav.heightAt(c.x, c.z) + 1, c.z, 40);
           } else if (e.k === 'senal') {
             // El final abierto: la partida sigue, pero se cuenta lo que ha pasado
             this.epilogue = true;
@@ -566,8 +575,18 @@ export class Game {
 
   // --- Órdenes ---------------------------------------------------------------------------
 
+  /** Seleccionados que pueden recibir órdenes (los presos no). */
   squad(): Char[] {
-    return this.selected.map((id) => this.sim.char(id)).filter((c): c is Char => !!c && c.player && c.st === 'ok');
+    return this.selected.map((id) => this.sim.char(id)).filter((c): c is Char => !!c && c.player && c.st === 'ok' && !c.captive);
+  }
+
+  /** Muestra una escuadra propia (o toda la gente) y la selecciona; con `focus`, la cámara va a ella. */
+  showTeam(id: number | null, focus = false) {
+    this.teamView = id;
+    const members = this.sim.players.filter((c) => c.st === 'ok' && !c.captive && (id === null || (c.team ?? 0) === id));
+    if (members.length) this.select(members.map((c) => c.id));
+    if (focus && members[0]) this.focusOn(members[0].id);
+    this.bump();
   }
 
   private give(c: Char, o: Order, queue: boolean) {
@@ -628,7 +647,9 @@ export class Game {
       if (!first) return { title, actions };
       const hs = hostile(sim, first, c);
       if (c.player) {
-        if (c.st === 'ok') {
+        if (c.captive) {
+          actions.push({ label: 'Forzar sus grilletes', hint: 'Si os ven, es un delito', run: one({ t: 'liberar', id: c.id }), danger: true });
+        } else if (c.st === 'ok') {
           if (needsCare(c) || totalHpFrac(c) < 0.95) actions.push({ label: 'Curar', run: one({ t: 'curar', id: c.id }) });
           actions.push({ label: 'Seguir', run: all({ t: 'seguir', id: c.id }) });
         } else {
@@ -666,6 +687,11 @@ export class Game {
       if (b.prog < 1) {
         actions.push({ label: 'Construir', run: all({ t: 'construir', id: b.id }) });
       } else {
+        if (b.hp < def.hp) actions.push({ label: 'Reparar', hint: `Estructura al ${Math.round((b.hp / def.hp) * 100)} %`, run: all({ t: 'reparar', id: b.id }) });
+        if (def.turret) {
+          actions.push({ label: 'Servir el nido', hint: 'Dispara solo a lo que entre por delante', run: one({ t: 'operar', id: b.id }) });
+          actions.push({ label: 'Asignar como trabajo fijo', hint: 'Se queda de guardia en el nido', run: job('guardia') });
+        }
         if (def.beds) {
           actions.push({ label: 'Descansar aquí', run: one({ t: 'descansar', id: b.id }) });
           if (first.carry) actions.push({ label: 'Acostar al herido', run: one({ t: 'soltar', id: b.id }) });
@@ -764,7 +790,13 @@ export class Game {
   }
 
   closePanel() {
-    if (this.panel && (this.panel.t === 'hablar' || this.panel.t === 'peaje' || this.panel.t === 'comercio' || this.panel.t === 'despedir')) this.paused = false;
+    // A una visita hay que contestarle
+    if (this.panel?.t === 'visita') {
+      const npc = this.sim.char(this.panel.npc);
+      const sq = npc?.squad ? this.sim.squad(npc.squad) : null;
+      if (sq && !sq.done) return;
+    }
+    if (this.panel && (this.panel.t === 'hablar' || this.panel.t === 'peaje' || this.panel.t === 'comercio' || this.panel.t === 'despedir' || this.panel.t === 'visita')) this.paused = false;
     this.panel = null;
     this.bump();
   }

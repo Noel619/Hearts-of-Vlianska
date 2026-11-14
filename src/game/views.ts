@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { CREATURES } from '../data/criaturas';
 import { BUILDS } from '../data/edificios';
-import { ITEMS } from '../data/items';
+import { ARMOR_SLOTS, ITEMS } from '../data/items';
 import { angleDiff, hashStr } from '../core/math';
 import type { AnimInput } from '../render/chars/anim';
 import { CreatureView } from '../render/chars/creatures';
@@ -13,7 +13,7 @@ import { MeshBuilder } from '../render/geo';
 import { propGeometry } from '../render/kit/core';
 import { drawHeld, hasHeld, heldGrip } from '../render/kit/weapons';
 import { cloneProbeMaterial, probeMaterial, setProbe } from '../render/materials';
-import { effectiveLook, limpSide, weaponItem } from '../sim/chars';
+import { effectiveLook, limbMask, limpSide, weaponItem } from '../sim/chars';
 import { Sim } from '../sim/sim';
 import type { Building, Char, Drop } from '../sim/types';
 
@@ -138,7 +138,13 @@ export class CharViews {
       let lift = 0;
       if (c.carriedBy) {
         const o = sim.char(c.carriedBy);
-        if (o) {
+        if (o && o.kind !== 'humano') {
+          // Arrastrado por una fiera: por el suelo, delante de sus fauces
+          lift = 0.05;
+          x = o.x + Math.cos(o.face) * 0.9 * CREATURES[o.kind].scale;
+          z = o.z + Math.sin(o.face) * 0.9 * CREATURES[o.kind].scale;
+          face = o.face + Math.PI;
+        } else if (o) {
           lift = 1.28;
           x = o.x - Math.sin(o.face) * 0.16;
           z = o.z + Math.cos(o.face) * 0.16;
@@ -159,7 +165,8 @@ export class CharViews {
       if (v.human) {
         const h = v.human;
         // Aspecto y armas (solo si cambia el equipo)
-        const sig = `${c.eq.arma?.id ?? ''}|${c.eq.cabeza?.id ?? ''}|${c.eq.cara?.id ?? ''}|${c.eq.torso?.id ?? ''}|${c.eq.mochila?.id ?? ''}|${c.look?.armband ?? ''}`;
+        let sig = `${c.eq.arma?.id ?? ''}|${c.look?.armband ?? ''}|${limbMask(c, false)}|${limbMask(c, true)}`;
+        for (const k of ARMOR_SLOTS) sig += '|' + (c.eq[k]?.id ?? '');
         if (sig !== v.sig) {
           v.sig = sig;
           h.setLook(effectiveLook(c)!);
@@ -184,7 +191,8 @@ export class CharViews {
         inp.limp = limpSide(c);
         inp.hold = tool ? (tool === 'pico' ? 'dos' : 'nada') : inHand ? (w?.weapon?.hold ?? 'nada') : 'nada';
         inp.aim = c.aim;
-        inp.pose = c.st === 'muerto' ? 'muerto' : c.st === 'ko' ? (c.carriedBy ? 'cargado' : 'ko') : c.pose;
+        const byBeast = !!c.carriedBy && sim.char(c.carriedBy)?.kind !== 'humano';
+        inp.pose = c.st === 'muerto' ? 'muerto' : c.st === 'ko' ? (c.carriedBy && !byBeast ? 'cargado' : 'ko') : c.pose;
         inp.work = c.work;
         inp.carrying = c.carry !== 0;
         inp.attack = c.atkT >= 0 ? (c.atkKind as AnimInput['attack']) : null;

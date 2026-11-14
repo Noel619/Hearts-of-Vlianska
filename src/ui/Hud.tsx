@@ -10,13 +10,15 @@ import { ITEMS, type EquipSlot } from '../data/items';
 import { BODY_PARTS, SKILLS, SKILL_IDS, skillWord, type SkillId } from '../data/skills';
 import type { FactionId } from '../data/tipos';
 import { dropItem, hasLamp, unequipSlot, useItem } from '../sim/actions';
-import { armorBulk, BULK_WEIGHT, invWeight, maxCarry, NAME_MAX, totalHpFrac, weaponDef } from '../sim/chars';
+import { armorBulk, BULK_WEIGHT, invWeight, LIMB_NAMES, maxCarry, NAME_MAX, totalHpFrac, weaponDef } from '../sim/chars';
 import { hostile, relation } from '../sim/combat';
+import { bailCost, captiveText, PRISONS, setEscape } from '../sim/derrota';
+import { assignTeam, createTeam, teamMembers, teamOf, teams } from '../sim/escuadras';
 import { nameError, renameChar, squadCap } from '../sim/events';
 import { filterMask, spareFilters } from '../sim/gas';
 import { firstSteps } from '../sim/hilos';
 import type { Char, Stance } from '../sim/types';
-import { Bar, BodyDoll, Face, ItemIcon, Money, charTitle, hex, itemTip, sideName, statusBad, statusIcon, statusText, useGame, useTick, useTooltip } from './core';
+import { Bar, BodyDoll, Face, GradeMark, ItemIcon, Money, charTitle, hex, itemName, itemTip, sideName, statusBad, statusIcon, statusText, useGame, useTick, useTooltip } from './core';
 import { Emblem } from './sprites/Emblem';
 import { Icon, ItemSprite } from './sprites/Sprite';
 
@@ -102,9 +104,32 @@ export function SquadBar() {
   const sim = g.sim;
   const sel = new Set(g.selected);
   const lastClick = useRef({ id: 0, t: 0 });
-  const all = sim.state.chars.filter((c) => c.player);
+  const list = teams(sim);
+  const view = g.teamView !== null && list.some((t) => t.id === g.teamView) ? g.teamView : null;
+  const all = sim.state.chars.filter((c) => c.player && (view === null || (c.st !== 'muerto' && teamOf(c) === view)));
+  const chosen = g.selected.map((id) => sim.char(id)).filter((c): c is Char => !!c && c.player && c.st !== 'muerto');
   return (
     <div className="squad scroll">
+      {(list.length > 1 || chosen.length) && (
+        <div className="teams">
+          {list.length > 1 && (
+            <button className={view === null ? 'on' : ''} title="Toda tu gente" onClick={() => g.showTeam(null)}>
+              Todos
+            </button>
+          )}
+          {list.length > 1 &&
+            list.map((t) => (
+              <button key={t.id} className={view === t.id ? 'on' : ''} title={`${t.name}: ${teamMembers(sim, t.id).length} · doble clic para ir`} onClick={() => g.showTeam(t.id)} onDoubleClick={() => g.showTeam(t.id, true)}>
+                {t.name}
+              </button>
+            ))}
+          {chosen.length > 0 && chosen.length < sim.players.length && (
+            <button title="Separa a los seleccionados en una escuadra nueva, que va por su cuenta" onClick={() => g.showTeam(createTeam(sim, chosen))}>
+              + Nueva escuadra
+            </button>
+          )}
+        </div>
+      )}
       {all.map((c) => {
         const down = c.st !== 'ok';
         return (
@@ -149,6 +174,9 @@ const SLOTS: [EquipSlot, string, string][] = [
   ['cabeza', 'Cabeza', 'casco'],
   ['cara', 'Cara', 'mascaraGas'],
   ['torso', 'Torso', 'chaleco'],
+  ['manos', 'Manos', 'guantes'],
+  ['piernas', 'Piernas', 'pantalonGuata'],
+  ['pies', 'Pies', 'botas'],
   ['mochila', 'Espalda', 'mochila'],
   ['luz', 'Luz', 'linterna'],
 ];
@@ -202,6 +230,23 @@ export function SelectionPanel() {
             {w ? ` · ${c.eq.arma ? ITEMS[c.eq.arma.id].name : ''}` : ''}
           </div>
         </div>
+        {teams(sim).length > 1 && (
+          <select
+            className="teamsel"
+            title="Escuadra"
+            value={teamOf(c)}
+            onChange={(e) => {
+              for (const q of chars) assignTeam(sim, q, Number(e.target.value));
+              g.bump();
+            }}
+          >
+            {teams(sim).map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        )}
         <span className={'chipst' + (statusBad(c) ? ' bad' : '')}>
           <Icon id={statusIcon(c)} size={13} />
           {statusText(g, c)}
@@ -231,6 +276,7 @@ export function SelectionPanel() {
           <Icon id="trabajos" size={13} /> Trabajos {c.jobs.length ? `(${c.jobs.length})` : ''}
         </button>
       </div>
+      {c.captive && <CaptiveBox c={c} />}
       <div className="selbody">
         <div className="vitals">
           <BodyDoll c={c} size={116} names={BODY_PARTS} />
@@ -278,17 +324,18 @@ export function SelectionPanel() {
                       <div
                         key={slot}
                         className={'slot eq' + (st ? ' k-' + (ITEMS[st.id]?.kind ?? 'varios') : ' empty')}
-                        {...(st ? tip.bind(itemTip(st) + '\nClic: quitar', st.id) : tip.bind(`${label}: vacío`))}
+                        {...(st ? tip.bind(itemTip(st) + (c.captive ? '' : '\nClic: quitar'), st.id) : tip.bind(`${label}: vacío`))}
                         onClick={() => {
-                          if (st) {
+                          if (st && !c.captive) {
                             unequipSlot(sim, c, slot);
                             tip.clear();
                             g.bump();
                           }
                         }}
                       >
-                        <ItemSprite id={st ? st.id : ghost} size={40} className={st ? '' : 'ghost'} />
+                        <ItemSprite id={st ? st.id : ghost} size={30} className={st ? '' : 'ghost'} />
                         <span className="lbl">{label}</span>
+                        {st && <GradeMark s={st} />}
                         {st?.mag !== undefined && <span className="n">{st.mag}</span>}
                         {st && ITEMS[st.id]?.armor?.filter && <span className={'n' + ((st.fil ?? 0) > 0 ? '' : ' bad')}>{(st.fil ?? 0) > 0 ? `${Math.ceil(((st.fil ?? 0) / FILTER_LIFE) * 100)}%` : '0%'}</span>}
                       </div>
@@ -312,8 +359,9 @@ export function SelectionPanel() {
                       }}
                     >
                       <ItemSprite id={st.id} size={38} />
+                      <GradeMark s={st} />
                       {st.n > 1 && <span className="n">{st.n}</span>}
-                      {st.hot && st.hot !== 'acarreo' && <span className="tag" title="Robado" />}
+                      {st.hot && st.hot !== 'acarreo' && st.hot !== 'saqueo' && <span className="tag" title="Robado" />}
                     </div>
                   ))}
                   {c.inv.length === 0 && <div className="dim" style={{ gridColumn: '1 / -1', padding: 6 }}>No lleva nada.</div>}
@@ -394,6 +442,41 @@ export function SelectionPanel() {
         </div>
       </div>
       {tip.node}
+    </div>
+  );
+}
+
+/** Aviso de un preso: dónde está, cuánto le queda y la fuga. */
+function CaptiveBox({ c }: { c: Char }) {
+  const g = useGame();
+  const sim = g.sim;
+  const cap = c.captive!;
+  const pr = PRISONS[cap.by as FactionId];
+  const slave = cap.kind === 'esclavo';
+  return (
+    <div className="captive">
+      <Icon id="candado" size={22} className="bad" />
+      <div className="grow">
+        <b>{captiveText(sim, c)}.</b>{' '}
+        {cap.escaping
+          ? 'Fuerza los grilletes en cuanto los guardias no miran. Si le pillan, paliza.'
+          : slave
+            ? `Para sacarle: forzar sus grilletes (un compañero, clic derecho sobre él), que escape solo o comprar su libertad a ${pr ? 'quien manda allí' : 'sus amos'} (${bailCost(sim, c)} cartuchos).`
+            : `Fianza: ${bailCost(sim, c)} cartuchos (habla con un oficial o un guardia de ${sideName(cap.by)}). O que intente escapar.`}
+        {cap.pick > 0 && <Bar v={cap.pick} cls="thin amber" />}
+      </div>
+      {c.st === 'ok' && (
+        <button
+          className={'btn small' + (cap.escaping ? ' on' : '')}
+          title="Forzar los grilletes y la cerradura cuando nadie mire (sube Cerraduras)"
+          onClick={() => {
+            setEscape(c, !cap.escaping);
+            g.bump();
+          }}
+        >
+          <Icon id="candado" size={12} /> {cap.escaping ? 'Esperar' : 'Intentar escapar'}
+        </button>
+      )}
     </div>
   );
 }
@@ -755,7 +838,9 @@ export function LogView() {
 /** Icono de cada acción del menú contextual, según lo que dice. */
 function actionIcon(label: string): string {
   const l = label.toLowerCase();
-  if (/atacar|rematar/.test(l)) return 'atacar';
+  if (/atacar|rematar|servir el nido/.test(l)) return 'atacar';
+  if (/grilletes|liberar|fianza|libertad/.test(l)) return 'candado';
+  if (/reparar/.test(l)) return 'construir';
   if (/comerciar/.test(l)) return 'comerciar';
   if (/hablar/.test(l)) return 'hablar';
   if (/curar|auxilios/.test(l)) return 'curar';

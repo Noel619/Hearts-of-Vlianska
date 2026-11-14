@@ -46,6 +46,11 @@ describe('mallas', () => {
       let look = makeLook(rng, sides[i % sides.length] as never, roles[i % roles.length]);
       if (i % 3 === 0) look = { ...look, ...armor[i % armor.length] };
       if (i % 5 === 0) look = { ...look, female: !look.female, hair: (['largo', 'mono', 'corto', 'rapado', 'calvo'] as const)[i % 5] };
+      // Miembros perdidos (con y sin prótesis): todas las combinaciones
+      if (i % 2 === 1) {
+        const lost = (i >> 1) % 16;
+        look = { ...look, lost: lost & ~((i * 5) % 16), pros: lost & ((i * 5) % 16) };
+      }
       const g = buildHumanoid(look);
       expect(checkSkinned(g, HUMAN_BONES.length), JSON.stringify(look)).toBeNull();
       maxV = Math.max(maxV, g.attributes.position.count);

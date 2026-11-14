@@ -6,6 +6,10 @@ import { BUILDS } from '../data/edificios';
 import { hasTech } from './build';
 import { countItem } from './chars';
 import { isCivilDefense } from './events';
+import { playerBases } from './asaltos';
+import { bailCost, captiveText, HUNT_MIN } from './derrota';
+import { FACTION_LORE } from '../data/historia/facciones';
+import type { FactionId } from '../data/tipos';
 import type { Sim } from './sim';
 
 export type ThreadState = 'pendiente' | 'en curso' | 'hecho';
@@ -182,8 +186,42 @@ export function storyThreads(sim: Sim): Thread[] {
       progress: radio && radio.prog >= 1 ? radio.craft : 0,
     });
 
+  // --- Presos y esclavos de tu gente
+  for (const c of st.chars) {
+    if (!c.player || !c.captive || c.st === 'muerto') continue;
+    const cap = c.captive;
+    const slave = cap.kind === 'esclavo';
+    out.push({
+      id: 'preso' + c.id,
+      title: slave ? `${c.name}, esclavo` : `${c.name}, preso`,
+      sprite: 'llaveAlmacen',
+      state: 'en curso',
+      text: `${captiveText(sim, c)}. Lo que llevaba está en el depósito de decomisos${cap.place === 'VHL' ? ' (el botín de la Hermandad)' : ''}.`,
+      hint: slave
+        ? `Que fuerce los grilletes cuando nadie mire, que un compañero se los fuerce desde fuera o comprad su libertad (${bailCost(sim, c)} cartuchos) a quien manda allí.`
+        : `Cumple la condena, pagad la fianza (${bailCost(sim, c)} cartuchos) a un oficial o un guardia de ${FACTION_LORE[cap.by as FactionId]?.shortName ?? 'su bando'}, o que escape: entonces le perseguirán.`,
+      progress: cap.pick > 0 ? cap.pick : undefined,
+    });
+  }
+
+  // --- Precio por vuestras cabezas
+  const wanted = (Object.keys(st.bounty) as FactionId[]).filter((k) => st.bounty[k] > 0).sort((a, b) => st.bounty[b] - st.bounty[a]);
+  if (wanted.length) {
+    const top = st.bounty[wanted[0]];
+    out.push({
+      id: 'recompensa',
+      title: 'Os buscan',
+      sprite: 'cartucho',
+      state: 'en curso',
+      text: `Pagan por vuestras cabezas: ${wanted.map((k) => `${FACTION_LORE[k].shortName} ${st.bounty[k]}`).join(' · ')}. ${top >= 100 ? 'Sus guardias os disparan al veros y se llevan presos a los que caen.' : top >= HUNT_MIN ? 'Hay cazarrecompensas siguiéndoos el rastro.' : 'Con el tiempo se olvida, poco a poco.'}`,
+      hint: 'Saldad la deuda hablando con un oficial o un guardia de esa facción, o en Staraya, que arregla cuentas con todos (con comisión).',
+    });
+  }
+
   // --- Una estación propia
-  const done = st.buildings.filter((b) => b.prog >= 1);
+  const bases = playerBases(sim);
+  const main = bases[0];
+  const done = main ? st.buildings.filter((b) => main.ids.includes(b.id)) : [];
   const beds = done.reduce((a, b) => a + (BUILDS[b.def].beds ?? 0), 0);
   const squad = sim.players.length;
   const goals: [boolean, string][] = [
@@ -200,7 +238,10 @@ export function storyThreads(sim: Sim): Thread[] {
     title: 'Una estación donde nadie mande',
     sprite: 'tablones',
     state: got >= goals.length ? 'hecho' : done.length ? 'en curso' : 'pendiente',
-    text: got >= goals.length ? `${st.playerName} tiene estación propia: camas, comida, luz y un portón. Ya no sois nadie.` : 'Nadie os espera ni os debe nada. Levantad vuestra propia estación en un túnel o cruce sin dueño.',
+    text:
+      (got >= goals.length ? `${st.playerName} tiene estación propia: camas, comida, luz y un portón. Ya no sois nadie.` : 'Nadie os espera ni os debe nada. Levantad vuestra propia estación en un túnel o cruce sin dueño.') +
+      (main ? ` Base: ${main.name} (${main.n} obras).` : '') +
+      (bases.length > 1 ? ` Puestos avanzados: ${bases.slice(1).map((b) => `${b.name} (${b.n})`).join(', ')}.` : ''),
     hint: got >= goals.length ? '' : 'Falta: ' + goals.filter((g) => !g[0]).map((g) => g[1]).join(', ') + '.',
     progress: got / goals.length,
   });

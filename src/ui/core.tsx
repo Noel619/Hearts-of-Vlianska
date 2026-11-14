@@ -7,10 +7,11 @@ import { CREATURES } from '../data/criaturas';
 import { ROLE_NAMES } from '../data/gente';
 import { FACTION_LORE } from '../data/historia/facciones';
 import { FILTER_LIFE } from '../data/gases';
-import { ITEMS, type ItemDef, type Stack } from '../data/items';
+import { ITEMS, QUALITY_NAMES, condOf, condWord, freshWord, hasQuality, qualityOf, type ItemDef, type Stack } from '../data/items';
 import type { SideId } from '../data/tipos';
 import type { Game } from '../game/game';
-import { BULK_WEIGHT, effectiveLook } from '../sim/chars';
+import { BULK_WEIGHT, effectiveLook, isLost, prosOf } from '../sim/chars';
+import { captiveText } from '../sim/derrota';
 import type { Char } from '../sim/types';
 import { Emblem } from './sprites/Emblem';
 import { Portrait } from './sprites/Portrait';
@@ -142,16 +143,29 @@ function partColor(v: number): string {
   return '#6fae5e';
 }
 
-/** Muñeco de salud: cada parte del cuerpo se tiñe según su estado; las heridas abiertas laten. */
+/**
+ * Muñeco de salud: cada parte del cuerpo se tiñe según su estado; las heridas
+ * abiertas laten. Un miembro perdido se ve vacío; una prótesis, de acero.
+ */
 export function BodyDoll({ c, size = 118, names }: { c: Char; size?: number; names: readonly string[] }) {
   return (
     <svg className="doll" width={(size * 60) / 120} height={size} viewBox="0 0 60 120">
       {PART_SHAPES.map((d, i) => {
-        const v = c.hp[i] / c.hpMax[i];
         const open = c.wound[i] > 0.8;
+        if (isLost(c, i)) {
+          const p = prosOf(c, i);
+          const v = c.hp[i] / c.hpMax[i];
+          return (
+            <path key={i} d={d} fill={p ? (v > 0 ? '#8a939a' : '#4a4f55') : 'transparent'} stroke={p ? '#c7ced3' : '#6a6e74'} strokeDasharray={p ? undefined : '2 2'} strokeWidth={0.8} className={open ? 'wound' : ''}>
+              <title>{p ? `${names[i]}: ${ITEMS[p.id].name.toLowerCase()} (${condWord(condOf(p)).toLowerCase()})` : `${names[i]}: perdido${open ? ' · el muñón sangra hasta que se vende' : ''}`}</title>
+            </path>
+          );
+        }
+        const v = c.hp[i] / c.hpMax[i];
+        const limp = c.limp === i;
         return (
-          <path key={i} d={d} fill={partColor(v)} className={open ? 'wound' : ''}>
-            <title>{`${names[i]}: ${Math.max(0, Math.round(c.hp[i]))}/${c.hpMax[i]}${open ? ' · herida abierta: sangra hasta que se vende' : ''}`}</title>
+          <path key={i} d={d} fill={partColor(v)} className={open ? 'wound' : ''} stroke={limp ? '#d9782a' : undefined} strokeWidth={limp ? 1 : undefined}>
+            <title>{`${names[i]}: ${Math.max(0, Math.round(c.hp[i]))}/${c.hpMax[i]}${open ? ' · herida abierta: sangra hasta que se vende' : ''}${limp ? ' · cojera crónica: solo la arreglan en el quirófano de Nadezhdy' : ''}`}</title>
           </path>
         );
       })}
@@ -159,10 +173,48 @@ export function BodyDoll({ c, size = 118, names }: { c: Char; size?: number; nam
   );
 }
 
+/** Color de cada grado de calidad (de chatarra a militar). */
+export const QUALITY_COLORS = ['#8a6a4a', '#a39e90', '#d8d3c4', '#7fc28a', '#e8c35a'];
+
+/** Distintivo de calidad y estado en un hueco de objeto. */
+export function GradeMark({ s }: { s: Stack }) {
+  const def = ITEMS[s.id];
+  if (!def) return null;
+  if (hasQuality(def)) {
+    const dur = condOf(s);
+    return (
+      <>
+        <span className="qmark" style={{ background: QUALITY_COLORS[qualityOf(s)] }} />
+        {dur < 0.97 && (
+          <span className="cond">
+            <i style={{ width: `${Math.max(0, dur) * 100}%`, background: dur < 0.25 ? '#e0624f' : dur < 0.5 ? '#d9a03a' : '#9fbf5a' }} />
+          </span>
+        )}
+      </>
+    );
+  }
+  if (def.spoil && s.fresh !== undefined && s.fresh < 0.75) {
+    return (
+      <span className="cond">
+        <i style={{ width: `${Math.max(0, s.fresh) * 100}%`, background: s.fresh < 0.15 ? '#e0624f' : s.fresh < 0.4 ? '#d9a03a' : '#9fbf5a' }} />
+      </span>
+    );
+  }
+  return null;
+}
+
+/** Nombre de un objeto con su calidad, si la tiene («Kalashnikov restaurado (bueno)»). */
+export function itemName(s: Stack): string {
+  const def = ITEMS[s.id];
+  if (!def) return s.id;
+  return hasQuality(def) ? `${def.name} · ${QUALITY_NAMES[qualityOf(s)].toLowerCase()}` : def.name;
+}
+
 export function itemTip(s: Stack): string {
   const def = ITEMS[s.id];
   if (!def) return s.id;
   const lines = [def.name, def.desc];
+  if (hasQuality(def)) lines.push(`Calidad: ${QUALITY_NAMES[qualityOf(s)].toLowerCase()} · estado: ${condWord(condOf(s)).toLowerCase()} (${Math.round(condOf(s) * 100)} %)${condOf(s) <= 0 ? ' · hay que repararlo' : ''}`);
   const w = def.weapon;
   if (w) {
     const dmg = [w.cut ? `corte ${w.cut}` : '', w.blunt ? `contusión ${w.blunt}` : '', w.pierce ? `perforación ${w.pierce}` : ''].filter(Boolean).join(' · ');
@@ -174,6 +226,12 @@ export function itemTip(s: Stack): string {
   if (a && a.cover.length) lines.push(`Protección: corte ${Math.round(a.cut * 100)} % · golpes ${Math.round(a.blunt * 100)} % · balas ${Math.round(a.pierce * 100)} %`);
   if (a?.carry) lines.push(`+${a.carry} kg de carga`);
   if (a?.bulk) lines.push(`Estorbo: −${Math.round(a.bulk * BULK_WEIGHT * 100)} % al sigilo y a la esquiva`);
+  if (a?.speed) lines.push(`${a.speed > 0 ? '+' : ''}${Math.round(a.speed * 100)} % de velocidad al correr`);
+  if (a?.quiet) lines.push(`Pisada silenciosa: ayuda al sigilo`);
+  if (a?.work) lines.push(`${a.work > 0 ? '+' : ''}${Math.round(a.work * 100)} % de rapidez en obras y talleres`);
+  if (a?.grip) lines.push(`+${a.grip} al ataque cuerpo a cuerpo (mejor agarre)`);
+  if (def.pros) lines.push(`Sustituye ${def.pros === 'brazo' ? 'un brazo' : 'una pierna'} perdido. Úsala para ponérsela (antes hay que vendar el muñón)`);
+  if (def.spoil) lines.push(s.fresh !== undefined ? `${freshWord(s.fresh)} (${Math.round(Math.max(0, s.fresh) * 100)} %): se estropea en unos ${Math.max(1, Math.round(def.spoil * Math.max(0, s.fresh)))} días` : `Fresca: aguanta unos ${def.spoil} días antes de pudrirse`);
   if (a?.filter) {
     lines.push(a.filter >= 1 ? 'Deja fuera todo el gas mientras el filtro aguante' : 'Filtra el gas ligero; del denso deja pasar una parte');
     lines.push((s.fil ?? 0) > 0 ? `Filtro puesto: ${Math.ceil(((s.fil ?? 0) / FILTER_LIFE) * 100)} %` : 'Sin filtro: en el gas se pone uno de los que lleves');
@@ -214,12 +272,13 @@ export function useTooltip() {
 
 /** ¿Está en apuros? (el estado se pinta en rojo) */
 export function statusBad(c: Char): boolean {
-  return c.st !== 'ok' || c.bleed > 0.05 || c.gas > 0.05;
+  return c.st !== 'ok' || c.bleed > 0.05 || c.gas > 0.05 || !!c.captive || (!!c.carriedBy && c.st !== 'ok');
 }
 
 /** Icono que resume el estado de un personaje. */
 export function statusIcon(c: Char): string {
   if (c.st === 'muerto') return 'calavera';
+  if (c.captive) return 'candado';
   if (c.st === 'ko') return c.gas > 0.05 ? 'gas' : 'ko';
   if (c.gas > 0.05) return 'gas';
   if (c.target) return 'agresivo';
@@ -251,6 +310,10 @@ export function statusIcon(c: Char): string {
         return 'saquear';
       case 'cargar':
         return 'cargar';
+      case 'reparar':
+        return 'construir';
+      case 'liberar':
+        return 'candado';
       default:
         return 'reloj';
     }
@@ -264,6 +327,11 @@ export function statusIcon(c: Char): string {
 /** Qué está haciendo un personaje, en pocas palabras. */
 export function statusText(g: Game, c: Char): string {
   if (c.st === 'muerto') return 'Muerto';
+  if (c.captive) return c.captive.escaping ? 'Forzando los grilletes' : c.st === 'ko' ? 'Preso e inconsciente' : captiveText(g.sim, c);
+  if (c.carriedBy) {
+    const by = g.sim.char(c.carriedBy);
+    if (by && !by.player) return by.kind === 'humano' ? `Se lo lleva ${by.name}` : '¡Lo arrastra una fiera!';
+  }
   if (c.st === 'ko') return c.gas > 0.05 ? 'Inconsciente en el gas' : c.bleed > 0.05 ? 'Inconsciente y sangrando' : 'Inconsciente';
   if (c.carriedBy) return 'A hombros';
   if (c.gas > 0.05) return c.target ? 'Lucha en el gas' : 'Respira gas';
@@ -297,6 +365,10 @@ export function statusText(g: Game, c: Char): string {
         return 'Registrando';
       case 'cargar':
         return 'Va a cargar';
+      case 'reparar':
+        return 'Reparando';
+      case 'liberar':
+        return 'Forzando una cerradura';
       default:
         return 'Ocupado';
     }

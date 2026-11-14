@@ -472,12 +472,72 @@ export function buildHumanoid(look: Look): THREE.BufferGeometry {
   const armR = 0.05 * (1 + look.build * 0.1) * (fem ? 0.9 : 1);
   const delt = (shW / 0.19) * (fem ? 0.94 : 1);
   const rolled = look.top === 'camisa' && rnd(9) < 0.5;
+  // Muñones vendados y prótesis
+  const BANDAGE: RGB = [0.5, 0.45, 0.36];
+  const STEEL: RGB = [0.3, 0.32, 0.34];
+  const STEEL_D: RGB = [0.1, 0.11, 0.12];
   for (const s of [1, -1]) {
     const sh = s > 0 ? B.shoulderL : B.shoulderR;
     const ua = s > 0 ? B.upperArmL : B.upperArmR;
     const fa = s > 0 ? B.forearmL : B.forearmR;
     const hd = s > 0 ? B.handL : B.handR;
     const x = 0.205 * s;
+    const armBit = s > 0 ? 1 : 2;
+    const armGone = ((look.lost ?? 0) & armBit) !== 0;
+    const armPros = ((look.pros ?? 0) & armBit) !== 0;
+    if (armGone || armPros) {
+      // Brazo perdido por encima del codo: muñón vendado bajo la manga
+      column(
+        sb,
+        [
+          { y: 1.185, rx: armR * 0.6 + pad * 0.4, rz: armR * 0.64 + pad * 0.4, w: [[ua, 1]], c: BANDAGE, cx: x },
+          { y: 1.21, rx: armR * 0.84 + pad * 0.9, rz: armR * 0.88 + pad * 0.9, w: [[ua, 1]], c: BANDAGE, cx: x },
+          { y: 1.235, rx: armR * 0.9 + pad, rz: armR * 0.94 + pad, w: [[ua, 1]], c: scalec(sleeve, 0.82), cx: x },
+          { y: 1.27, rx: armR * 0.95 + pad, rz: armR * 1.04 + pad, w: [[ua, 1]], c: sleeve, cx: x, cz: 0.004 },
+          { y: 1.35, rx: armR * 1.0 * delt + pad, rz: armR * 1.06 + pad, w: [[ua, 0.9], [sh, 0.1]], c: sleeve, cx: x + s * 0.002 },
+          { y: 1.405, rx: armR * 1.05 * delt + pad, rz: armR * 1.1 + pad, w: [[ua, 0.75], [sh, 0.25]], c: sleeve, cx: x },
+          { y: 1.445, rx: armR * 0.92 * delt + pad, rz: armR * 0.98 + pad, w: [[ua, 0.5], [sh, 0.5]], c: sleeve, cx: x - s * 0.014 },
+          { y: 1.47, rx: armR * 0.6 * delt + pad, rz: armR * 0.7 + pad, w: [[sh, 0.7], [ua, 0.3]], c: scalec(sleeve, 0.96), cx: x - s * 0.032 },
+        ],
+        10,
+        true,
+        true,
+      );
+      if (armPros) {
+        // Cuja de cuero con correas, tubo de acero con muelle y garra de tres dedos
+        column(
+          sb,
+          [
+            { y: 1.15, rx: armR * 0.74, rz: armR * 0.78, w: [[ua, 1]], c: leather, cx: x },
+            { y: 1.24, rx: armR * 0.98 + pad, rz: armR * 1.02 + pad, w: [[ua, 1]], c: leather, cx: x },
+          ],
+          10,
+          false,
+          true,
+        );
+        sb.color(STEEL_D).blob(x, 1.13, 0, 0.03, 0.03, 0.03, 8, 4, [[fa, 0.5], [ua, 0.5]]);
+        column(
+          sb,
+          [
+            { y: 0.9, rx: 0.016, rz: 0.016, w: [[fa, 0.8], [hd, 0.2]], c: STEEL, cx: x },
+            { y: 1.12, rx: 0.016, rz: 0.016, w: [[fa, 1]], c: STEEL, cx: x },
+          ],
+          6,
+        );
+        sb.color(STEEL_D);
+        for (let k = 0; k < 3; k++) sb.box(x, 1.06 - k * 0.04, 0, 0.042, 0.008, 0.042, [[fa, 1]]);
+        sb.color(STEEL_D).blob(x, 0.885, 0, 0.026, 0.026, 0.026, 8, 4, [[hd, 1]]);
+        sb.color(STEEL);
+        for (const [dz, dx] of [
+          [0.022, 0],
+          [-0.012, 0.012 * s],
+          [-0.012, -0.012 * s],
+        ] as [number, number][]) {
+          sb.box(x + dx, 0.835, dz, 0.012, 0.07, 0.012, [[hd, 0.7], [s > 0 ? B.fingersL : B.fingersR, 0.3]]);
+        }
+      }
+    }
+    if (!armGone && !armPros) {
     const handC = gloves ?? skin;
     const bare = (look.top === 'harapos' && rnd(s + 5) > 0.5) || rolled;
     const lower = bare ? skin : sleeve;
@@ -557,6 +617,7 @@ export function buildHumanoid(look: Look): THREE.BufferGeometry {
       true,
       false,
     );
+    }
     if (look.armband !== undefined && s > 0) {
       column(
         sb,
@@ -582,6 +643,52 @@ export function buildHumanoid(look: Look): THREE.BufferGeometry {
     const ft = s > 0 ? B.footL : B.footR;
     const x = 0.1 * s;
     const wear = scalec(pants, 0.86);
+    const legBit = s > 0 ? 4 : 8;
+    const legGone = ((look.lost ?? 0) & legBit) !== 0;
+    const legPros = ((look.pros ?? 0) & legBit) !== 0;
+    if (legGone || legPros) {
+      // Pierna perdida por la rodilla: el muslo acaba en un muñón vendado
+      column(
+        sb,
+        [
+          { y: 0.54, rx: 0.042, rz: 0.044, w: [[th, 1]], c: BANDAGE, cx: x },
+          { y: 0.57, rx: 0.058, rz: 0.06, w: [[th, 1]], c: BANDAGE, cx: x },
+          { y: 0.6, rx: legR * 0.76, rz: legR * 0.8, w: [[th, 1]], c: scalec(pants, 0.82), cx: x },
+          { y: 0.64, rx: legR * 0.8, rz: legR * 0.84, w: [[th, 1]], c: pants, cx: x, cz: 0.004 },
+          { y: 0.74, rx: legR * 0.92, rz: legR * 0.98, w: [[th, 1]], c: pants, cx: x, cz: 0.007 },
+          { y: 0.83, rx: legR * 1.02, rz: legR * 1.07, w: [[th, 0.9], [B.hips, 0.1]], c: pants, cx: x * 0.97, cz: 0.005 },
+          { y: 0.9, rx: legR * 1.07, rz: legR * 1.12, w: [[th, 0.7], [B.hips, 0.3]], c: pants, cx: x * 0.93 },
+          { y: 0.955, rx: legR * 1.02, rz: legR * 1.08, w: [[th, 0.45], [B.hips, 0.55]], c: pants, cx: x * 0.92 },
+        ],
+        10,
+        false,
+        true,
+      );
+      if (legPros) {
+        // Cuja de cuero, rodillera de chapa, tubo y taco de goma
+        column(
+          sb,
+          [
+            { y: 0.52, rx: 0.05, rz: 0.052, w: [[th, 0.6], [shn, 0.4]], c: leather, cx: x },
+            { y: 0.62, rx: legR * 0.84, rz: legR * 0.88, w: [[th, 1]], c: leather, cx: x },
+          ],
+          10,
+          false,
+          true,
+        );
+        sb.color(STEEL_D).blob(x, 0.52, 0, 0.034, 0.03, 0.034, 8, 4, [[shn, 0.6], [th, 0.4]]);
+        column(
+          sb,
+          [
+            { y: 0.05, rx: 0.019, rz: 0.019, w: [[shn, 1]], c: STEEL, cx: x },
+            { y: 0.5, rx: 0.021, rz: 0.021, w: [[shn, 1]], c: STEEL, cx: x },
+          ],
+          6,
+        );
+        sb.color([0.03, 0.03, 0.03]).blob(x, 0.03, 0, 0.034, 0.03, 0.034, 8, 4, [[shn, 1]]);
+      }
+      continue;
+    }
     // Los muslos se tocan por dentro: la entrepierna queda tapada
     column(
       sb,

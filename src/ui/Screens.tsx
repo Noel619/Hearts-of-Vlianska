@@ -18,6 +18,7 @@ import { propThumb } from '../render/thumbs';
 import { SCENARIOS } from '../data/escenarios';
 import { burnLetter } from '../sim/events';
 import { epilogue, firstSteps, storyThreads } from '../sim/hilos';
+import { HUNT_MIN, PRISONS } from '../sim/derrota';
 import { VERSION, VERSION_LABEL } from '../version';
 import { actionLabel, KEY_ACTIONS, KEY_GROUPS, keyFor, keyLabel, keyName, keyProblem, keysCustomized, onKeysChange, resetKeys, setKey, withKeys } from '../game/keys';
 import { Bar, Cost, Face, ItemIcon, Money, Win, hex, useGame, useTick } from './core';
@@ -468,7 +469,8 @@ export function FactionsScreen({ close }: { close: () => void }) {
                 <b className="fname">{f.name}</b>
                 <div className="dim" style={{ fontSize: 12.5 }}>
                   {f.government} · {stations} {stations === 1 ? 'estación' : 'estaciones'}
-                  {bounty > 0 ? <span className="bad"> · Te buscan ({bounty})</span> : null}
+                  {bounty > 0 ? <span className="bad"> · Pagan {bounty} por vuestras cabezas{bounty >= 100 ? ': os detendrán' : ''}</span> : null}
+                  {PRISONS[id] ? <span> · Encierra en {PRISONS[id]!.label}</span> : <span> · Sin calabozos: multa y suelta</span>}
                 </div>
               </div>
               <div>
@@ -484,7 +486,7 @@ export function FactionsScreen({ close }: { close: () => void }) {
         })}
       </div>
       <p className="dim" style={{ marginBottom: 0 }}>
-        La reputación sube comerciando, ayudando y entregando a quienes buscan; baja robando y atacando a su gente. Por debajo de −50 te disparan nada más verte.
+        La reputación sube comerciando, ayudando y entregando a quienes buscan; baja robando y atacando a su gente. Por debajo de −50 te disparan nada más verte. Con la cabeza a precio, sus guardias se llevan presos a los tuyos si caen, y a partir de {HUNT_MIN} salen cazarrecompensas a cobrarla; la deuda se salda hablando con sus oficiales o guardias, o, con comisión, en Staraya.
       </p>
     </Win>
   );
@@ -732,6 +734,15 @@ export function HelpBody() {
       </p>
       <p className="dim" style={{ lineHeight: 1.5 }}>
         En algunos túneles se estanca el gas (el mapa marca dónde). Sin máscara le quema el pecho a quien lo respira, le hace toser y le delata; quien cae inconsciente dentro se asfixia si nadie lo saca. La máscara antigás lo deja fuera mientras aguante el filtro, que se cambia solo si llevas de repuesto; el respirador solo basta con el gas ligero. El equipo pesado, como el chaleco de placas, estorba al moverse en sigilo y al esquivar.
+      </p>
+      <p className="dim" style={{ lineHeight: 1.5 }}>
+        Caer tiene consecuencias. Los saqueadores despojan a los caídos; si tu cabeza tiene precio, los guardias de esa facción se llevan a los tuyos a sus calabozos, y los de Vhlainska y el Califato los encadenan como esclavos. Un preso puede cumplir la condena, salir bajo fianza, forzar los grilletes cuando nadie mire o esperar a que un compañero se los fuerce desde fuera. Las fieras arrastran a los inconscientes a su nido y se los comen. Con una buena recompensa por vuestras cabezas salen cazarrecompensas; la deuda se salda con sus oficiales o, con comisión, en Staraya.
+      </p>
+      <p className="dim" style={{ lineHeight: 1.5 }}>
+        Un brazo o una pierna destrozados pueden perderse para siempre, y una pierna rota puede dejar cojera crónica (solo la arreglan en el quirófano de Nadezhdy). Los brazos y piernas ortopédicos se compran a los médicos o se fabrican en un banco de prótesis. Las armas, armaduras y prótesis tienen calidad, de chatarra a militar, y se gastan con el uso: se reparan en la mesa de desguace, el banco de armero o el de prótesis. La comida fresca se pudre en pocos días: sécala, ahúmala o guárdala en una despensa.
+      </p>
+      <p className="dim" style={{ lineHeight: 1.5 }}>
+        Puedes levantar puestos avanzados lejos de la base y repartir a tu gente en escuadras que van por su cuenta («+ Nueva escuadra» sobre la lista). Las obras se dañan en los asaltos y se reparan con clic derecho. Un nido de ametralladora dispara solo hacia delante mientras alguien lo sirva. Las facciones vecinas vendrán a cobrar tributo o a registrar en busca de lo robado; si te niegas, mandarán un castigo.
       </p>
     </>
   );

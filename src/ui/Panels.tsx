@@ -2,19 +2,21 @@
 // peaje de los bandidos y recetas de taller.
 
 import { useState } from 'react';
-import { BUILDS, RECIPES } from '../data/edificios';
+import { BUILDS, RECIPES, REPAIR_RECIPE } from '../data/edificios';
 import { FACTION_LORE } from '../data/historia/facciones';
 import { STATION_BY_ID } from '../data/historia/mapa';
 import { ITEMS, stackState, type EquipSlot, type Stack } from '../data/items';
 import type { FactionId } from '../data/tipos';
 import type { Panel, Target } from '../game/game';
-import { healCost, holderItems, owned, payHeal, recipeAvailable, setRecipe, transfer, unequipSlot, type Holder } from '../sim/actions';
-import { building } from '../sim/build';
+import { healCost, holderItems, isSurgeon, owned, payHeal, payLimpSurgery, recipeAvailable, setRecipe, SURGERY_COST, transfer, unequipSlot, type Holder } from '../sim/actions';
+import { answerVisit, bribeFor, playerBases } from '../sim/asaltos';
+import { building, repairCap, repairQueue } from '../sim/build';
+import { bailCost, bountyCost, canNegotiate, payBail, payBounty } from '../sim/derrota';
 import { addItem, countItem, hirePrice, invWeight, maxCarry } from '../sim/chars';
 import { relation } from '../sim/combat';
 import { buyItem, buyPrice, canDismiss, deliverLetter, deliverPrisoner, dismiss, hire, nearestHome, payStaToll, sellItem, sellPrice, shopOf, staTollFee, staTollState } from '../sim/events';
 import type { Char } from '../sim/types';
-import { Cost, Face, ItemIcon, Money, Win, charTitle, itemTip, sideName, useGame, useTick, useTooltip } from './core';
+import { Cost, Face, ItemIcon, Money, Win, charTitle, itemName, itemTip, sideName, useGame, useTick, useTooltip } from './core';
 import { Emblem } from './sprites/Emblem';
 import { Icon, ItemSprite } from './sprites/Sprite';
 
@@ -70,6 +72,14 @@ function DialogWin({ p }: { p: Extract<Panel, { t: 'hablar' }> }) {
   const say = (s: string | null) => s && setText(s);
   // En Staraya, quien no ha pagado el peaje no comercia
   const moroso = npc.side === 'STA' && npc.ai.place === 'STA' && staTollState(sim) === 'moroso';
+  // Presos de su bando que se pueden sacar por las buenas, deudas, y el quirófano de Nadezhdy
+  const captives = sim.state.chars.filter((q) => q.player && q.captive && canNegotiate(npc, q.captive));
+  const isFaction = npc.side !== 'LIB' && npc.side !== 'JUG' && npc.side !== 'MUT';
+  const debt = isFaction && (authority || npc.ai.mode === 'guardia') ? bountyCost(sim, npc.side as FactionId) : 0;
+  const broker = npc.side === 'STA' && (npc.unique === 'orlova' || npc.role === 'comerciante' || npc.bio?.startsWith('Cobrador'));
+  const brokered = broker ? (Object.keys(sim.state.bounty) as FactionId[]).filter((f) => f !== 'STA' && sim.state.bounty[f] > 0).map((f) => [f, bountyCost(sim, f, true)] as [FactionId, number]) : [];
+  const surgeon = isSurgeon(npc);
+  const limping = surgeon ? sim.players.filter((q) => q.limp && !q.captive && Math.hypot(q.x - npc.x, q.z - npc.z) < 25) : [];
   return (
     <Win title={npc.name} icon="hablar" onClose={close} cls="dialog">
       <div className="talk">
@@ -138,6 +148,37 @@ function DialogWin({ p }: { p: Extract<Panel, { t: 'hablar' }> }) {
             <Icon id="cargar" size={16} /> Entregar a {prisoner.name}
           </button>
         )}
+        {captives.map((q) => {
+          const cost = bailCost(sim, q);
+          const slave = q.captive!.kind === 'esclavo';
+          return (
+            <button
+              key={'f' + q.id}
+              className="btn"
+              disabled={sim.state.money < cost}
+              onClick={() => say(payBail(sim, q) ?? (slave ? `${npc.name} cuenta los cartuchos. «Llévatelo. Ya no nos sirve.»` : `${npc.name} firma un papel. «Que no vuelva a pasar.» ${q.name} sale libre.`))}
+            >
+              <Icon id="candado" size={16} /> {slave ? 'Comprar la libertad de' : 'Pagar la fianza de'} {q.name} ({cost} cartuchos)
+            </button>
+          );
+        })}
+        {debt > 0 && rel > -50 && (
+          <button className="btn" disabled={sim.state.money < debt} onClick={() => say(payBounty(sim, npc.side as FactionId) ?? '«Cuenta saldada. Por ahora.»')}>
+            <Icon id="aviso" size={16} /> Saldar la deuda con {FACTION_LORE[npc.side as FactionId].shortName} ({debt} cartuchos)
+          </button>
+        )}
+        {broker &&
+          brokered.map(([f, cost]) => (
+            <button key={'b' + f} className="btn" disabled={sim.state.money < cost} onClick={() => say(payBounty(sim, f, true) ?? `«El Consejo Mercantil arregla cuentas con todo el metro… con su comisión.» Vuestra deuda con ${FACTION_LORE[f].shortName} queda saldada.`)}>
+              <Icon id="comerciar" size={16} /> Que Staraya salde vuestra deuda con {FACTION_LORE[f].shortName} ({cost} cartuchos)
+            </button>
+          ))}
+        {surgeon &&
+          limping.map((q) => (
+            <button key={'l' + q.id} className="btn" disabled={sim.state.money < SURGERY_COST} onClick={() => say(payLimpSurgery(sim, npc, q) ?? 'El cirujano se lava las manos con samogón.')}>
+              <Icon id="curar" size={16} /> Operar la cojera de {q.name} ({SURGERY_COST} cartuchos)
+            </button>
+          ))}
         {rel > -40 && (
           <button
             className="btn"
@@ -193,7 +234,7 @@ function TradeWin({ p }: { p: Extract<Panel, { t: 'comercio' }> }) {
                 }}
               >
                 <ItemIcon id={s.id} />
-                <span className="nm">{ITEMS[s.id].name}</span>
+                <span className="nm">{itemName(s)}</span>
                 <span className="q">×{s.n}</span>
                 <Money n={buyPrice(sim, place, s.id, npc.side, s)} size={15} cls="p" />
               </div>
@@ -224,7 +265,7 @@ function TradeWin({ p }: { p: Extract<Panel, { t: 'comercio' }> }) {
                 }}
               >
                 <ItemIcon id={s.id} />
-                <span className="nm">{ITEMS[s.id].name}</span>
+                <span className="nm">{itemName(s)}</span>
                 <span className="q">×{s.n}</span>
                 <Money n={sellPrice(sim, place, s.id, npc.side, s)} size={15} cls="p" />
               </div>
@@ -305,7 +346,7 @@ function LootWin({ p }: { p: Extract<Panel, { t: 'saqueo' }> }) {
       }}
     >
       <ItemIcon id={s.id} />
-      <span className="nm">{ITEMS[s.id].name}</span>
+      <span className="nm">{itemName(s)}</span>
       <span className="q">×{s.n}</span>
       <span className="p dim">{(ITEMS[s.id].w * s.n).toFixed(1)} kg</span>
     </div>
@@ -337,7 +378,7 @@ function LootWin({ p }: { p: Extract<Panel, { t: 'saqueo' }> }) {
                 return (
                   <div key={slot} className="item" {...tip.bind(itemTip(s), s.id)} onClick={() => takeEq(slot)}>
                     <ItemIcon id={s.id} />
-                    <span className="nm">{ITEMS[s.id].name}</span>
+                    <span className="nm">{itemName(s)}</span>
                     <span className="q">puesto</span>
                     <span className="p dim">{ITEMS[s.id].w.toFixed(1)} kg</span>
                   </div>
@@ -484,8 +525,9 @@ function WorkshopWin({ p }: { p: Extract<Panel, { t: 'taller' }> }) {
   return (
     <Win title={def.name} icon="trabajar" onClose={() => g.closePanel()} width={760}>
       <p className="dim" style={{ marginTop: 0 }}>
-        Elige qué fabricar y asigna a alguien al taller (clic derecho sobre él). Los materiales se cogen del almacén más cercano.
+        Elige qué fabricar y asigna a alguien al taller (clic derecho sobre él). Los materiales se cogen del almacén más cercano. Lo que sale tiene la calidad de la mano de quien lo hace.
       </p>
+      {def.repair && <RepairRow b={b} />}
       <div className="list recipes">
         {recipes.map((r) => {
           const ok = recipeAvailable(sim, r.id);
@@ -534,6 +576,112 @@ function WorkshopWin({ p }: { p: Extract<Panel, { t: 'taller' }> }) {
         <button className="btn" onClick={() => g.openBuilding(b.id)}>
           <Icon id="abrir" size={13} /> Ver contenido
         </button>
+      </div>
+    </Win>
+  );
+}
+
+/** Reparar en el banco: lo gastado de los almacenes cercanos y de quien esté al lado. */
+function RepairRow({ b }: { b: NonNullable<ReturnType<typeof building>> }) {
+  const g = useGame();
+  const sim = g.sim;
+  const queue = repairQueue(sim, b);
+  const cur = b.recipe === REPAIR_RECIPE;
+  const tip = useTooltip();
+  return (
+    <div className={'recipe' + (cur ? ' sel' : '')} style={{ marginBottom: 8 }}>
+      <ItemIcon id="martillo" size={46} />
+      <div className="grow">
+        <h4>Reparar armas, armaduras y prótesis</h4>
+        <div className="dim" style={{ fontSize: 12, lineHeight: 1.35 }}>
+          Arregla lo gastado de los almacenes cercanos y lo que lleve tu gente a menos de 22 m, empezando por lo más estropeado. Gasta piezas, cuero, tela o tablones según la pieza. Quien sabe poco no lo deja como nuevo (hasta el {Math.round(repairCap(0) * 100)} % con Armería 0).
+        </div>
+        <div className="stacks" style={{ marginTop: 4 }}>
+          {queue.slice(0, 10).map((j, i) => (
+            <span key={i} className="chip" {...tip.bind(itemTip(j.s), j.s.id)}>
+              <ItemSprite id={j.s.id} size={22} />
+              {Math.round((j.s.dur ?? 1) * 100)}%
+            </span>
+          ))}
+          {!queue.length && <span className="dim">Nada que reparar ahora mismo.</span>}
+        </div>
+      </div>
+      <button className={'btn small' + (cur ? ' on' : '')} onClick={() => (setRecipe(sim, b, cur ? null : REPAIR_RECIPE, 0, !cur), g.bump())}>
+        {cur ? 'Reparando' : 'Ponerse a reparar'}
+      </button>
+      {tip.node}
+    </div>
+  );
+}
+
+/** Visita de una facción: recaudadores del tributo o una inspección en busca de contrabando. */
+function VisitWin({ p }: { p: Extract<Panel, { t: 'visita' }> }) {
+  const g = useGame();
+  useTick();
+  const sim = g.sim;
+  const npc = sim.char(p.npc);
+  const [text, setText] = useState<string | null>(null);
+  const sq = npc?.squad ? sim.squad(npc.squad) : null;
+  if (!npc || !sq) return null;
+  const f = npc.side as FactionId;
+  const fl = FACTION_LORE[f];
+  const base = playerBases(sim)[0] ?? null;
+  const close = () => g.closePanel();
+  const act = (a: Parameters<typeof answerVisit>[2]) => {
+    const r = answerVisit(sim, npc, a);
+    if (r === 'No tienes cartuchos suficientes') setText(r);
+    else setText(r);
+    g.bump();
+  };
+  const tribute = sq.visit === 'tributo';
+  const bribe = bribeFor(sim, f, base);
+  return (
+    <Win title={tribute ? `Recaudadores de ${fl.shortName}` : `Inspección de ${fl.shortName}`} icon={tribute ? 'comerciar' : 'ojo'} cls="dialog" onClose={sq.done ? close : undefined}>
+      <div className="talk">
+        <Face c={npc} size={104} />
+        <div className="grow">
+          <div className="row side">
+            <Emblem side={npc.side} size={22} />
+            <span>{sideName(npc.side)}</span>
+            <span className="dim">· {charTitle(npc)}</span>
+          </div>
+          <p className="quote">
+            {text ??
+              (tribute
+                ? `«Estos túneles los vigila ${fl.shortName}. Vuestro asentamiento ha crecido, y la protección cuesta: ${sq.demand} cartuchos. Pagad y os dejaremos en paz.»`
+                : `«Inspección de ${fl.shortName}. Buscamos mercancía robada y lo que aquí está prohibido. Apartaos y dejadnos mirar.»`)}
+          </p>
+        </div>
+      </div>
+      <div className="opts">
+        {!sq.done && tribute && (
+          <>
+            <button className="btn" disabled={sim.state.money < (sq.demand ?? 0)} onClick={() => act('pagar')}>
+              <Icon id="comerciar" size={16} /> Pagar {sq.demand} cartuchos
+            </button>
+            <button className="btn" disabled={sim.state.money < Math.round((sq.demand ?? 0) / 2)} onClick={() => act('mitad')}>
+              «Ahora solo tenemos la mitad» ({Math.round((sq.demand ?? 0) / 2)})
+            </button>
+            <button className="btn danger" onClick={() => act('negar')}>
+              «Aquí no mandáis vosotros.» (vendrán a castigaros)
+            </button>
+          </>
+        )}
+        {!sq.done && !tribute && (
+          <>
+            <button className="btn" onClick={() => act('registro')}>
+              <Icon id="ojo" size={16} /> Dejar que registren
+            </button>
+            <button className="btn" disabled={sim.state.money < bribe} onClick={() => act('soborno')}>
+              <Icon id="comerciar" size={16} /> Sobornarles ({bribe} cartuchos)
+            </button>
+          </>
+        )}
+        {sq.done && (
+          <button className="btn" onClick={close}>
+            <Icon id="salir" size={16} /> Que se vayan
+          </button>
+        )}
       </div>
     </Win>
   );
@@ -639,6 +787,8 @@ export function PanelView() {
       return <WorkshopWin p={p} />;
     case 'despedir':
       return <DismissWin key={'d' + p.id} p={p} />;
+    case 'visita':
+      return <VisitWin key={'v' + p.npc} p={p} />;
     default:
       return null;
   }
