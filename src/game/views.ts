@@ -14,11 +14,15 @@ import { propGeometry } from '../render/kit/core';
 import { drawHeld, hasHeld, heldGrip } from '../render/kit/weapons';
 import { cloneProbeMaterial, probeMaterial, setProbe } from '../render/materials';
 import { effectiveLook, limbMask, limpSide, weaponItem } from '../sim/chars';
+import { dragsBackward } from '../sim/derrota';
+import { remateSpot } from '../sim/remate';
 import { Sim } from '../sim/sim';
 import type { Building, Char, Drop } from '../sim/types';
 
 const RANGE = 150;
 const out = new Float32Array(6);
+const vGrip = new THREE.Vector3();
+const vAnkle = new THREE.Vector3();
 
 interface CharView {
   group: THREE.Group;
@@ -48,6 +52,13 @@ interface CharView {
   turn: number;
   /** Distancia recorrida en este fotograma (m). */
   moved: number;
+  /** Arrastrado por una fiera: altura del agarre (unidades del modelo) del fotograma anterior. */
+  grip: number;
+}
+
+/** Elevación de la puntería admisible (rad): de casi a plomo hacia abajo a algo hacia arriba. */
+function clampPitch(p: number): number {
+  return Math.max(-1.05, Math.min(0.5, p));
 }
 
 const WORK_TOOL: Record<string, string> = { martillo: 'martillo', pico: 'pico', guitarra: 'guitarra', cargarCaja: 'cajaCarga' };
@@ -88,6 +99,7 @@ export class CharViews {
       vz: 0,
       turn: 0,
       moved: 0,
+      grip: 0.42,
     };
     if (c.kind === 'humano') {
       const look = effectiveLook(c)!;
@@ -139,11 +151,10 @@ export class CharViews {
       if (c.carriedBy) {
         const o = sim.char(c.carriedBy);
         if (o && o.kind !== 'humano') {
-          // Arrastrado por una fiera: por el suelo, delante de sus fauces
-          lift = 0.05;
-          x = o.x + Math.cos(o.face) * 0.9 * CREATURES[o.kind].scale;
-          z = o.z + Math.sin(o.face) * 0.9 * CREATURES[o.kind].scale;
-          face = o.face + Math.PI;
+          // Arrastrado por una fiera, cogido de un tobillo: la posición de la
+          // simulación es aproximada; al final se ajusta para que el tobillo
+          // quede justo en sus dientes (o en su mano)
+          lift = 0.02;
         } else if (o) {
           lift = 1.28;
           x = o.x - Math.sin(o.face) * 0.16;
@@ -192,7 +203,8 @@ export class CharViews {
         inp.hold = tool ? (tool === 'pico' ? 'dos' : 'nada') : inHand ? (w?.weapon?.hold ?? 'nada') : 'nada';
         inp.aim = c.aim;
         const byBeast = !!c.carriedBy && sim.char(c.carriedBy)?.kind !== 'humano';
-        inp.pose = c.st === 'muerto' ? 'muerto' : c.st === 'ko' ? (c.carriedBy && !byBeast ? 'cargado' : 'ko') : c.pose;
+        inp.pose = c.st === 'muerto' ? 'muerto' : c.st === 'ko' ? (c.carriedBy ? (byBeast ? 'arrastrado' : 'cargado') : 'ko') : c.pose;
+        inp.grip = v.grip;
         inp.work = c.work;
         inp.carrying = c.carry !== 0;
         inp.attack = c.atkT >= 0 ? (c.atkKind as AnimInput['attack']) : null;
@@ -203,6 +215,8 @@ export class CharViews {
         inp.sinceBlock = c.sinceBlock;
         this.lookAt(v, c, inp, 1.62 * h.scale);
         h.aimYaw = v.face;
+        // Al apuntar, el arma sigue la mirada (hacia el suelo, si remata a un caído)
+        h.aimPitch = c.aim > 0 && inp.look !== null ? clampPitch(inp.lookPitch) : 0;
         h.place(v.x, v.y, v.z, v.face);
         h.setProbe(p[0], p[1], p[2], p[3], p[4], p[5]);
         // Lejos de la cámara se anima a media frecuencia
@@ -217,6 +231,9 @@ export class CharViews {
           q.turn = v.turn;
           q.attacking = c.atkT >= 0;
           q.attackT = Math.max(0, c.atkT);
+          q.back = dragsBackward(c);
+          q.drag = c.carry ? 1 : 0;
+          q.feed = c.work === 'comer' ? 1 : 0;
           q.sinceHit = c.sinceHit;
           q.hitSide = c.hitSide;
           q.dead = c.st !== 'ok';
@@ -227,8 +244,13 @@ export class CharViews {
         } else {
           const inp = cv.bin;
           this.motion(v, inp, def.scale);
-          inp.pose = c.st === 'muerto' ? 'muerto' : c.st === 'ko' ? 'ko' : 'normal';
-          inp.attack = c.atkT >= 0 ? (c.id % 2 ? 'golpe' : 'tajo') : null;
+          // Comiendo, se agacha sobre el cuerpo y desgarra con las manos
+          const feeding = c.work === 'comer' && c.st === 'ok';
+          inp.pose = c.st === 'muerto' ? 'muerto' : c.st === 'ko' ? 'ko' : feeding ? 'arrodillado' : 'normal';
+          inp.work = feeding ? 'rebuscar' : 'nada';
+          inp.dragging = c.carry !== 0 && c.st === 'ok';
+          inp.armed = inp.dragging;
+          inp.attack = c.atkT >= 0 && !feeding ? (c.id % 2 ? 'golpe' : 'tajo') : null;
           inp.attackT = Math.max(0, c.atkT);
           inp.sinceHit = c.sinceHit;
           inp.hitSide = c.hitSide;
@@ -241,6 +263,35 @@ export class CharViews {
       }
     }
     for (const id of this.views.keys()) if (!seen.has(id)) this.destroy(id);
+    this.attachDragged();
+  }
+
+  /**
+   * Quien va arrastrado por una fiera se coloca de modo que su tobillo quede en
+   * los dientes (o en el puño) de la fiera, y la altura del agarre se le pasa
+   * a su pose para el fotograma siguiente: la pierna sube lo justo.
+   */
+  private attachDragged() {
+    const sim = this.sim;
+    for (const c of sim.state.chars) {
+      if (!c.carriedBy || c.kind !== 'humano') continue;
+      const v = this.views.get(c.id);
+      const o = sim.char(c.carriedBy);
+      const bv = o && o.kind !== 'humano' ? this.views.get(o.id) : undefined;
+      if (!v?.human || !bv?.creature) continue;
+      const g = bv.creature.grip(vGrip);
+      const a = v.human.ankleR(vAnkle);
+      const dx = g.x - a.x;
+      const dz = g.z - a.z;
+      // Un salto grande (recién agarrado) se suaviza; el resto se pega en el acto
+      const k = Math.hypot(dx, dz) > 0.6 ? 0.35 : 1;
+      v.x += dx * k;
+      v.z += dz * k;
+      v.human.group.position.x = v.x;
+      v.human.group.position.z = v.z;
+      const scale = v.human.scale;
+      v.grip += ((g.y - v.y) / scale - v.grip) * 0.5;
+    }
   }
 
   /**
@@ -300,21 +351,28 @@ export class CharViews {
     } else inp.moveDir = 0;
   }
 
-  /** Hacia dónde mira: al enemigo con quien pelea (la cabeza y el pecho lo siguen). */
+  /** Hacia dónde mira: al enemigo con quien pelea (la cabeza y el pecho lo siguen) o al caído que remata. */
   private lookAt(v: CharView, c: Char, inp: AnimInput, eye: number) {
     inp.look = null;
     inp.alert = 0;
-    if (c.st !== 'ok' || !c.target) return;
-    const t = this.sim.char(c.target);
-    if (!t || t.st === 'muerto') return;
-    inp.alert = 1;
+    const tid = c.target || (c.order?.t === 'rematar' ? (c.order.id ?? 0) : 0);
+    if (c.st !== 'ok' || !tid) return;
+    const t = this.sim.char(tid);
+    if (!t || (t.st === 'muerto' && c.order?.t !== 'rematar')) return;
+    inp.alert = c.target ? 1 : 0;
     const tv = this.views.get(t.id);
-    const tx = tv ? tv.x : t.x;
-    const tz = tv ? tv.z : t.z;
+    let tx = tv ? tv.x : t.x;
+    let tz = tv ? tv.z : t.z;
+    if (!c.target) {
+      // Remata: mira a la cabeza del caído
+      const at = remateSpot(t, 0);
+      tx += at.x - t.x;
+      tz += at.z - t.z;
+    }
     const dd = Math.hypot(tx - v.x, tz - v.z);
     if (dd < 0.3 || dd > 40) return;
     inp.look = -angleDiff(v.face, Math.atan2(tz - v.z, tx - v.x));
-    const th = this.heightOf(t) * (t.st === 'ok' ? 0.86 : 0.15);
+    const th = t.st === 'ok' ? this.heightOf(t) * 0.86 : 0.18;
     inp.lookPitch = Math.atan2(th - eye, dd);
   }
 

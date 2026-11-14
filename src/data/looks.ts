@@ -1,6 +1,18 @@
 // Aspecto de los personajes: cuerpo, cara y ropa. Son datos puros que la
 // simulación guarda y el render convierte en un modelo 3D.
 
+import { hash2 } from '../core/math';
+
+/**
+ * Al caer, ¿queda boca arriba? Lo decide la semilla del aspecto, y lo usan
+ * tanto el dibujo (la pose de caído) como la simulación (dónde le queda la
+ * cabeza a quien hay que rematar): boca arriba, la cabeza queda a su espalda;
+ * boca abajo, hacia donde miraba.
+ */
+export function fallsFaceUp(seed: number): boolean {
+  return hash2(seed, 21, 1) > 0.55;
+}
+
 export type HairStyle = 'corto' | 'largo' | 'mono' | 'rapado' | 'calvo';
 export type Facial = 'nada' | 'barba3' | 'bigote' | 'barba' | 'barbaLarga';
 export type Hat = 'nada' | 'gorra' | 'plato' | 'ushanka' | 'boina' | 'casco' | 'panuelo' | 'kufi' | 'capucha' | 'pasamontanas';

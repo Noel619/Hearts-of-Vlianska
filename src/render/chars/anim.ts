@@ -14,10 +14,11 @@
 
 import * as THREE from 'three';
 import { angleDiff, clamp, clamp01, hash2, hermite, lerp, smoothstep } from '../../core/math';
+import { fallsFaceUp } from '../../data/looks';
 import { HB, HUMAN_BONES } from './humanoid';
 
 export type WeaponHold = 'nada' | 'una' | 'dos' | 'fusil' | 'pistola';
-export type BodyPose = 'normal' | 'sentado' | 'sentadoSuelo' | 'arrodillado' | 'cuclillas' | 'tumbado' | 'ko' | 'muerto' | 'cargado' | 'gateo';
+export type BodyPose = 'normal' | 'sentado' | 'sentadoSuelo' | 'arrodillado' | 'cuclillas' | 'tumbado' | 'ko' | 'muerto' | 'cargado' | 'gateo' | 'arrastrado';
 export type WorkAnim =
   | 'nada'
   | 'martillo'
@@ -34,7 +35,8 @@ export type WorkAnim =
   | 'cargarCaja'
   | 'rezar'
   | 'guardia';
-export type AttackAnim = 'tajo' | 'golpe' | 'estocada' | 'punetazo';
+/** Golpes de pelea y, para rematar a un caído, la puñalada de rodillas, el golpe hacia el suelo y estrangular. */
+export type AttackAnim = 'tajo' | 'golpe' | 'estocada' | 'punetazo' | 'clavar' | 'machacar' | 'ahogar';
 /** Forma de moverse: persona, mole que arrastra los brazos o acechador encorvado. */
 export type BodyStyle = 'humano' | 'bruto' | 'acechador';
 
@@ -79,6 +81,10 @@ export interface AnimInput {
   /** Hay pelea cerca: guardia con los pies abiertos (0..1). */
   alert: number;
   style: BodyStyle;
+  /** Arrastrado de un tobillo: altura del agarre sobre el suelo (unidades del modelo). */
+  grip: number;
+  /** Arrastra a alguien cogido de un tobillo con la mano derecha (bestias bípedas). */
+  dragging: boolean;
 }
 
 export function defaultAnimInput(seed = 1): AnimInput {
@@ -108,6 +114,8 @@ export function defaultAnimInput(seed = 1): AnimInput {
     lookPitch: 0,
     alert: 0,
     style: 'humano',
+    grip: 0.42,
+    dragging: false,
   };
 }
 
@@ -270,6 +278,9 @@ const RIFLE = {
   wind: key([-0.2, -0.04, 0.14], [0.25, 0.1, 0.96], [0, 1, 0]),
   strike: key([-0.08, 0.02, 0.42], [0.15, 0.25, 0.95], [0, 1, -0.25], 0.8),
   block: key([-0.1, 0.1, 0.3], [0.85, 0.45, 0.25], [0, 0.3, 1]),
+  // Culatazo hacia el suelo (rematar sin balas): la boca arriba y la culata abajo
+  groundWind: key([-0.08, 0.26, 0.22], [0.1, 0.96, 0.22], [0, -0.22, 1], 0.8),
+  groundStrike: key([-0.04, -0.2, 0.4], [0.08, 0.96, 0.25], [0, -0.25, 1], 0.8),
 };
 const POLE = {
   // Asta en guardia: mano atrás junto a la cadera, cabeza del arma arriba y al frente
@@ -282,6 +293,8 @@ const POLE = {
   thrustWind: key([-0.22, -0.14, 0.02], [0.12, 0.12, 0.98], [0, -1, 0.1], 0.9),
   thrustStrike: key([-0.1, -0.06, 0.2], [0.04, 0.3, 0.95], [0, -1, 0.3], 0.62),
   block: key([-0.14, 0.02, 0.28], [0.8, 0.55, 0.22], [0, -0.2, 1]),
+  // Hacia el suelo, a quien está tendido delante
+  groundStrike: key([-0.04, -0.26, 0.52], [0.03, -0.7, 0.71], [0, -0.71, -0.7]),
 };
 
 function blendKey(out: WKey, k: WKey, w: number) {
@@ -333,7 +346,20 @@ function footPivot(pitch: number): [number, number] {
   return PIV;
 }
 
-const lyingPose = (q: BodyPose) => q === 'ko' || q === 'muerto' || q === 'tumbado' || q === 'gateo' || q === 'cargado';
+/**
+ * Fases de un golpe: preparación (se arma) y golpe (descarga). Los de pelea
+ * son rápidos; los del remate se toman su tiempo para armarse y el golpe cae
+ * más tarde, a la mitad del gesto.
+ */
+function attackPhases(kind: AttackAnim | null, t: number): { wind: number; strike: number } {
+  if (kind === 'machacar' || kind === 'clavar') {
+    return { wind: smoothstep(0.02, 0.4, t) * (1 - smoothstep(0.43, 0.52, t)), strike: smoothstep(0.43, 0.54, t) * (1 - smoothstep(0.78, 1, t)) };
+  }
+  if (kind === 'ahogar') return { wind: smoothstep(0, 0.12, t) * (1 - smoothstep(0.84, 1, t)), strike: smoothstep(0.8, 0.86, t) * (1 - smoothstep(0.88, 1, t)) };
+  return { wind: smoothstep(0, 0.28, t) * (1 - smoothstep(0.3, 0.44, t)), strike: smoothstep(0.3, 0.46, t) * (1 - smoothstep(0.58, 1, t)) };
+}
+
+const lyingPose = (q: BodyPose) => q === 'ko' || q === 'muerto' || q === 'tumbado' || q === 'gateo' || q === 'cargado' || q === 'arrastrado';
 
 export class HumanAnimator {
   /** Fase del ciclo de paso (rad). */
@@ -474,7 +500,7 @@ export class HumanAnimator {
     if (falling) this.fall(p, s);
 
     // --- Suavizado -----------------------------------------------------------------------
-    const lying = s.pose === 'ko' || s.pose === 'muerto' || s.pose === 'tumbado' || s.pose === 'gateo';
+    const lying = s.pose === 'ko' || s.pose === 'muerto' || s.pose === 'tumbado' || s.pose === 'gateo' || s.pose === 'arrastrado';
     const k = falling ? 1 : ease(s.attack ? 30 : 16);
     const kr = falling ? 1 : ease(s.attack ? 24 : lying || kneeling ? 7 : 9);
     const wasFirst = first;
@@ -602,6 +628,15 @@ export class HumanAnimator {
         p.foot(0, 0.02 * aw * idle, 0.1 * aw * idle, 0.1 * aw * idle);
         p.foot(1, -0.02 * aw * idle, -0.06 * aw * idle, -0.3 * aw * idle);
       }
+    }
+    // Apuntando hacia el suelo (un tiro de gracia): se inclina sobre el blanco
+    if ((s.hold === 'pistola' || s.hold === 'fusil') && aw > 0.01) {
+      const down = clamp(-s.lookPitch - 0.25, 0, 0.7) * aw;
+      p.add(B.spine, 0.55 * down);
+      p.add(B.chest, 0.3 * down);
+      p.add(B.neck, -0.2 * down);
+      p.foot(0, 0, 0.12 * down);
+      p.y -= 0.07 * down;
     } else if (s.hold === 'una') {
       // Brazo suelto con el arma apuntando al frente; la muñeca la deja caer un poco
       p.mix(B.upperArmR, 0.85, -0.12 + sway, 0, -0.16);
@@ -627,6 +662,19 @@ export class HumanAnimator {
       p.add(B.forearmR, -0.12 * r);
       p.add(B.head, -0.04 * r);
       p.fz -= 0.03 * r;
+    }
+    // Arrastrar a alguien de un tobillo (las bestias bípedas): el brazo derecho
+    // estirado hacia atrás y abajo, el cuerpo inclinado hacia delante, tirando
+    if (s.dragging) {
+      p.add(B.spine, 0.2, -0.08, 0);
+      p.add(B.chest, 0.08, -0.2, 0);
+      p.add(B.neck, 0, 0.15, 0);
+      p.y -= 0.04;
+      // El brazo cuelga hacia atrás y abajo sea cual sea la joroba: se descuenta lo inclinado del tronco
+      const tilt = p.x(B.spine) + p.x(B.chest);
+      p.mix(B.upperArmR, 1, 0.42 - tilt, 0.1, -0.2);
+      p.mix(B.forearmR, 1, -0.1);
+      p.mix(B.handR, 1, -0.2, 0, 0);
     }
     // Llevar a alguien al hombro
     if (s.carrying) {
@@ -667,8 +715,9 @@ export class HumanAnimator {
   private weaponPose(s: AnimInput, run: number, dt: number) {
     const o = TW;
     const t = clamp01(s.attackT);
-    const wind = s.attack ? smoothstep(0, 0.28, t) * (1 - smoothstep(0.3, 0.44, t)) : 0;
-    const strike = s.attack ? smoothstep(0.3, 0.46, t) * (1 - smoothstep(0.58, 1, t)) : 0;
+    const ph = s.attack && s.attack !== 'ahogar' && s.attack !== 'clavar' ? attackPhases(s.attack, t) : null;
+    const wind = ph ? ph.wind : 0;
+    const strike = ph ? (s.attack === 'machacar' ? Math.max(ph.strike, smoothstep(0.52, 0.58, t) * (1 - smoothstep(0.82, 1, t)) * 0.8) : ph.strike) : 0;
     const block = s.sinceBlock < 0.35 ? Math.sin(clamp01(s.sinceBlock / 0.35) * Math.PI) : 0;
     this.striking = Math.max(wind, strike, block);
     if (s.hold === 'fusil') {
@@ -678,8 +727,9 @@ export class HumanAnimator {
       o.slide = 1;
       blendKey(o, RIFLE.port, run);
       if (s.sneak) blendKey(o, RIFLE.sneak, 1);
-      blendKey(o, RIFLE.wind, wind);
-      blendKey(o, RIFLE.strike, strike);
+      const ground = s.attack === 'machacar';
+      blendKey(o, ground ? RIFLE.groundWind : RIFLE.wind, wind);
+      blendKey(o, ground ? RIFLE.groundStrike : RIFLE.strike, strike);
       blendKey(o, RIFLE.block, block);
     } else {
       o.p.copy(POLE.ready.p);
@@ -687,9 +737,9 @@ export class HumanAnimator {
       o.u.copy(POLE.ready.u);
       o.slide = 1;
       blendKey(o, POLE.run, run);
-      const k = s.attack === 'golpe' ? 0 : s.attack === 'estocada' ? 2 : 1;
+      const k = s.attack === 'golpe' || s.attack === 'machacar' ? 0 : s.attack === 'estocada' ? 2 : 1;
       blendKey(o, k === 0 ? POLE.golpeWind : k === 2 ? POLE.thrustWind : POLE.tajoWind, wind);
-      blendKey(o, k === 0 ? POLE.golpeStrike : k === 2 ? POLE.thrustStrike : POLE.tajoStrike, strike);
+      blendKey(o, s.attack === 'machacar' ? POLE.groundStrike : k === 0 ? POLE.golpeStrike : k === 2 ? POLE.thrustStrike : POLE.tajoStrike, strike);
       blendKey(o, POLE.block, block);
     }
     // Balanceo al andar (sube y baja con cada paso) y al respirar
@@ -827,9 +877,12 @@ export class HumanAnimator {
 
   private attack(p: Pose, kind: AttackAnim, t: number, hold: WeaponHold) {
     // Preparación (se arma y carga el peso atrás), golpe (el peso pasa al pie de delante) y recuperación
-    const wind = smoothstep(0, 0.28, t) * (1 - smoothstep(0.3, 0.44, t));
-    const strike = smoothstep(0.3, 0.46, t) * (1 - smoothstep(0.58, 1, t));
+    const { wind, strike } = attackPhases(kind, t);
     const two = hold === 'dos' || hold === 'fusil';
+    if (kind === 'clavar' || kind === 'machacar' || kind === 'ahogar') {
+      this.coupDeGrace(p, kind, t, wind, strike, two);
+      return;
+    }
     if (kind === 'tajo') {
       // La muñeca se arma hacia atrás y latiguea al golpear
       p.mix(B.handR, wind, -0.45, 0, 0);
@@ -905,6 +958,85 @@ export class HumanAnimator {
       p.fz += 0.12 * strike;
       p.y -= 0.04;
     }
+  }
+
+  /**
+   * El golpe de gracia a alguien que está en el suelo, delante. De rodillas, la
+   * puñalada: la mano izquierda lo sujeta, la derecha sube y baja con todo el
+   * peso. De pie, el golpe hacia el suelo: se arma por encima de la cabeza y
+   * descarga doblando la espalda y las rodillas. Sin arma, de rodillas, las
+   * dos manos al cuello hasta que deja de moverse.
+   */
+  private coupDeGrace(p: Pose, kind: AttackAnim, t: number, wind: number, strike: number, two: boolean) {
+    const hold = smoothstep(0.52, 0.58, t) * (1 - smoothstep(0.82, 1, t));
+    if (kind === 'clavar') {
+      const lean = smoothstep(0, 0.25, t) * (1 - smoothstep(0.85, 1, t));
+      // La izquierda sujeta el cuerpo contra el suelo
+      p.mix(B.upperArmL, lean, -1.55, -0.2, 0.18);
+      p.mix(B.forearmL, lean, -0.15);
+      p.mix(B.handL, lean, 0.5);
+      p.add(B.spine, 0.35 * lean + 0.35 * strike + 0.3 * hold - 0.12 * wind);
+      p.add(B.chest, 0.1 * lean + 0.15 * strike + 0.1 * hold, -0.3 * wind + 0.15 * strike, 0);
+      p.add(B.head, -0.2 * lean + 0.3 * (strike + hold));
+      // La derecha, armada en alto con la hoja hacia abajo, y la puñalada
+      p.mix(B.upperArmR, wind, -2.5, 0.25, -0.35);
+      p.mix(B.forearmR, wind, -1.35);
+      p.mix(B.handR, wind, 1.25, 0, 0);
+      p.mix(B.upperArmR, Math.max(strike, hold), -1.5, 0.15, -0.05);
+      p.mix(B.forearmR, Math.max(strike, hold), -0.1);
+      p.mix(B.handR, Math.max(strike, hold), 1.3, 0, 0);
+      p.y -= 0.04 * strike;
+      return;
+    }
+    if (kind === 'machacar') {
+      // Por encima de la cabeza y hacia el suelo: espalda y rodillas acompañan el golpe
+      const down = Math.max(strike, hold * 0.8);
+      for (const [ua, fa, sg] of [
+        [B.upperArmR, B.forearmR, -1],
+        [B.upperArmL, B.forearmL, 1],
+      ] as const) {
+        if (!two && ua === B.upperArmL) {
+          // A una mano: la izquierda abierta, para equilibrar
+          p.mix(ua, wind, -0.6, 0, 0.45);
+          p.mix(ua, down, -0.2, 0, 0.35);
+          p.mix(fa, Math.max(wind, down), -0.5);
+          continue;
+        }
+        p.mix(ua, wind, -2.85, sg * -0.25, sg * 0.1);
+        p.mix(fa, wind, -1.35);
+        p.mix(ua, down, -0.55, sg * -0.25, sg * 0.05);
+        p.mix(fa, down, -0.15);
+      }
+      if (!two) {
+        p.mix(B.handR, wind, -0.5, 0, 0);
+        p.mix(B.handR, down, 0.6, 0, 0);
+      }
+      p.add(B.spine, -0.28 * wind + 0.7 * down);
+      p.add(B.chest, -0.12 * wind + 0.32 * down);
+      p.add(B.neck, 0.1 * down);
+      p.add(B.head, 0.25 * down);
+      p.foot(0, 0.04 * down, 0.3 * down, 0.12 * down);
+      p.foot(1, -0.04 * down, -0.16 * down, -0.25 * down);
+      p.y += 0.02 * wind - 0.2 * down;
+      p.fz += 0.14 * down - 0.05 * wind;
+      return;
+    }
+    // Estrangular: inclinado sobre él, las dos manos al cuello, temblando del esfuerzo
+    const grip = wind;
+    const shake = grip * (0.5 + 0.5 * smoothstep(0.2, 0.8, t)) * Math.sin(this.time * 34);
+    p.mix(B.upperArmL, grip, -1.72 + 0.03 * shake, -0.3, 0.1);
+    p.mix(B.upperArmR, grip, -1.72 - 0.03 * shake, 0.3, -0.1);
+    p.mix(B.forearmL, grip, -0.22 + 0.05 * shake);
+    p.mix(B.forearmR, grip, -0.22 - 0.05 * shake);
+    p.mix(B.handL, grip, 0.35);
+    p.mix(B.handR, grip, 0.35);
+    p.add(B.spine, 0.78 * grip);
+    p.add(B.chest, (0.24 + 0.03 * shake) * grip);
+    p.add(B.neck, -0.1 * grip);
+    p.add(B.head, 0.3 * grip);
+    p.y -= 0.06 * grip;
+    // El último apretón
+    p.add(B.chest, 0.08 * strike);
   }
 
   private fullBody(p: Pose, s: AnimInput, t: number, sn: number, cs: number, walk: number) {
@@ -1022,7 +1154,7 @@ export class HumanAnimator {
       case 'muerto': {
         p.e.fill(0);
         p.st.fill(0);
-        const up = sa > 0.55;
+        const up = fallsFaceUp(s.seed);
         p.rx = (up ? -1 : 1) * (Math.PI / 2 - 0.04);
         p.ry = (sb - 0.5) * 0.5;
         p.y = 0.125;
@@ -1042,6 +1174,41 @@ export class HumanAnimator {
         p.set(B.shinR, 0.1 + sc * (up ? 0.5 : 0.25));
         p.set(B.footL, 0.5);
         p.set(B.footR, 0.5);
+        break;
+      }
+      case 'arrastrado': {
+        // Arrastrado de un tobillo: boca arriba, la pierna derecha en alto hacia quien
+        // tira, la otra a rastras, los brazos por encima de la cabeza y la cabeza
+        // vencida a un lado. Con cada tirón todo se sacude.
+        p.e.fill(0);
+        p.st.fill(0);
+        const lift = Math.asin(clamp((s.grip - 0.13) / (L1 + L2), 0.06, 0.9));
+        const mv = smoothstep(0.05, 0.7, s.speed);
+        const j1 = Math.sin(t * 9.3 + sa * 5) * mv;
+        const j2 = Math.sin(t * 6.1 + sb * 7) * mv;
+        const side = sa < 0.5 ? 1 : -1;
+        p.rx = -(Math.PI / 2 - 0.06) + 0.04 * j2;
+        p.rz = -0.12 - 0.05 * j1;
+        p.y = 0.13;
+        p.fz = 0;
+        p.fx = 0;
+        p.set(B.thighR, -lift, 0, -0.06);
+        p.set(B.shinR, 0.05);
+        p.set(B.footR, 0.3);
+        p.set(B.thighL, -0.2 - 0.12 * sb, 0, 0.3 + 0.12 * sc + 0.06 * j2);
+        p.set(B.shinL, 0.42 + 0.25 * sc);
+        p.set(B.footL, 0.55);
+        p.set(B.spine, 0.04, 0.12 * (sb - 0.5) + 0.06 * j2, -0.05 + 0.04 * j1);
+        p.set(B.chest, 0.05, -0.1 + 0.05 * j1, 0);
+        p.set(B.neck, -0.2);
+        p.set(B.head, -0.28 + 0.06 * j2, side * (0.7 + 0.15 * j1), 0.1 * j2);
+        // Los brazos se arrastran por encima de la cabeza, abiertos y flojos
+        p.set(B.upperArmL, -2.7 + 0.1 * j1, 0, 0.45 + 0.1 * sb + 0.08 * j2);
+        p.set(B.forearmL, -0.3 - 0.4 * sc);
+        p.set(B.upperArmR, -2.55 - 0.1 * j2, 0, -0.55 - 0.1 * sa - 0.08 * j1);
+        p.set(B.forearmR, -0.5 - 0.3 * sa);
+        p.set(B.handL, 0.25);
+        p.set(B.handR, 0.25);
         break;
       }
       case 'cargado': {

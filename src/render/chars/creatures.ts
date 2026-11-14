@@ -659,6 +659,12 @@ export interface QuadInput {
   seed: number;
   /** Hacia dónde mira respecto al frente (rad; + izquierda) o null. */
   look?: number | null;
+  /** Anda hacia atrás (tirando de una presa). */
+  back?: boolean;
+  /** Sujeta una presa con los dientes y tira de ella (0..1). */
+  drag?: number;
+  /** Come de algo que está en el suelo (0..1): los mordiscos son desgarros. */
+  feed?: number;
 }
 
 interface Leg {
@@ -742,6 +748,8 @@ export class QuadAnimator {
   private sniff = 0;
   private sniffWait: number;
   private seedA: number;
+  private dragW = 0;
+  private feedW = 0;
   private targets = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
   private pitches = [0, 0, 0, 0];
   private plants = [1, 1, 1, 1];
@@ -806,8 +814,12 @@ export class QuadAnimator {
     const legLen = this.legs[2].L1 + this.legs[2].L2;
     const S = Math.max(0.3, Math.min(lerp(lerp(0.35 + 0.6 * v, 0.5 + 0.42 * v, trot), 0.9 + 0.3 * v, gal), 4.2 * legLen));
     const moved = s.dist >= 0 ? s.dist : v * dt;
-    this.cyc = (this.cyc + Math.min(0.45, moved / S)) % 1;
+    // Hacia atrás el ciclo corre al revés: las patas apoyadas avanzan bajo el cuerpo
+    const step = Math.min(0.45, moved / S) * (s.back ? -1 : 1);
+    this.cyc = (((this.cyc + step) % 1) + 1) % 1;
     this.phase = this.cyc * TAU;
+    this.dragW += ((s.dead ? 0 : (s.drag ?? 0)) - this.dragW) * ease(5);
+    this.feedW += ((s.dead ? 0 : (s.feed ?? 0)) - this.feedW) * ease(4);
     const beta = Math.min(lerp(lerp(0.66, 0.46, trot), 0.32, gal), (legLen * 0.95) / S);
     // --- Pose objetivo (se suaviza) ----------------------------------------------------
     const e = this.tgt;
@@ -860,9 +872,41 @@ export class QuadAnimator {
     add(Q.head, 0, this.lookYaw * this.lookW * 0.5 + wander * 0.4);
     // Mandíbula: entreabierta; jadea al correr; el skrebun la tiene siempre algo abierta
     set(Q.jaw, (this.def.id === 'skrebun' ? 0.12 : 0.04) + 0.12 * gal * (0.5 + 0.5 * Math.sin(t * 9)) + 0.03 * Math.sin(t * 2.7) * idle);
+    // Tirar de una presa: agachado y echado atrás, la cabeza baja con el tobillo entre
+    // los dientes; con cada tirón el cuello se recoge y el cuerpo carga atrás
+    const dw = this.dragW;
+    if (dw > 0.001) {
+      const pull = smoothstep(0.35, 1.3, v);
+      ty -= (0.07 + 0.03 * pull) * dw;
+      trx -= (0.08 + 0.08 * pull) * dw;
+      add(Q.neck, (0.62 - 0.2 * pull) * dw, 0.06 * Math.sin(t * 5.3) * dw);
+      add(Q.head, 0.12 * dw, 0.1 * Math.sin(t * 7.7) * dw);
+      add(Q.spine, -0.06 * pull * dw);
+      add(Q.t1, 0.3 * dw);
+      e[Q.jaw * 3] = lerp(e[Q.jaw * 3], 0.07, dw);
+    }
+    // Comer: la cabeza en el suelo; cada mordisco es un desgarro, tirando hacia atrás y a un lado
+    const fw = this.feedW;
+    if (fw > 0.001) {
+      ty -= 0.08 * fw;
+      trx += 0.1 * fw;
+      add(Q.neck, 0.72 * fw);
+      add(Q.head, 0.32 * fw);
+      add(Q.t1, -0.1 * fw);
+      if (s.attacking && !s.dead) {
+        const a = clamp01(s.attackT);
+        const open = smoothstep(0, 0.2, a) * (1 - smoothstep(0.28, 0.36, a));
+        const rip = smoothstep(0.3, 0.48, a) * (1 - smoothstep(0.62, 1, a));
+        add(Q.neck, -0.42 * rip * fw);
+        add(Q.head, -0.18 * rip * fw, 0.45 * Math.sin(t * 17) * rip * fw);
+        trx -= 0.08 * rip * fw;
+        tfz -= 0.06 * rip * fw;
+        e[Q.jaw * 3] = lerp(e[Q.jaw * 3], 0.75 * open + 0.08 * rip, fw);
+      }
+    }
     // Ataque: se agacha, salta con las zarpas por delante y muerde
     let reach = 0;
-    if (s.attacking && !s.dead) {
+    if (s.attacking && !s.dead && fw < 0.5) {
       const a = clamp01(s.attackT);
       const wind = smoothstep(0, 0.3, a) * (1 - smoothstep(0.3, 0.45, a));
       const lunge = smoothstep(0.3, 0.46, a) * (1 - smoothstep(0.6, 1, a));
@@ -993,6 +1037,13 @@ export class QuadAnimator {
       }
       const t = this.targets[i];
       t.set(L.rest[0], L.rest[1] + lift * walk, L.rest[2] + along * walk);
+      // Tirando de una presa: las de delante afianzadas por delante y las de detrás abiertas;
+      // comiendo, las de delante abiertas a los lados del cuerpo
+      if (this.dragW > 0.001) {
+        t.z += (L.front ? 0.07 : -0.03) * this.dragW;
+        t.x += L.side * 0.025 * this.dragW;
+      }
+      if (this.feedW > 0.001 && L.front) t.x += L.side * 0.04 * this.feedW;
       // Ataque: las patas de delante se levantan y se estiran hacia la presa
       if (L.front && reach > 0) {
         t.z += 0.22 * reach;
@@ -1390,6 +1441,16 @@ export class CreatureView {
   place(x: number, y: number, z: number, facing: number) {
     this.group.position.set(x, y, z);
     this.group.rotation.y = Math.PI / 2 - facing;
+  }
+
+  /**
+   * Dónde sujeta lo que arrastra, en el mundo: entre los dientes (los
+   * cuadrúpedos, justo detrás de los colmillos) o en el puño derecho (los bípedos).
+   */
+  grip(out: THREE.Vector3): THREE.Vector3 {
+    this.group.updateMatrixWorld(true);
+    if (this.quad) return out.set(0, -0.055, 0.15).applyMatrix4(this.bones[Q.head].matrixWorld);
+    return out.set(0, -0.085, 0.01).applyMatrix4(this.bones[HB.handR].matrixWorld);
   }
 
   setProbe(r: number, g: number, b: number, dx: number, dy: number, dz: number) {

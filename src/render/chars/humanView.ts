@@ -283,11 +283,17 @@ export class HumanView {
     this.group.rotation.y = Math.PI / 2 - facing;
   }
 
+  /** Tobillo derecho en el mundo (por donde le agarra una fiera que lo arrastra). */
+  ankleR(out: THREE.Vector3): THREE.Vector3 {
+    this.group.updateMatrixWorld(true);
+    return out.setFromMatrixPosition(this.bones[HB.footR].matrixWorld);
+  }
+
   update(dt: number) {
     const inp = this.input;
     const g = this.grip;
     const hold = inp.hold;
-    const upright = inp.pose !== 'ko' && inp.pose !== 'muerto' && inp.pose !== 'cargado' && inp.pose !== 'gateo' && inp.pose !== 'tumbado';
+    const upright = inp.pose !== 'ko' && inp.pose !== 'muerto' && inp.pose !== 'cargado' && inp.pose !== 'gateo' && inp.pose !== 'tumbado' && inp.pose !== 'arrastrado';
     const armsFree = inp.work === 'nada' || inp.work === 'guardia';
     const long = hold === 'fusil' || hold === 'dos';
     // Qué brazos sigue el arma
@@ -309,7 +315,7 @@ export class HumanView {
     const k = 1 - Math.exp(-12 * dt);
     this.ikMain += (wantMain - this.ikMain) * k;
     this.ikOff += (wantOff - this.ikOff) * k;
-    inp.armed = !!this.weapon && inp.pose !== 'ko' && inp.pose !== 'muerto';
+    inp.armed = !!this.weapon && inp.pose !== 'ko' && inp.pose !== 'muerto' && inp.pose !== 'arrastrado';
     inp.offHand = this.ikOff > 0.5 ? (g?.offMode === 'bajo' ? 0.9 : 1) : 0;
     inp.lantern = false;
     if (this.lamp && this.lampKind === 'farol') {
@@ -359,7 +365,9 @@ export class HumanView {
         // Rumbo de tiro en el espacio del modelo: al frente, con la elevación de la puntería
         v2.set(0, Math.sin(this.aimPitch), Math.cos(this.aimPitch));
         const anchor = rifle ? POCKET : PISTOL_ANCHOR;
-        v3.copy(anchor).applyMatrix4(chestM).addScaledVector(v2, rifle ? (g.stock ?? 0.32) : g.offMode === 'bajo' ? 0.36 : 0.46);
+        // Hacia abajo, la pistola se estira más: los brazos bajan hacia el blanco
+        const reachDown = pistol ? Math.max(0, -Math.sin(this.aimPitch)) * 0.12 : 0;
+        v3.copy(anchor).applyMatrix4(chestM).addScaledVector(v2, (rifle ? (g.stock ?? 0.32) : g.offMode === 'bajo' ? 0.36 : 0.46) + reachDown);
         if (rifle) v3.y += 0.012;
         if (pistol) {
           vPos.copy(v3);

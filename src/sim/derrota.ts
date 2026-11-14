@@ -15,7 +15,7 @@ import { addItem, countItem, gainXp, hirePrice, takeItem } from './chars';
 import { damage, hostile, kill, knockOut, sightRange } from './combat';
 import { clearDest, faceTo, setDest, stepMove } from './move';
 import { newSquad, placePos } from './population';
-import { beastName } from './remate';
+import { beastName, remateSpot } from './remate';
 import type { Sim } from './sim';
 import type { Captive, Char, Container, Order, Squad } from './types';
 
@@ -730,8 +730,11 @@ export function runDefeatOrder(sim: Sim, c: Char, o: Order, dt: number): boolean
         return false;
       }
       const def = CREATURES[c.kind];
-      if (!reach(sim, c, o, v.x, v.z, (def?.reach ?? 1) + 0.3)) return true;
-      faceTo(c, v.x, v.z, dt);
+      // Con el hocico (o las manos) sobre el pecho del caído
+      const at = remateSpot(v, 1);
+      const near = def?.shape === 'bipedo' ? 0.75 * def.scale : 0.68 * (def?.scale ?? 1) + 0.12;
+      if (!reach(sim, c, o, at.x, at.z, near)) return true;
+      faceTo(c, at.x, at.z, dt);
       c.work = 'comer';
       if (c.atkT >= 0) {
         c.atkT += dt / 0.6;

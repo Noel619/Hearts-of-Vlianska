@@ -132,10 +132,10 @@ describe('animación humana', () => {
   });
 
   it('ninguna combinación de postura, trabajo, arma y ataque da NaN', () => {
-    const poses: BodyPose[] = ['normal', 'sentado', 'sentadoSuelo', 'arrodillado', 'cuclillas', 'tumbado', 'ko', 'muerto', 'cargado', 'gateo'];
+    const poses: BodyPose[] = ['normal', 'sentado', 'sentadoSuelo', 'arrodillado', 'cuclillas', 'tumbado', 'ko', 'muerto', 'cargado', 'gateo', 'arrastrado'];
     const works: WorkAnim[] = ['nada', 'martillo', 'pico', 'operar', 'cocinar', 'rebuscar', 'vendar', 'comer', 'hablar', 'guitarra', 'calentarse', 'escribir', 'cargarCaja', 'rezar', 'guardia'];
     const holds: WeaponHold[] = ['nada', 'una', 'dos', 'fusil', 'pistola'];
-    const attacks: (AttackAnim | null)[] = [null, 'tajo', 'golpe', 'estocada', 'punetazo'];
+    const attacks: (AttackAnim | null)[] = [null, 'tajo', 'golpe', 'estocada', 'punetazo', 'clavar', 'machacar', 'ahogar'];
     const { bones, root } = makeSkeleton(HUMAN_BONES);
     new THREE.Object3D().add(root);
     const an = new HumanAnimator(bones, 3);
@@ -157,6 +157,9 @@ describe('animación humana', () => {
         inp.turn = i % 6 === 0 ? 3 : 0;
         inp.sinceHit = (i % 4) * 0.2;
         inp.sinceFire = (i % 3) * 0.1;
+        inp.grip = 0.2 + (i % 5) * 0.2;
+        inp.dragging = i % 4 === 1;
+        inp.lookPitch = i % 2 ? -0.8 : 0;
         for (let f = 0; f < 6; f++) {
           an.update(1 / 30, inp);
           frames++;
@@ -192,7 +195,94 @@ describe('animación humana', () => {
   });
 });
 
+describe('arrastrado por una fiera', () => {
+  it('la pierna agarrada sube justo hasta el agarre', () => {
+    for (const grip of [0.3, 0.45, 0.6, 0.8]) {
+      const { bones, root } = makeSkeleton(HUMAN_BONES);
+      const mesh = new THREE.Object3D();
+      mesh.add(root);
+      const an = new HumanAnimator(bones, 7);
+      const inp = defaultAnimInput(7);
+      inp.pose = 'arrastrado';
+      inp.grip = grip;
+      inp.speed = 0.8;
+      for (let f = 0; f < 120; f++) an.update(1 / 30, inp);
+      mesh.updateMatrixWorld(true);
+      const ankle = new THREE.Vector3().setFromMatrixPosition(bones[HB.footR].matrixWorld);
+      const other = new THREE.Vector3().setFromMatrixPosition(bones[HB.footL].matrixWorld);
+      const head = new THREE.Vector3().setFromMatrixPosition(bones[HB.head].matrixWorld);
+      // El tobillo agarrado a la altura del agarre, y por delante (+Z, hacia quien tira)
+      expect(Math.abs(ankle.y - grip), `agarre ${grip}`).toBeLessThan(0.12);
+      expect(ankle.z).toBeGreaterThan(0.4);
+      // La otra pierna a rastras por el suelo y la cabeza al otro lado, en el suelo
+      expect(other.y).toBeLessThan(0.3);
+      expect(head.z).toBeLessThan(-0.3);
+      expect(head.y).toBeLessThan(0.4);
+    }
+  });
+});
+
 describe('animación de los cuadrúpedos', () => {
+  it('tirando de una presa hacia atrás, las patas tampoco patinan', () => {
+    const def = CREATURES.skrebun;
+    const defs = quadBones(def);
+    const T = quadToes(def);
+    for (const v of [0.4, 0.9, 1.4]) {
+      const { bones, root } = makeSkeleton(defs);
+      const mesh = new THREE.Object3D();
+      mesh.add(root);
+      const an = new QuadAnimator(bones, 5, def);
+      const paws = [12, 15, 18, 21];
+      const tip = paws.map((b, i) => new THREE.Vector3(T[i][0] - defs[b].pos[0], T[i][1] - defs[b].pos[1], T[i][2] - defs[b].pos[2]));
+      const inp = { speed: v, dist: 0, turn: 0, attackT: 0, attacking: false, sinceHit: 9, hitSide: 0, dead: false, alert: 0, seed: 5, look: null, back: true, drag: 1 };
+      const dt = 1 / 60;
+      let z = 0;
+      let slide = 0;
+      let travel = 0;
+      const prev: (THREE.Vector3 | null)[] = [null, null, null, null];
+      for (let f = 0; f < 4 * 60; f++) {
+        const d = v * dt;
+        // Hacia atrás: el modelo mira a +Z y avanza hacia -Z
+        z -= d;
+        inp.dist = d;
+        mesh.position.set(0, 0, z);
+        an.update(dt, inp);
+        mesh.updateMatrixWorld(true);
+        if (f < 60) continue;
+        travel += d;
+        paws.forEach((b, i) => {
+          const p = tip[i].clone().applyMatrix4(bones[b].matrixWorld);
+          expect(Number.isFinite(p.x + p.y + p.z)).toBe(true);
+          const pv = prev[i];
+          if (p.y < 0.0135 && pv) slide += Math.hypot(p.x - pv.x, p.z - pv.z);
+          prev[i] = p.y < 0.0135 ? p : null;
+        });
+      }
+      expect(slide / travel, `skrebun hacia atrás a ${v}`).toBeLessThan(0.03);
+    }
+  });
+
+  it('tirar de una presa y comérsela no dan NaN, y al comer la boca baja al suelo', () => {
+    const def = CREATURES.skrebun;
+    const { bones, root } = makeSkeleton(quadBones(def));
+    new THREE.Object3D().add(root);
+    const an = new QuadAnimator(bones, 4, def);
+    const inp = { speed: 0, dist: -1, turn: 0, attackT: 0, attacking: false, sinceHit: 9, hitSide: 1, dead: false, alert: 0, seed: 4, look: null, back: false, drag: 0, feed: 0 };
+    for (let f = 0; f < 240; f++) {
+      inp.drag = f < 100 ? 1 : 0;
+      inp.back = f < 100;
+      inp.speed = f < 100 ? 0.3 + (f % 20) * 0.06 : 0;
+      inp.feed = f >= 100 ? 1 : 0;
+      inp.attacking = f >= 100 && f % 30 < 18;
+      inp.attackT = (f % 30) / 18;
+      an.update(1 / 30, inp);
+      for (const b of bones) expect(Number.isFinite(b.quaternion.x + b.quaternion.w + b.position.y), `${f}`).toBe(true);
+    }
+    root.parent!.updateMatrixWorld(true);
+    const mouth = new THREE.Vector3(0, -0.055, 0.15).applyMatrix4(bones[4].matrixWorld);
+    expect(mouth.y).toBeLessThan(0.35);
+  });
+
   it('las patas que apoyan no patinan al paso, al trote ni al galope', () => {
     for (const id of ['rata', 'skrebun', 'cerdo']) {
       const def = CREATURES[id];

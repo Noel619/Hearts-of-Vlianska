@@ -5,6 +5,7 @@
 // ha perdido a alguien a vuestras manos: sangre por sangre.
 
 import { CREATURES } from '../data/criaturas';
+import { fallsFaceUp } from '../data/looks';
 import { countItem, gainXp, partWork, takeItem, weaponDef, wear } from './chars';
 import { hostile, kill } from './combat';
 import { clearDest, faceTo, setDest } from './move';
@@ -50,17 +51,17 @@ export function specOf(c: Char, how: RemateHow): RemateSpec {
   const w = weaponDef(c);
   switch (how) {
     case 'tiro':
-      return { how, range: 1.5, strike: 0.55, end: 0.95, part: 0 };
+      return { how, range: 1.25, strike: 0.55, end: 0.95, part: 0 };
     case 'ahogar': {
       // De rodillas, las dos manos al cuello. Cuanta más fuerza, antes
       const strike = Math.max(2.2, 3.8 - c.sk.fuerza * 0.02);
-      return { how, range: 0.95, strike, end: strike + 0.6, part: 0 };
+      return { how, range: 0.82, strike, end: strike + 0.6, part: 0 };
     }
     case 'clavar':
-      return { how, range: 0.95, strike: 0.75, end: 1.45, part: 1 };
+      return { how, range: 0.82, strike: 0.75, end: 1.45, part: 1 };
     default: {
       const strike = 0.45 + 0.22 * (w?.speed ?? 1);
-      return { how: 'machacar', range: Math.min(1.35, (w?.reach ?? 1.2) * 0.75), strike, end: strike + 0.6, part: 0 };
+      return { how: 'machacar', range: Math.min(1.05, (w?.reach ?? 1.2) * 0.62), strike, end: strike + 0.6, part: 0 };
     }
   }
 }
@@ -84,6 +85,17 @@ export function remateAnim(how: RemateHow): { attack: string | null; kneel: bool
     default:
       return { attack: null, kneel: false };
   }
+}
+
+/**
+ * Dónde se da el golpe: la cabeza o el pecho del caído. Su posición es la de
+ * la cadera; boca arriba la cabeza le queda a la espalda y boca abajo, hacia
+ * donde miraba (las fieras caen de costado, con la cabeza al frente).
+ */
+export function remateSpot(v: Char, part: number): { x: number; z: number } {
+  const def = CREATURES[v.kind];
+  const along = def ? 0.55 * def.scale : (part === 0 ? 0.58 : 0.36) * (fallsFaceUp(v.look?.seed ?? v.id) ? -1 : 1) * (v.look?.height ?? 1);
+  return { x: v.x + Math.cos(v.face) * along, z: v.z + Math.sin(v.face) * along };
 }
 
 /** ¿Es un asesinato? (rematar a alguien que no es enemigo). */
@@ -115,7 +127,8 @@ export function finishOff(sim: Sim, c: Char, v: Char, spec: RemateSpec): void {
     c.sinceFire = 0;
     c.cd = w.ranged.rof;
     if (c.player) wear(sim, c, st, 0.0012);
-    sim.emit({ t: 'tiro', id: c.id, x: c.x, z: c.z, tx: v.x, tz: v.z, hit: true, w: st.id, low: true });
+    const at = remateSpot(v, part);
+    sim.emit({ t: 'tiro', id: c.id, x: c.x, z: c.z, tx: at.x, tz: at.z, hit: true, w: st.id, low: true });
     sim.emit({ t: 'golpe', id: c.id, target: v.id, part, dmg: 90, kind: 'bala', block: false, low: true });
     sim.noise(c, w.ranged.noise);
   } else if (spec.how === 'ahogar') {
@@ -185,7 +198,9 @@ export function runRemate(sim: Sim, c: Char, o: Order, dt: number): boolean {
     return false;
   }
   const spec = committed ? specOf(c, o.data as RemateHow) : remateSpec(c);
-  const d = Math.hypot(v.x - c.x, v.z - c.z);
+  // Se pone junto a la cabeza o al pecho, no a los pies
+  const at = remateSpot(v, spec.part);
+  const d = Math.hypot(at.x - c.x, at.z - c.z);
   if (d > spec.range + (c.workT > 0 ? 0.6 : 0.15)) {
     // De camino (o el caído se ha movido): al llegar se vuelve a decidir
     c.workT = 0;
@@ -198,7 +213,7 @@ export function runRemate(sim: Sim, c: Char, o: Order, dt: number): boolean {
         return stop();
       }
     }
-    setDest(c, v.x, v.z, spec.range * 0.8, true);
+    setDest(c, at.x, at.z, spec.range * 0.8, true);
     return true;
   }
   if (c.hasDest) clearDest(c);
@@ -208,7 +223,7 @@ export function runRemate(sim: Sim, c: Char, o: Order, dt: number): boolean {
   }
   c.speed = 0;
   c.target = 0;
-  faceTo(c, v.x, v.z, dt, 10);
+  faceTo(c, at.x, at.z, dt, 10);
   c.workT += dt;
   animate(c, spec);
   if (c.workT >= spec.strike) finishOff(sim, c, v, spec);
