@@ -156,10 +156,14 @@ export function buildQuadruped(def: CreatureDef): THREE.BufferGeometry {
 
 export interface QuadInput {
   speed: number;
+  dist: number;
+  turn: number;
   attackT: number;
   attacking: boolean;
   sinceHit: number;
+  hitSide: number;
   dead: boolean;
+  alert: number;
   seed: number;
 }
 

@@ -139,6 +139,11 @@ export class HumanView {
     this.setLook(look);
   }
 
+  /** Escala del personaje (su estatura relativa): las distancias del animador van sin ella. */
+  get scale(): number {
+    return this.look.height;
+  }
+
   setLook(look: Look) {
     const key = lookKey(look);
     if (key === this.key) return;

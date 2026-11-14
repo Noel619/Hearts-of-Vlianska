@@ -1,8 +1,11 @@
-// Banco de poses para desarrollo: ?view&poses[=listo|apuntar|ataque|marcha|todo]
+// Banco de poses para desarrollo: ?view&poses[=listo|apuntar|ataque|marcha|correr|sigilo|reposo|caida|giro|varios]
 // muestra una fila de personajes sobre un suelo neutro, cada uno con un arma,
-// para revisar de cerca cómo la sujetan. Parámetros:
+// para revisar de cerca cómo la sujetan y cómo se mueven. Parámetros:
 //   only=ak,hacha   solo esas armas       t=0.4   fase fija del ataque (0..1)
+//   pick=0,3        solo esos casos del preset
 //   cam=x,z,d,yaw,pitch                    y=1.1   altura a la que mira la cámara
+//   move            avanzan de verdad (los pies que apoyan no deben patinar)
+//   freeze          el tiempo solo avanza con __vl.step(dt) (para capturas)
 
 import * as THREE from 'three';
 import { DEFAULT_LOOK, type Look } from '../data/looks';
@@ -27,6 +30,13 @@ interface Case {
   back?: string;
   lamp?: 'frontal' | 'farol';
   look?: Partial<Look>;
+  /** Tumbarse y levantarse en bucle (prueba de caídas). */
+  fall?: AnimInput['pose'];
+  /** Giro en el sitio (rad/s). */
+  turn?: number;
+  limp?: number;
+  carrying?: boolean;
+  alert?: boolean;
 }
 
 const GUNS: [string, AnimInput['hold']][] = [
@@ -76,6 +86,38 @@ function casesFor(preset: string): Case[] {
       guns(0, { sneak: true, speed: 0.9 });
       two({ sneak: true, speed: 0.9 });
       break;
+    case 'correr':
+      out.push({ weapon: null, hold: 'nada', speed: 3.6 });
+      out.push({ weapon: null, hold: 'nada', speed: 5 });
+      out.push({ weapon: 'ak', hold: 'fusil', speed: 4.2 });
+      out.push({ weapon: 'machete', hold: 'una', speed: 4.2 });
+      out.push({ weapon: 'hacha', hold: 'dos', speed: 4.2 });
+      out.push({ weapon: 'pistola', hold: 'pistola', speed: 4.2 });
+      out.push({ weapon: null, hold: 'nada', speed: 2.6, carrying: true });
+      out.push({ weapon: null, hold: 'nada', speed: 1.3, limp: -1 });
+      break;
+    case 'reposo':
+      out.push({ weapon: null, hold: 'nada' });
+      out.push({ weapon: null, hold: 'nada', look: { female: true, hair: 'largo' } });
+      out.push({ weapon: 'machete', hold: 'una' });
+      out.push({ weapon: 'ak', hold: 'fusil' });
+      out.push({ weapon: null, hold: 'nada', lamp: 'farol' });
+      out.push({ weapon: 'hacha', hold: 'dos', alert: true });
+      out.push({ weapon: 'cuchillo', hold: 'una', alert: true });
+      out.push({ weapon: null, hold: 'nada', alert: true });
+      break;
+    case 'caida':
+      out.push({ weapon: null, hold: 'nada', fall: 'ko' });
+      out.push({ weapon: 'ak', hold: 'fusil', fall: 'ko', look: { seed: 4 } });
+      out.push({ weapon: 'machete', hold: 'una', fall: 'muerto', look: { seed: 9 } });
+      out.push({ weapon: null, hold: 'nada', fall: 'ko', look: { seed: 7 } });
+      break;
+    case 'giro':
+      out.push({ weapon: null, hold: 'nada', turn: 2.5 });
+      out.push({ weapon: 'ak', hold: 'fusil', turn: -3 });
+      out.push({ weapon: null, hold: 'nada', speed: 1.4, turn: 1.2 });
+      out.push({ weapon: null, hold: 'nada', speed: 4.4, turn: 1.6 });
+      break;
     case 'varios':
       out.push({ weapon: null, hold: 'nada' });
       out.push({ weapon: 'martillo', hold: 'nada', work: 'martillo', back: 'ak' });
@@ -110,6 +152,8 @@ export async function startPoses(root: HTMLElement, params: URLSearchParams) {
   const only = (params.get('only') ?? '').split(',').filter(Boolean);
   let cases = casesFor(params.get('poses') || 'listo');
   if (only.length) cases = cases.filter((c) => only.includes(c.weapon ?? 'nada'));
+  const pick = (params.get('pick') ?? '').split(',').filter(Boolean).map(Number);
+  if (pick.length) cases = cases.filter((_, i) => pick.includes(i));
   const gap = Number(params.get('gap') ?? 1.25);
   const W = cases.length * gap;
   const nav = new NavGrid(-20, -20, Math.ceil((W + 40) * 2), 80);
@@ -126,6 +170,8 @@ export async function startPoses(root: HTMLElement, params: URLSearchParams) {
   gfx.scene.add(floor);
   gfx.scene.add(new THREE.HemisphereLight(0xffffff, 0x666666, 0.6));
   const fixedT = params.has('t') ? Number(params.get('t')) : null;
+  const moving = params.has('move');
+  const frozen = params.has('freeze');
   const facing = Number(params.get('face') ?? Math.PI / 2);
   const out = new Float32Array(6);
   const views = cases.map((c, i) => {
@@ -141,13 +187,17 @@ export async function startPoses(root: HTMLElement, params: URLSearchParams) {
     inp.sneak = !!c.sneak;
     inp.pose = c.pose ?? 'normal';
     inp.work = c.work ?? 'nada';
+    inp.limp = c.limp ?? 0;
+    inp.carrying = !!c.carrying;
+    inp.alert = c.alert ? 1 : 0;
+    if (c.alert) inp.look = 0.3;
     v.setWeapon(c.weapon);
     v.setBack(c.back ?? null);
     v.setLamp(c.lamp ?? null);
     gfx.scene.add(v.group);
     field.sample(x, 1.2, 0, 0, 1, 0, false, out);
     v.setProbe(out[0], out[1], out[2], out[3], out[4], out[5]);
-    return { v, c, t: i * 0.31 };
+    return { v, c, t: i * 0.31, x, z: 0, face: facing };
   });
   const rig = new CameraRig(gfx.camera);
   rig.minDist = 1.2;
@@ -192,9 +242,35 @@ export async function startPoses(root: HTMLElement, params: URLSearchParams) {
         }
       }
       if (inp.aim > 0 && fixedT === null) inp.sinceFire = e.t % 1.4;
+      if (e.c.fall) {
+        // Cae, se queda en el suelo y se levanta
+        const cyc = e.t % 5;
+        inp.pose = cyc > 1 && cyc < 3.2 ? e.c.fall : 'normal';
+      }
+      if (e.c.turn) {
+        e.face -= e.c.turn * dt;
+        inp.turn = e.c.turn;
+      }
+      if (moving && inp.speed > 0) {
+        // Avanza de verdad y vuelve al principio tras unos metros
+        const d = inp.speed * dt;
+        e.x += Math.cos(e.face) * d;
+        e.z += Math.sin(e.face) * d;
+        inp.dist = d;
+        if (Math.hypot(e.x - (e.v.group.userData.x0 ?? e.x), e.z) > 3.5) {
+          e.x = e.v.group.userData.x0;
+          e.z = -1.5;
+          inp.dist = 0;
+        }
+      }
+      e.v.place(e.x, 0, e.z, e.face);
       e.v.update(dt);
     }
   };
+  for (const e of views) {
+    e.v.group.userData.x0 = e.x;
+    if (moving) e.z = -1.5;
+  }
   // Deja que las poses se asienten antes del primer fotograma
   for (let i = 0; i < 40; i++) step(1 / 30);
   let last = performance.now();
@@ -203,7 +279,7 @@ export async function startPoses(root: HTMLElement, params: URLSearchParams) {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     rig.update(dt);
-    step(dt);
+    if (!frozen) step(dt);
     gfx.render(dt);
     requestAnimationFrame(loop);
   };

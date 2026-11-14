@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { CREATURES } from '../data/criaturas';
 import { BUILDS } from '../data/edificios';
 import { ITEMS } from '../data/items';
-import { hashStr } from '../core/math';
+import { angleDiff, hashStr } from '../core/math';
 import { HumanAnimator, defaultAnimInput, type AnimInput } from '../render/chars/anim';
 import { QUAD_BONES, QuadAnimator, buildBrute, buildQuadruped, type QuadInput } from '../render/chars/creatures';
 import { HUMAN_BONES } from '../render/chars/humanoid';
@@ -16,7 +16,7 @@ import { propGeometry } from '../render/kit/core';
 import { drawHeld, hasHeld, heldGrip } from '../render/kit/weapons';
 import { cloneProbeMaterial, probeMaterial, setProbe } from '../render/materials';
 import { effectiveLook, limpSide, weaponItem } from '../sim/chars';
-import type { Sim } from '../sim/sim';
+import { Sim } from '../sim/sim';
 import type { Building, Char, Drop } from '../sim/types';
 
 const RANGE = 150;
@@ -31,6 +31,26 @@ interface CharView {
   sig: string;
   probe: Float32Array;
   y: number;
+  // Interpolación entre pasos de la simulación: posición y rumbo del paso
+  // anterior (p*) y del último (c*), y lo que se dibuja (x, z, face)
+  tick: number;
+  px: number;
+  pz: number;
+  pf: number;
+  cx: number;
+  cz: number;
+  cf: number;
+  x: number;
+  z: number;
+  face: number;
+  /** Velocidad sobre el suelo (m/s de juego) y su dirección en el mundo, suavizadas. */
+  gs: number;
+  vx: number;
+  vz: number;
+  /** Velocidad de giro (rad/s de juego, + hacia la izquierda del personaje), suavizada. */
+  turn: number;
+  /** Distancia recorrida en este fotograma (m). */
+  moved: number;
 }
 
 const creatureGeo = new Map<string, THREE.BufferGeometry>();
@@ -53,7 +73,28 @@ export class CharViews {
 
   private create(c: Char): CharView {
     const g = new THREE.Group();
-    const v: CharView = { group: g, kind: 'humano', sig: '', probe: new Float32Array([0.2, 0.2, 0.25, 0, 0.3, 0]), y: 0 };
+    const v: CharView = {
+      group: g,
+      kind: 'humano',
+      sig: '',
+      probe: new Float32Array([0.2, 0.2, 0.25, 0, 0.3, 0]),
+      y: 0,
+      tick: -1,
+      px: c.x,
+      pz: c.z,
+      pf: c.face,
+      cx: c.x,
+      cz: c.z,
+      cf: c.face,
+      x: c.x,
+      z: c.z,
+      face: c.face,
+      gs: 0,
+      vx: 0,
+      vz: 0,
+      turn: 0,
+      moved: 0,
+    };
     if (c.kind === 'humano') {
       const look = effectiveLook(c)!;
       v.human = new HumanView(look);
@@ -73,7 +114,7 @@ export class CharViews {
         mesh.castShadow = true;
         g.add(mesh);
         v.kind = 'cuadrupedo';
-        v.quad = { anim: new QuadAnimator(bones, c.id), input: { speed: 0, attackT: 0, attacking: false, sinceHit: 9, dead: false, seed: c.id }, mat };
+        v.quad = { anim: new QuadAnimator(bones, c.id), input: { speed: 0, dist: -1, turn: 0, attackT: 0, attacking: false, sinceHit: 9, hitSide: 0, dead: false, alert: 0, seed: c.id }, mat };
       } else {
         if (!geo) creatureGeo.set(c.kind, (geo = buildBrute(def)));
         const { bones, skeleton, root } = makeSkeleton(HUMAN_BONES);
@@ -84,7 +125,7 @@ export class CharViews {
         mesh.castShadow = true;
         g.add(mesh);
         v.kind = 'bipedo';
-        v.brute = { anim: new HumanAnimator(bones, c.id), input: defaultAnimInput(c.id), mat };
+        v.brute = { anim: new HumanAnimator(bones, c.id), input: { ...defaultAnimInput(c.id), style: c.kind === 'glubinnik' ? 'bruto' : 'acechador' }, mat };
       }
       g.scale.setScalar(def.scale);
     }
@@ -103,10 +144,16 @@ export class CharViews {
     this.views.delete(id);
   }
 
+  /** Posición y rumbo con que se dibuja a un personaje (interpolados entre pasos), si está a la vista. */
+  shown(id: number): { x: number; z: number; face: number; y: number } | undefined {
+    return this.views.get(id);
+  }
+
   update(dt: number, fx: number, fz: number) {
     const sim = this.sim;
     const nav = sim.world.nav;
     const field = sim.world.field;
+    const alpha = sim.alpha;
     this.frame++;
     const seen = new Set<number>();
     for (const c of sim.state.chars) {
@@ -115,25 +162,27 @@ export class CharViews {
       seen.add(c.id);
       let v = this.views.get(c.id);
       if (!v) v = this.create(c);
-      // Posición
-      let y = nav.heightAt(c.x, c.z);
+      // Posición del último paso de la simulación
       let x = c.x;
       let z = c.z;
       let face = c.face;
+      let lift = 0;
       if (c.carriedBy) {
         const o = sim.char(c.carriedBy);
         if (o) {
-          y = nav.heightAt(o.x, o.z) + 1.28;
+          lift = 1.28;
           x = o.x - Math.sin(o.face) * 0.16;
           z = o.z + Math.cos(o.face) * 0.16;
           face = o.face + Math.PI;
         }
-      } else if (c.pose === 'tumbado' && c.ai.sub !== '') y += 0.32;
+      } else if (c.pose === 'tumbado' && c.ai.sub !== '') lift = 0.32;
+      this.track(v, x, z, face, alpha);
+      const y = nav.heightAt(v.x, v.z) + lift;
       v.y += (y - v.y) * Math.min(1, dt * 14);
       if (Math.abs(y - v.y) > 1.5) v.y = y;
       // Sonda de luz (escalonada entre fotogramas)
       if ((this.frame + c.id) % 5 === 0) {
-        field.sample(c.x, y + 1.1, c.z, 0, 1, 0, false, out);
+        field.sample(v.x, y + 1.1, v.z, 0, 1, 0, false, out);
         const p = v.probe;
         for (let i = 0; i < 6; i++) p[i] += (out[i] - p[i]) * 0.5;
       }
@@ -161,7 +210,7 @@ export class CharViews {
         const lampId = c.lamp && up ? (c.eq.luz?.id ?? c.inv.find((q) => ITEMS[q.id]?.light)?.id ?? null) : null;
         h.setLamp(lampId === 'farol' ? 'farol' : lampId ? 'frontal' : null);
         const inp = h.input;
-        inp.speed = c.speed;
+        this.motion(v, inp, h.scale);
         inp.sneak = c.sneak;
         inp.limp = limpSide(c);
         inp.hold = tool ? (tool === 'pico' ? 'dos' : 'nada') : inHand ? (w?.weapon?.hold ?? 'nada') : 'nada';
@@ -175,39 +224,122 @@ export class CharViews {
         inp.sinceHit = c.sinceHit;
         inp.hitSide = c.hitSide;
         inp.sinceBlock = c.sinceBlock;
-        h.aimYaw = c.face;
-        h.place(x, v.y, z, face);
+        this.lookAt(v, c, inp, 1.62 * h.scale);
+        h.aimYaw = v.face;
+        h.place(v.x, v.y, v.z, v.face);
         h.setProbe(p[0], p[1], p[2], p[3], p[4], p[5]);
         // Lejos de la cámara se anima a media frecuencia
         if (d < 70 || (this.frame + c.id) % 2 === 0) h.update(d < 70 ? dt : dt * 2);
       } else if (v.quad) {
         const q = v.quad;
-        q.input.speed = c.speed;
+        const def = CREATURES[c.kind];
+        q.input.speed = v.gs / def.scale;
+        q.input.dist = v.moved / def.scale;
+        q.input.turn = v.turn;
         q.input.attacking = c.atkT >= 0;
         q.input.attackT = Math.max(0, c.atkT);
         q.input.sinceHit = c.sinceHit;
+        q.input.hitSide = c.hitSide;
         q.input.dead = c.st !== 'ok';
-        v.group.position.set(x, v.y, z);
-        v.group.rotation.y = Math.PI / 2 - face;
+        q.input.alert = c.target ? 1 : 0;
+        v.group.position.set(v.x, v.y, v.z);
+        v.group.rotation.y = Math.PI / 2 - v.face;
         setProbe(q.mat, p[0], p[1], p[2], p[3], p[4], p[5]);
         q.anim.update(dt, q.input);
       } else if (v.brute) {
         const b = v.brute;
         const inp = b.input;
-        inp.speed = c.speed / CREATURES[c.kind].scale;
+        const def = CREATURES[c.kind];
+        this.motion(v, inp, def.scale);
         inp.pose = c.st === 'muerto' ? 'muerto' : c.st === 'ko' ? 'ko' : 'normal';
         inp.attack = c.atkT >= 0 ? (c.id % 2 ? 'golpe' : 'tajo') : null;
         inp.attackT = Math.max(0, c.atkT);
         inp.sinceHit = c.sinceHit;
         inp.hitSide = c.hitSide;
-        inp.sneak = c.kind === 'sheptun' && c.speed < 1;
-        v.group.position.set(x, v.y, z);
-        v.group.rotation.y = Math.PI / 2 - face;
+        inp.sneak = c.kind === 'sheptun' && v.gs < 1;
+        this.lookAt(v, c, inp, 1.62 * def.scale);
+        v.group.position.set(v.x, v.y, v.z);
+        v.group.rotation.y = Math.PI / 2 - v.face;
         setProbe(b.mat, p[0], p[1], p[2], p[3], p[4], p[5]);
         b.anim.update(dt, inp);
       }
     }
     for (const id of this.views.keys()) if (!seen.has(id)) this.destroy(id);
+  }
+
+  /**
+   * Interpola entre los dos últimos pasos de la simulación y mide la marcha real
+   * (velocidad, giro y distancia recorrida en este fotograma).
+   */
+  private track(v: CharView, x: number, z: number, face: number, alpha: number) {
+    const sim = this.sim;
+    const ticks = sim.tick - v.tick;
+    if (v.tick < 0 || ticks > 0) {
+      const first = v.tick < 0;
+      v.px = v.cx;
+      v.pz = v.cz;
+      v.pf = v.cf;
+      v.cx = x;
+      v.cz = z;
+      v.cf = face;
+      v.tick = sim.tick;
+      if (first || Math.hypot(v.cx - v.px, v.cz - v.pz) > 2.5) {
+        // Recién aparecido o teletransportado: sin estela
+        v.px = v.cx;
+        v.pz = v.cz;
+        v.pf = v.cf;
+        v.vx = v.vz = v.gs = v.turn = 0;
+        v.x = x;
+        v.z = z;
+        v.face = face;
+      } else {
+        const span = Math.min(ticks, 6) * Sim.STEP;
+        const k = 1 - Math.exp(-span * 9);
+        v.vx += ((v.cx - v.px) / span - v.vx) * k;
+        v.vz += ((v.cz - v.pz) / span - v.vz) * k;
+        v.gs = Math.hypot(v.vx, v.vz);
+        // Rumbo matemático (de +X hacia +Z): girar a la izquierda del personaje lo hace bajar
+        v.turn += (-angleDiff(v.pf, v.cf) / span - v.turn) * (1 - Math.exp(-span * 7));
+      }
+    }
+    const nx = v.px + (v.cx - v.px) * alpha;
+    const nz = v.pz + (v.cz - v.pz) * alpha;
+    v.moved = Math.hypot(nx - v.x, nz - v.z);
+    if (v.moved > 2.5) v.moved = 0;
+    v.x = nx;
+    v.z = nz;
+    v.face = v.pf + angleDiff(v.pf, v.cf) * alpha;
+  }
+
+  /** Marcha medida → entrada del animador, en unidades del modelo (sin la escala del personaje). */
+  private motion(v: CharView, inp: AnimInput, scale: number) {
+    inp.speed = v.gs / scale;
+    inp.dist = v.moved / scale;
+    inp.turn = v.turn;
+    if (v.gs > 0.05) {
+      const sf = Math.sin(v.face);
+      const cf = Math.cos(v.face);
+      // Componentes hacia la izquierda y hacia delante del personaje
+      inp.moveDir = Math.atan2(v.vx * sf - v.vz * cf, v.vx * cf + v.vz * sf);
+    } else inp.moveDir = 0;
+  }
+
+  /** Hacia dónde mira: al enemigo con quien pelea (la cabeza y el pecho lo siguen). */
+  private lookAt(v: CharView, c: Char, inp: AnimInput, eye: number) {
+    inp.look = null;
+    inp.alert = 0;
+    if (c.st !== 'ok' || !c.target) return;
+    const t = this.sim.char(c.target);
+    if (!t || t.st === 'muerto') return;
+    inp.alert = 1;
+    const tv = this.views.get(t.id);
+    const tx = tv ? tv.x : t.x;
+    const tz = tv ? tv.z : t.z;
+    const dd = Math.hypot(tx - v.x, tz - v.z);
+    if (dd < 0.3 || dd > 40) return;
+    inp.look = -angleDiff(v.face, Math.atan2(tz - v.z, tx - v.x));
+    const th = this.heightOf(t) * (t.st === 'ok' ? 0.86 : 0.15);
+    inp.lookPitch = Math.atan2(th - eye, dd);
   }
 
   /** Altura del modelo de un personaje (para barras y selección). */

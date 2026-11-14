@@ -406,37 +406,43 @@ export class Game {
     const hoverId = this.hover && this.hover.kind === 'char' ? this.hover.id : 0;
     const targets = new Set<number>();
     for (const c of sim.state.chars) {
-      const d = Math.hypot(c.x - f.x, c.z - f.z);
+      // Lo que acompaña al modelo va donde se dibuja (interpolado entre pasos)
+      const sv = this.views.shown(c.id);
+      const cx = sv ? sv.x : c.x;
+      const cz = sv ? sv.z : c.z;
+      const cf = sv ? sv.face : c.face;
+      const d = Math.hypot(cx - f.x, cz - f.z);
       if (d > 120) continue;
-      const y = nav.heightAt(c.x, c.z);
+      const y = nav.heightAt(cx, cz);
       const scale = c.kind === 'humano' ? 1 : CREATURES[c.kind].scale;
-      if (!c.carriedBy) blobs.push({ x: c.x, y, z: c.z, r: (c.st === 'ok' ? 0.42 : 0.7) * scale });
+      if (!c.carriedBy) blobs.push({ x: cx, y, z: cz, r: (c.st === 'ok' ? 0.42 : 0.7) * scale });
       const isSel = sel.has(c.id);
       if (isSel) {
-        rings.push({ x: c.x, y, z: c.z, r: 0.5, color: 0x8dffa0 });
+        rings.push({ x: cx, y, z: cz, r: 0.5, color: 0x8dffa0 });
         if (c.hasDest && Math.hypot(c.destX - c.x, c.destZ - c.z) > 1.5) dests.push({ x: c.destX, y: nav.heightAt(c.destX, c.destZ), z: c.destZ, color: 0x8dffa0 });
         if (c.target) targets.add(c.target);
       } else if (c.id === hoverId) {
         const hs = sim.players[0] ? hostile(sim, sim.players[0], c) : false;
-        rings.push({ x: c.x, y, z: c.z, r: 0.5 * scale, color: c.player ? 0xcfffd6 : hs ? 0xff6a5a : 0xf0e6c8 });
+        rings.push({ x: cx, y, z: cz, r: 0.5 * scale, color: c.player ? 0xcfffd6 : hs ? 0xff6a5a : 0xf0e6c8 });
       }
       // Linternas
       if (c.lamp && c.st === 'ok' && d < 80) {
-        if (c.player) spots.push({ x: c.x + Math.cos(c.face) * 0.15, y: y + 1.62, z: c.z + Math.sin(c.face) * 0.15, dx: Math.cos(c.face), dz: Math.sin(c.face), power: isSel ? 95 : 70 });
-        else lights.push({ x: c.x + Math.cos(c.face) * 0.8, y: y + 1.5, z: c.z + Math.sin(c.face) * 0.8, color: 0xffe2b8, power: 14, dist: 12 });
+        if (c.player) spots.push({ x: cx + Math.cos(cf) * 0.15, y: y + 1.62, z: cz + Math.sin(cf) * 0.15, dx: Math.cos(cf), dz: Math.sin(cf), power: isSel ? 95 : 70 });
+        else lights.push({ x: cx + Math.cos(cf) * 0.8, y: y + 1.5, z: cz + Math.sin(cf) * 0.8, color: 0xffe2b8, power: 14, dist: 12 });
       }
       // Barras: seleccionados y heridos cercanos
       if (c.st !== 'muerto' && d < 60) {
         const hp = totalHpFrac(c);
         if (isSel || c.id === hoverId || (hp < 0.97 && c.sinceHit < 12) || (c.st === 'ko' && c.player)) {
           const kind = c.player ? 1 : sim.players[0] && hostile(sim, sim.players[0], c) ? -1 : 0;
-          bars.push({ x: c.x, y: y + this.views.heightOf(c) + 0.28, z: c.z, hp, kind, blood: c.blood / 100 });
+          bars.push({ x: cx, y: y + this.views.heightOf(c) + 0.28, z: cz, hp, kind, blood: c.blood / 100 });
         }
       }
     }
     for (const id of targets) {
       const t = sim.char(id);
-      if (t) rings.push({ x: t.x, y: nav.heightAt(t.x, t.z), z: t.z, r: 0.55, color: 0xff5040 });
+      const tv = this.views.shown(id);
+      if (t) rings.push({ x: tv ? tv.x : t.x, y: nav.heightAt(t.x, t.z), z: tv ? tv.z : t.z, r: 0.55, color: 0xff5040 });
     }
     // Las linternas seleccionadas primero
     spots.sort((a, b) => b.power - a.power || Math.hypot(a.x - f.x, a.z - f.z) - Math.hypot(b.x - f.x, b.z - f.z));

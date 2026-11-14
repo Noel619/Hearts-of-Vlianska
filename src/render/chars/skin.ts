@@ -215,10 +215,17 @@ export class SkinBuilder {
     const n = this.vcount;
     for (let i = 0; i < n; i++) {
       const p = i * 3;
-      const l = Math.hypot(N[p], N[p + 1], N[p + 2]) || 1;
-      N[p] /= l;
-      N[p + 1] /= l;
-      N[p + 2] /= l;
+      const l = Math.hypot(N[p], N[p + 1], N[p + 2]);
+      if (l > 1e-9) {
+        N[p] /= l;
+        N[p + 1] /= l;
+        N[p + 2] /= l;
+      } else {
+        // Vértice suelto o de triángulos degenerados: una normal nula daría NaN en el shader
+        N[p] = 0;
+        N[p + 1] = 1;
+        N[p + 2] = 0;
+      }
       // Las caras que miran hacia abajo quedan algo más oscuras
       const k = 1 - ao * Math.max(0, -N[p + 1] * 0.8 + 0.2);
       this.col[p] *= k;
